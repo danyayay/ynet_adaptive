@@ -1,3 +1,8 @@
+.vscode
+*.out
+figures/
+ckpts/
+
 pretrained_models
 sdd_ynet
 csv
