@@ -6,6 +6,7 @@ import os
 import cv2
 import argparse
 import math
+import seaborn as sns
 import matplotlib.pyplot as plt
 import pathlib
 
@@ -321,24 +322,26 @@ def load_images(scenes, image_path, image_file='reference.jpg'):
     return images
 
 
-def compute_vel_labels(df, obs_len):
-    vel_labels = {}
+def gather_all_stats(df, varf, obs_len):
+    stats_dict = {}
     meta_ids = np.unique(df["metaId"].values)
     for meta_id in meta_ids:
-        vel_mean, label = compute_vel_meta_id(df, meta_id, obs_len)
-        if label not in vel_labels:
-            vel_labels[label] = []
-        vel_labels[label] += [vel_mean]
-    return vel_labels
+        stats, label = compute_stats_per_metaId(df, meta_id, varf, obs_len)
+        if label not in stats_dict:
+            stats_dict[label] = []
+        stats_dict[label] += [stats]
+    return stats_dict
 
 
-def compute_vel_meta_id(df, meta_id, obs_len):
+def compute_stats_per_metaId(df, meta_id, varf, obs_len):
     df_meta = df[df["metaId"] == meta_id]
     x = df_meta["x"].values
     y = df_meta["y"].values
+
     unique_labels = np.unique(df_meta["label"].values)
     assert len(unique_labels) == 1
     label = unique_labels[0]
+    
     frame_steps = []
     for frame_idx, frame in enumerate(df_meta["frame"].values):
         if frame_idx != len(df_meta["frame"].values) - 1:
@@ -346,45 +349,62 @@ def compute_vel_meta_id(df, meta_id, obs_len):
     unique_frame_step = np.unique(frame_steps)
     assert len(unique_frame_step) == 1
     frame_step = unique_frame_step[0]
-    vel = []
+    stats_seqs = []
+    op, attr = varf.split('_')
+
     # take only the observed trajectory, instead of obs + pred
     for i in range(obs_len):
-        if i != obs_len - 1:
-            vel_i = math.sqrt(((x[i+1] - x[i])/frame_step)
-                              ** 2 + ((y[i+1] - y[i])/frame_step)**2)
-            vel.append(vel_i)
-    vel_mean = np.mean(vel)
-    return vel_mean, label
+        if attr == 'vel':
+            if i != obs_len - 1:
+                stats_seq = math.sqrt((x[i+1] - x[i]) ** 2 + (y[i+1] - y[i]) ** 2) / frame_step
+                stats_seqs.append(stats_seq)
+        elif attr == 'acc':
+            if i != obs_len - 2:
+                # todo: check divide by frame_step
+                stats_seq = (math.sqrt((x[i+2] - x[i+1]) ** 2 + (y[i+2] - y[i+1]) ** 2) - 
+                             math.sqrt((x[i+1] - x[i]) ** 2 + (y[i+1] - y[i]) ** 2)) / frame_step ** 2
+                stats_seqs.append(stats_seq)
+        else:  # attr == 'dist'
+            pass
+
+    # take statistic for one sequence
+    if op == 'max':
+        stats = np.max(stats_seqs)
+    elif op == 'avg':
+        stats = np.mean(stats_seqs)
+    else:  # op == 'min'
+        stats = np.min(stats_seqs)
+
+    return stats, label
 
 
-def create_vel_dataset(df, vel_ranges, labels, out_dir, obs_len):
+def create_dataset_by_varf(df, varf, varf_ranges, labels, out_dir, obs_len):
     pathlib.Path(out_dir).mkdir(parents=True, exist_ok=True)
-    vel_meta_ids = {vel_range: {"metaId": [], "sceneId": [], "label": []}
-                    for vel_range in vel_ranges}
+    varf_group_dict = {varf_range: {"metaId": [], "sceneId": [], "label": []}
+                       for varf_range in varf_ranges}
 
-    # categorize by factor of variation 
+    # categorize by factor of variation
     meta_ids = np.unique(df["metaId"].values)
     for meta_id in meta_ids:
-        vel_mean, label = compute_vel_meta_id(df, meta_id, obs_len)
+        stats, label = compute_stats_per_metaId(df, meta_id, varf, obs_len)
         if label not in labels:
             continue
-        for vel_range in vel_meta_ids.keys():
-            vel_min, vel_max = vel_range
-            if vel_mean >= vel_min and vel_mean <= vel_max:
-                vel_meta_ids[vel_range]["metaId"].append(meta_id)
+        for varf_range in varf_group_dict.keys():
+            varf_min, varf_max = varf_range
+            if stats >= varf_min and stats <= varf_max:
+                varf_group_dict[varf_range]["metaId"].append(meta_id)
                 unique_scene_ids = np.unique(
                     df[df["metaId"] == meta_id]["sceneId"].values)
                 assert len(unique_scene_ids) == 1
                 scene_id = unique_scene_ids[0]
-                vel_meta_ids[vel_range]["sceneId"].append(scene_id)
-                vel_meta_ids[vel_range]["label"].append(label)
+                varf_group_dict[varf_range]["sceneId"].append(scene_id)
+                varf_group_dict[varf_range]["label"].append(label)
 
     # keep each group with the same number of data
-    num_metas = min([len(vel_range_meta_ids["metaId"])
-                    for vel_range_meta_ids in vel_meta_ids.values()])
-    for vel_range, vel_range_meta_ids in vel_meta_ids.items():
+    min_n_metas = min([len(varf_group["metaId"]) for varf_group in varf_group_dict.values()])
+    for varf_range, varf_group in varf_group_dict.items():
         scene_ids, scene_counts = np.unique(
-            vel_range_meta_ids["sceneId"], return_counts=True)
+            varf_group["sceneId"], return_counts=True)
         sorted_unique_scene_counts = np.unique(np.sort(scene_counts))
         total_count = 0
         prev_count = 0
@@ -392,7 +412,7 @@ def create_vel_dataset(df, vel_ranges, labels, out_dir, obs_len):
         for scene_count in sorted_unique_scene_counts:
             total_count += (scene_counts >= scene_count).sum() * \
                 (scene_count - prev_count)
-            if total_count >= num_metas:
+            if total_count >= min_n_metas:
                 break
             mask[scene_counts == scene_count] = True
             prev_count = scene_count
@@ -402,18 +422,18 @@ def create_vel_dataset(df, vel_ranges, labels, out_dir, obs_len):
         less = True
         while less:
             for i in np.where(mask == False)[0]:
-                total_counts[i] += min(1, num_metas - total_counts.sum())
-                if num_metas == total_counts.sum():
+                total_counts[i] += min(1, min_n_metas - total_counts.sum())
+                if min_n_metas == total_counts.sum():
                     less = False
                     break
-        vel_range_meta_ids["sceneId"] = np.array(vel_range_meta_ids["sceneId"])
-        vel_range_meta_ids["metaId"] = np.array(vel_range_meta_ids["metaId"])
-        vel_range_meta_ids["label"] = np.array(vel_range_meta_ids["label"])
-        meta_id_mask = np.zeros_like(vel_range_meta_ids["metaId"]).astype(bool)
+        varf_group["sceneId"] = np.array(varf_group["sceneId"])
+        varf_group["metaId"] = np.array(varf_group["metaId"])
+        varf_group["label"] = np.array(varf_group["label"])
+        meta_id_mask = np.zeros_like(varf_group["metaId"]).astype(bool)
         for scene_idx, scene_id in enumerate(scene_ids):
             scene_count = total_counts[scene_idx]
-            scene_mask = vel_range_meta_ids["sceneId"] == scene_id
-            scene_labels = vel_range_meta_ids["label"][scene_mask]
+            scene_mask = varf_group["sceneId"] == scene_id
+            scene_labels = varf_group["label"][scene_mask]
             unique_scene_labels, scene_labels_count = np.unique(
                 scene_labels, return_counts=True)
             scene_labels_chosen = []
@@ -428,44 +448,74 @@ def create_vel_dataset(df, vel_ranges, labels, out_dir, obs_len):
                 scene_labels_chosen, return_counts=True)
             for label, label_count in zip(labels_chosen, labels_chosen_count):
                 meta_id_idx = np.where(np.logical_and(
-                    vel_range_meta_ids["label"] == label, vel_range_meta_ids["sceneId"] == scene_id))[0][:label_count]
+                    varf_group["label"] == label, varf_group["sceneId"] == scene_id))[0][:label_count]
                 meta_id_mask[meta_id_idx] = True
-        df_vel = df[np.array(
-            [df["metaId"] == meta_id for meta_id in vel_range_meta_ids["metaId"][meta_id_mask]]).any(axis=0)]
-        vel_range_name = f"{vel_range[0]}_{vel_range[1]}"
-        df_vel["vel_range"] = np.array(vel_range_name).repeat(len(df_vel))
-        out_path = os.path.join(out_dir, f"{vel_range_name}.pkl")
-        df_vel.to_pickle(out_path)
+
+        df_varf = df[np.array(
+            [df["metaId"] == meta_id for meta_id in varf_group["metaId"][meta_id_mask]]).any(axis=0)]
+        varf_range_name = f"{varf_range[0]}_{varf_range[1]}"
+        df_varf["varf_range"] = varf_range_name
+        out_path = os.path.join(out_dir, f"{varf_range_name}.pkl")
+        df_varf.to_pickle(out_path)
 
 
-def plot_vel_histograms(df, out_dir, obs_len):
-    vel_labels = compute_vel_labels(df, obs_len)
-    vel_all = []
+def plot_varf_histograms(df, out_dir, varf, obs_len, bin=4):
+    stats_dict = gather_all_stats(df, varf, obs_len)
+    stats_all = []
     # Visualize data
-    for label, vel_label in vel_labels.items():
+    for label, stats in stats_dict.items():
         if label not in ["Pedestrian", "Biker"]:
             continue
-        plot_histogram(vel_label, label, out_dir)
-        vel_all += vel_label
-    plot_histogram(vel_all, "All", out_dir)
+        plot_histogram(stats, f'{label}_{varf}', out_dir, bin)
+        stats_all += stats
+    plot_histogram(stats_all, f"All_{varf}", out_dir, bin)
 
 
-def plot_histogram(vel, label, out_dir):
+def plot_histogram(stats, title, out_dir, bin=4):
     fig = plt.figure()
-    mean = np.round(np.mean(vel), 2)
-    std = np.round(np.std(vel), 2)
-    min_val = np.round(np.min(vel), 2)
-    max_val = np.round(np.max(vel), 2)
-    num_zeros = np.round((np.array(vel) == 0).sum()/len(vel), 2)
-    vel_label = np.sort(vel)[int(len(vel)*0.00):int(len(vel)*0.99)]
-    vel_label = vel_label[vel_label != 0]
-    plt.hist(vel_label, bins=4)
+    mean = np.round(np.mean(stats), 2)
+    std = np.round(np.std(stats), 2)
+    min = np.round(np.min(stats), 2)
+    max = np.round(np.max(stats), 2)
+    n_zero = np.round((np.array(stats) == 0).sum() / len(stats), 2)
+    stats = np.sort(stats)[int(len(stats) * 0.00): int(len(stats) * 0.99)]
+    stats = stats[stats != 0]
+    plt.hist(stats, bins=bin)
     plt.title(
-        f"{label}, Mean: {mean}, Std: {std}, Min: {min_val}, Max: {max_val}, Zeros: {num_zeros}")
+        f"{title}, Mean: {mean}, Std: {std}, Min: {min}, Max: {max}, Zero: {n_zero}")
     pathlib.Path(out_dir).mkdir(parents=True, exist_ok=True)
-    plt.savefig(os.path.join(out_dir, label))
+    plt.savefig(os.path.join(out_dir, title))
     plt.close(fig)
 
+
+def plot_varf_histograms_sns(df, out_dir, varf, obs_len):
+    stats_dict = gather_all_stats(df, varf, obs_len)
+    stats_all = []
+    # Visualize data
+    for label, stats in stats_dict.items():
+        if label not in ["Pedestrian", "Biker"]:
+            continue
+        plot_histogram_sns(stats, f'sns_{label}_{varf}', out_dir)
+        stats_all += stats
+    plot_histogram_sns(stats_all, f"sns_All_{varf}", out_dir)
+
+
+def plot_histogram_sns(stats, title, out_dir):
+    fig = plt.figure()
+    mean = np.round(np.mean(stats), 2)
+    std = np.round(np.std(stats), 2)
+    min = np.round(np.min(stats), 2)
+    max = np.round(np.max(stats), 2)
+    n_zero = np.round((np.array(stats) == 0).sum() / len(stats), 2)
+    stats = np.sort(stats)[int(len(stats) * 0.00): int(len(stats) * 0.99)]
+    stats = stats[stats != 0]
+    sns.histplot(stats, kde=True)
+    plt.title(
+        f"{title}, Mean: {mean}, Std: {std}, Min: {min}, Max: {max}, Zero: {n_zero}")
+    pathlib.Path(out_dir).mkdir(parents=True, exist_ok=True)
+    plt.savefig(os.path.join(out_dir, title))
+    plt.close(fig)
+    
 
 def split_df_ratio(df, ratio):
     meta_ids = np.unique(df["metaId"])
@@ -503,21 +553,29 @@ def limit_samples(df, num, batch_size, random_ids=True):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--data_raw", default='datset_raw', type=str)    
-    parser.add_argument("--data_filter", default='datset_filter', type=str)
+    parser.add_argument("--data_raw", default='sdd_ynet/dataset_raw', type=str)
+    parser.add_argument("--data_filter", default='sdd_ynet/dataset_filter', type=str)
+
     parser.add_argument("--step", default=12, type=int)
     parser.add_argument("--window_size", default=20, type=int)
     parser.add_argument("--stride", default=20, type=int)
     parser.add_argument("--obs_len", default=8, type=int)
-    parser.add_argument("--labels", default=['Pedestrian', 'Biker'],
-                        help=['Biker', 'Bus', 'Car', 'Cart', 'Pedestrian', 'Skater'], type=str)
+
+    parser.add_argument("--varf", default='avg_vel', type=str, help='variation factor',
+                        choices=['avg_vel', 'max_vel', 'avg_acc', 'max_acc', 'min_dist'])
+    parser.add_argument("--varf_ranges", help='range of varation factor to take',
+                        default=[(0.25, 0.75), (1.25, 1.75), (2.25, 2.75), (3.25, 3.75)])
+
+    parser.add_argument("--labels", default=['Pedestrian', 'Biker'], nargs='+', type=str,
+                        choices=['Biker', 'Bus', 'Car', 'Cart', 'Pedestrian', 'Skater'])
     args = parser.parse_args()
 
     # Create dataset
     print('Loading raw dataset')
-    df = load_raw_dataset(args.data_raw, args.step, args.window_size, args.stride)
+    df = load_raw_dataset(args.data_raw, args.step,
+                          args.window_size, args.stride)
 
-    print('Creating grouped dataset by velocity')
-    vel_ranges = [(0.25, 0.75), (1.25, 1.75), (2.25, 2.75), (3.25, 3.75)]
-    create_vel_dataset(df, vel_ranges, args.labels, args.data_filter, args.obs_len)
-    print('done')
+    print(f'Creating dataset by {args.varf}')
+    create_dataset_by_varf(df, args.varf, args.varf_ranges,
+                           args.labels, args.data_filter, args.obs_len)
+    print('Done')
