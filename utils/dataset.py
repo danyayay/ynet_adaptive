@@ -9,6 +9,8 @@ import math
 import seaborn as sns
 import matplotlib.pyplot as plt
 import pathlib
+import datetime
+from tqdm import tqdm 
 
 
 def load_sdd_raw(path):
@@ -322,18 +324,21 @@ def load_images(scenes, image_path, image_file='reference.jpg'):
     return images
 
 
-def gather_all_stats(df, varf, obs_len):
+def gather_all_stats(df, varf, obs_len, radius=100):
     stats_dict = {}
-    meta_ids = np.unique(df["metaId"].values)
-    for meta_id in meta_ids:
-        stats, label = compute_stats_per_metaId(df, meta_id, varf, obs_len)
+    if obs_len:
+        print('Compute statistics by obs_len')
+    else:
+        print('Compute statistics by obs_len + pred_len')
+    for meta_id in tqdm(df["metaId"].unique()):
+        stats, label = compute_stats_per_metaId(df, meta_id, varf, obs_len, radius)
         if label not in stats_dict:
             stats_dict[label] = []
         stats_dict[label] += [stats]
     return stats_dict
 
 
-def compute_stats_per_metaId(df, meta_id, varf, obs_len):
+def compute_stats_per_metaId(df, meta_id, varf, obs_len, radius=100):
     df_meta = df[df["metaId"] == meta_id]
     x = df_meta["x"].values
     y = df_meta["y"].values
@@ -353,40 +358,55 @@ def compute_stats_per_metaId(df, meta_id, varf, obs_len):
     op, attr = varf.split('_')
 
     # take only the observed trajectory, instead of obs + pred
+    if not obs_len:
+        obs_len = len(x)
     for i in range(obs_len):
         if attr == 'vel':
-            if i != obs_len - 1:
-                stats_seq = math.sqrt((x[i+1] - x[i]) ** 2 + (y[i+1] - y[i]) ** 2) / frame_step
-                stats_seqs.append(stats_seq)
+            if i < obs_len - 1:
+                vel = math.sqrt((x[i+1] - x[i]) ** 2 + (y[i+1] - y[i]) ** 2) / frame_step
+                stats_seqs.append(vel)
         elif attr == 'acc':
-            if i != obs_len - 2:
+            if i < obs_len - 2:
                 # todo: check divide by frame_step
-                stats_seq = (math.sqrt((x[i+2] - x[i+1]) ** 2 + (y[i+2] - y[i+1]) ** 2) - 
-                             math.sqrt((x[i+1] - x[i]) ** 2 + (y[i+1] - y[i]) ** 2)) / frame_step ** 2
-                stats_seqs.append(stats_seq)
-        else:  # attr == 'dist'
-            pass
+                acc = (math.sqrt((x[i+2] - x[i+1]) ** 2 + (y[i+2] - y[i+1]) ** 2) - 
+                       math.sqrt((x[i+1] - x[i]) ** 2 + (y[i+1] - y[i]) ** 2)) / frame_step ** 2
+                stats_seqs.append(acc)
+        elif attr == 'dist':
+            stats_seqs = df_meta[:obs_len].dist.apply(lambda x: x.min() if not isinstance(x, float) else np.inf).tolist()
+        elif attr == 'den':
+            stats_seqs = df_meta[:obs_len].dist.apply(lambda x: x[x < radius].shape[0] if not isinstance(x, float) else 0).tolist()
+        else:
+            raise ValueError(f'Cannot compute {attr} statistic')
 
     # take statistic for one sequence
     if op == 'max':
         stats = np.max(stats_seqs)
     elif op == 'avg':
         stats = np.mean(stats_seqs)
-    else:  # op == 'min'
+    elif op == 'min':
         stats = np.min(stats_seqs)
+    elif op == 'abs+max':
+        stats = np.max(np.abs(stats_seqs))
+    elif op == 'abs+avg':
+        stats = np.mean(np.abs(stats_seqs))
+    elif op == 'abs+min':
+        stats = np.mean(np.abs(stats_seqs))
+    elif op == 'tot':
+        stats = np.sum(stats_seqs)
+    else:
+        raise ValueError(f'Cannot compute {op} operation')
 
     return stats, label
 
 
-def create_dataset_by_varf(df, varf, varf_ranges, labels, out_dir, obs_len):
+def create_dataset_by_varf(df, varf, varf_ranges, labels, out_dir, obs_len, radius=100):
     pathlib.Path(out_dir).mkdir(parents=True, exist_ok=True)
     varf_group_dict = {varf_range: {"metaId": [], "sceneId": [], "label": []}
                        for varf_range in varf_ranges}
 
     # categorize by factor of variation
-    meta_ids = np.unique(df["metaId"].values)
-    for meta_id in meta_ids:
-        stats, label = compute_stats_per_metaId(df, meta_id, varf, obs_len)
+    for meta_id in tqdm(df["metaId"].unique()):
+        stats, label = compute_stats_per_metaId(df, meta_id, varf, obs_len, radius)
         if label not in labels:
             continue
         for varf_range in varf_group_dict.keys():
@@ -403,6 +423,7 @@ def create_dataset_by_varf(df, varf, varf_ranges, labels, out_dir, obs_len):
     # keep each group with the same number of data
     min_n_metas = min([len(varf_group["metaId"]) for varf_group in varf_group_dict.values()])
     for varf_range, varf_group in varf_group_dict.items():
+        print(f"Group {varf_range}")
         scene_ids, scene_counts = np.unique(
             varf_group["sceneId"], return_counts=True)
         sorted_unique_scene_counts = np.unique(np.sort(scene_counts))
@@ -459,63 +480,103 @@ def create_dataset_by_varf(df, varf, varf_ranges, labels, out_dir, obs_len):
         df_varf.to_pickle(out_path)
 
 
-def plot_varf_histograms(df, out_dir, varf, obs_len, bin=4):
+def compute_distance_with_neighbors(df_scene):
+    return df_scene.apply(lambda_distance_with_neighbors, axis=1, df_scene=df_scene)
+
+
+def lambda_distance_with_neighbors(row, df_scene, step=12):
+    start = datetime.datetime.now()
+    frame_diff = df_scene.frame - row.frame
+    df_sim = df_scene[(frame_diff < step/2) & \
+        (frame_diff >= -step/2) & (df_scene.metaId != row.metaId)]
+    dist = np.inf if df_sim.shape[0] == 0 else compute_distance_xy(df_sim, row.x, row.y)
+    duration = datetime.datetime.now() - start
+    print(f'### meta_id = {row.metaId}, time = {duration}')
+    return dist
+
+
+def compute_distance_xy(df_sim, x, y):
+    x_diff = df_sim['x'] - x
+    y_diff = df_sim['y'] - y
+    dist = np.sqrt((x_diff ** 2 + y_diff ** 2))
+    return np.array(dist)
+
+
+def filter_long_tail(distr, mu, sigma, n=3):
+    distr = np.array(distr)
+    mask = (distr < mu + n * sigma) & (distr > mu - n * sigma) & (distr != 0) & (distr != np.inf)
+    distr = distr[mask]
+    return distr, round((~mask).sum()/distr.shape[0], 2)
+
+
+def plot_varf_histograms(df, out_dir, varf, obs_len):
     stats_dict = gather_all_stats(df, varf, obs_len)
     stats_all = []
     # Visualize data
     for label, stats in stats_dict.items():
         if label not in ["Pedestrian", "Biker"]:
             continue
-        plot_histogram(stats, f'{label}_{varf}', out_dir, bin)
+        print(f'Plottting {label}')
+        plot_histogram(stats, f'{label}_{varf}', out_dir)
         stats_all += stats
-    plot_histogram(stats_all, f"All_{varf}", out_dir, bin)
+    plot_histogram(stats_all, f"Mixed_{varf}", out_dir)
 
 
-def plot_histogram(stats, title, out_dir, bin=4):
+def plot_histogram(stats, title, out_dir):
     fig = plt.figure()
-    mean = np.round(np.mean(stats), 2)
-    std = np.round(np.std(stats), 2)
+    mean = np.round(np.mean(stats, where=np.array(stats)!=np.inf), 2)
+    std = np.round(np.std(stats, where=np.array(stats)!=np.inf), 2)
     min = np.round(np.min(stats), 2)
-    max = np.round(np.max(stats), 2)
-    n_zero = np.round((np.array(stats) == 0).sum() / len(stats), 2)
-    stats = np.sort(stats)[int(len(stats) * 0.00): int(len(stats) * 0.99)]
-    stats = stats[stats != 0]
-    plt.hist(stats, bins=bin)
-    plt.title(
-        f"{title}, Mean: {mean}, Std: {std}, Min: {min}, Max: {max}, Zero: {n_zero}")
-    pathlib.Path(out_dir).mkdir(parents=True, exist_ok=True)
-    plt.savefig(os.path.join(out_dir, title))
-    plt.close(fig)
-
-
-def plot_varf_histograms_sns(df, out_dir, varf, obs_len):
-    stats_dict = gather_all_stats(df, varf, obs_len)
-    stats_all = []
-    # Visualize data
-    for label, stats in stats_dict.items():
-        if label not in ["Pedestrian", "Biker"]:
-            continue
-        plot_histogram_sns(stats, f'sns_{label}_{varf}', out_dir)
-        stats_all += stats
-    plot_histogram_sns(stats_all, f"sns_All_{varf}", out_dir)
-
-
-def plot_histogram_sns(stats, title, out_dir):
-    fig = plt.figure()
-    mean = np.round(np.mean(stats), 2)
-    std = np.round(np.std(stats), 2)
-    min = np.round(np.min(stats), 2)
-    max = np.round(np.max(stats), 2)
-    n_zero = np.round((np.array(stats) == 0).sum() / len(stats), 2)
-    stats = np.sort(stats)[int(len(stats) * 0.00): int(len(stats) * 0.99)]
-    stats = stats[stats != 0]
+    max = np.round(np.max(stats, where=np.array(stats)!=np.inf), 2)
+    p_zero = np.round((np.array(stats) == 0).sum() / len(stats), 2)
+    stats, p_filter = filter_long_tail(stats, mean, std)
     sns.histplot(stats, kde=True)
     plt.title(
-        f"{title}, Mean: {mean}, Std: {std}, Min: {min}, Max: {max}, Zero: {n_zero}")
+        f"{title}, \nMean: {mean}, Std: {std}, Min: {min}, Max: {max}, Zero: {p_zero}, Filter: {p_filter}")
     pathlib.Path(out_dir).mkdir(parents=True, exist_ok=True)
     plt.savefig(os.path.join(out_dir, title))
     plt.close(fig)
-    
+
+
+def plot_varf_hist_obs_and_complete(df, out_dir, varf, obs_len):
+    if not obs_len:
+        raise ValueError('obs_len cannot be None')
+    stats_dict_obs = gather_all_stats(df, varf, obs_len)
+    stats_dict_com = gather_all_stats(df, varf, None)
+    stats_all, stats_all_obs, stats_all_com = [], [], []
+    # Visualize data
+    for (label, stats_obs), (_, stats_com) in zip(stats_dict_obs.items(), stats_dict_com.items()):
+        if label not in ["Pedestrian", "Biker"]:
+            continue
+        stats = list(np.array(stats_obs) - np.array(stats_com))
+        plot_histogram(stats, f'{label}_{varf}_element_diff', out_dir)
+        plot_histogram_double(stats_obs, stats_com, f'{label}_{varf}_distr_diff', out_dir)
+        stats_all += stats
+        stats_all_obs += stats_obs
+        stats_all_com += stats_com
+    plot_histogram(stats_all, f"Mixed_{varf}_element_diff", out_dir)
+    plot_histogram_double(stats_all_obs, stats_all_com, f'Mixed_{varf}_distr_diff', out_dir)
+
+
+def plot_histogram_double(stats_obs, stats_com, title, out_dir):
+    fig = plt.figure()
+    data_len = len(stats_obs)
+    stats_obs = np.sort(stats_obs)[: int(data_len * 0.99)]
+    stats_com = np.sort(stats_com)[: int(data_len * 0.99)]
+    stats_obs = stats_obs[stats_obs != 0]
+    stats_com = stats_com[stats_com != 0]
+    df_obs = pd.DataFrame(stats_obs, columns=['value'])
+    df_obs['type'] = 'observation'
+    df_com = pd.DataFrame(stats_com, columns=['value'])
+    df_com['type'] = 'complete'
+    df_cat = pd.concat([df_obs, df_com], axis=0)
+    df_cat = df_cat.reset_index(drop=True)
+    sns.histplot(data=df_cat, x='value', hue="type")
+    plt.title(title)
+    pathlib.Path(out_dir).mkdir(parents=True, exist_ok=True)
+    plt.savefig(os.path.join(out_dir, title))
+    plt.close(fig)
+
 
 def split_df_ratio(df, ratio):
     meta_ids = np.unique(df["metaId"])
@@ -562,7 +623,9 @@ if __name__ == "__main__":
     parser.add_argument("--obs_len", default=8, type=int)
 
     parser.add_argument("--varf", default='avg_vel', type=str, help='variation factor',
-                        choices=['avg_vel', 'max_vel', 'avg_acc', 'max_acc', 'min_dist'])
+                        choices=['avg_vel', 'max_vel', 'avg_acc', 'max_acc', 
+                                 'abs+max_acc', 'abs+avg_acc', 'min_dist', 
+                                 'avg_den', 'tot_den'])
     parser.add_argument("--varf_ranges", help='range of varation factor to take',
                         default=[(0.25, 0.75), (1.25, 1.75), (2.25, 2.75), (3.25, 3.75)])
 
@@ -571,11 +634,53 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # Create dataset
-    print('Loading raw dataset')
-    df = load_raw_dataset(args.data_raw, args.step,
-                          args.window_size, args.stride)
+    # start = datetime.datetime.now()
+    # print('Loading raw dataset')
+    # df = load_raw_dataset(args.data_raw, args.step, args.window_size, args.stride)
+    # print(f'Time spent to load raw dataset: {datetime.datetime.now() - start}')
+    df = pd.read_pickle(os.path.join(args.data_raw, "data.pkl"))
 
-    print(f'Creating dataset by {args.varf}')
-    create_dataset_by_varf(df, args.varf, args.varf_ranges,
-                           args.labels, args.data_filter, args.obs_len)
-    print('Done')
+    # print('Plotting diff')
+    # varf_list = ['abs+avg_acc', 'abs+max_acc']
+    # for varf in varf_list:
+    #     plot_varf_hist_obs_and_complete(df, 'figures/uni_distr/sns/diff', varf, args.obs_len)
+
+    # possibly add a column of distance with neighbors 
+    # varf_list = ['avg_vel', 'max_vel', 'avg_acc', 'max_acc', 'min_acc', 
+    #              'abs+avg_acc', 'abs+max_acc']
+
+    # start = datetime.datetime.now()
+    # varf_list = ['min_dist', 'avg_den', 'tot_den']
+    # if any('den' in varf for varf in varf_list) or any('dist' in varf for varf in varf_list):
+    #     print('Adding a column of distance with neighbors to df')
+    #     df['dist'] = df.apply(lambda_distance_with_neighbors, axis=1, df=df)
+    # print(f'Time spent to add a new column: {datetime.datetime.now() - start}')
+
+    # start = datetime.datetime.now()
+    varf_list = ['min_dist', 'avg_den', 'tot_den']
+    # if any('den' in varf for varf in varf_list) or any('dist' in varf for varf in varf_list):
+    #     print('Adding a column of distance with neighbors to df')
+    #     print(datetime.datetime.now())
+    #     df['step'] = np.tile(np.arange(args.window_size), int(df.shape[0]/args.window_size))
+    #     df_obs = df[df.step < args.obs_len]
+    #     print(datetime.datetime.now())
+    #     out = df_obs.groupby('sceneId').apply(compute_distance_with_neighbors)
+    #     print('Sucessfully applied')
+    #     for idx_1st in out.index.get_level_values('sceneId').unique():
+    #         print(f'Filling {idx_1st} to df')
+    #         df.loc[out[idx_1st].index, 'dist'] = out[idx_1st].values
+    # print(f'Time spent to add a new column: {datetime.datetime.now() - start}')
+    # out_path = os.path.join(args.data_raw, f"data.pkl")
+    # df.to_pickle(out_path)
+    # print(f'Saved data to {args.data_raw}/data.pkl')
+
+
+    # print(f'Creating dataset by {args.varf}')
+    # create_dataset_by_varf(df, args.varf, args.varf_ranges,
+    #                        args.labels, args.data_filter, args.obs_len)
+    # print('Done')
+    
+    print('Plotting univariate distribution')
+    for varf in tqdm(varf_list):
+        print(f'Plotting {varf}')
+        plot_varf_histograms(df, 'figures/uni_distr/sns/obs', varf, args.obs_len)

@@ -12,4 +12,4 @@
 source ~/.bashrc
 conda activate ynetv
 
-bash run_train.sh
+bash create_custom_dataset.sh
