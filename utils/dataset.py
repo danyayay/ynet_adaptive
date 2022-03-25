@@ -10,7 +10,10 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 import pathlib
 import datetime
-from tqdm import tqdm 
+from tqdm import tqdm
+from zmq import XPUB_VERBOSE 
+import matplotlib as mpl
+mpl.rcParams.update({'figure.max_open_warning': 0})
 
 
 def load_sdd_raw(path):
@@ -324,59 +327,64 @@ def load_images(scenes, image_path, image_file='reference.jpg'):
     return images
 
 
-def gather_all_stats(df, varf, obs_len, radius=100):
-    stats_dict = {}
+def get_varf_table(df, varf_list, obs_len):
     if obs_len:
-        print('Compute statistics by obs_len')
+        print(f'Computing variation fatcor by obs_len')
     else:
-        print('Compute statistics by obs_len + pred_len')
-    for meta_id in tqdm(df["metaId"].unique()):
-        stats, label = compute_stats_per_metaId(df, meta_id, varf, obs_len, radius)
-        if label not in stats_dict:
-            stats_dict[label] = []
-        stats_dict[label] += [stats]
-    return stats_dict
+        print(f'Computing variation fatcor by obs_len + pred_len')
+
+    df_varfs = df.groupby(['metaId', 'label', 'sceneId']).size().reset_index()[['metaId', 'label', 'sceneId']]
+    df_varfs['scene'] = df_varfs.sceneId.apply(lambda x: x.split('_')[0])
+    for varf in varf_list:
+        df_stats = aggregate_per_varf_value(df, varf, obs_len)
+        df_varfs = df_varfs.merge(df_stats[['metaId', varf]], on='metaId')
+    return df_varfs
+    
+
+def aggregate_per_varf_value(df, varf, obs_len):
+    out = df.groupby('metaId').apply(aggregate_per_varf_value_per_metaId, varf, obs_len)
+    df_stats = pd.DataFrame(
+        [[idx, item[0], item[1]] for idx, item in out.items()], 
+        columns=['metaId', varf, 'label'])
+    return df_stats
 
 
-def compute_stats_per_metaId(df, meta_id, varf, obs_len, radius=100):
-    df_meta = df[df["metaId"] == meta_id]
+def aggregate_per_varf_value_per_metaId(df_meta, varf, obs_len):
     x = df_meta["x"].values
     y = df_meta["y"].values
 
+    # sanity check
     unique_labels = np.unique(df_meta["label"].values)
     assert len(unique_labels) == 1
     label = unique_labels[0]
-    
-    frame_steps = []
-    for frame_idx, frame in enumerate(df_meta["frame"].values):
-        if frame_idx != len(df_meta["frame"].values) - 1:
-            frame_steps.append(df_meta["frame"].values[frame_idx + 1] - frame)
-    unique_frame_step = np.unique(frame_steps)
+
+    unique_frame_step = (
+        df_meta['frame'].shift(periods=-1) - df_meta['frame']).iloc[:-1].unique()
     assert len(unique_frame_step) == 1
     frame_step = unique_frame_step[0]
-    stats_seqs = []
+
     op, attr = varf.split('_')
 
-    # take only the observed trajectory, instead of obs + pred
+    # take the observed trajectory, or obs + pred
     if not obs_len:
         obs_len = len(x)
-    for i in range(obs_len):
-        if attr == 'vel':
-            if i < obs_len - 1:
-                vel = math.sqrt((x[i+1] - x[i]) ** 2 + (y[i+1] - y[i]) ** 2) / frame_step
-                stats_seqs.append(vel)
-        elif attr == 'acc':
-            if i < obs_len - 2:
-                # todo: check divide by frame_step
-                acc = (math.sqrt((x[i+2] - x[i+1]) ** 2 + (y[i+2] - y[i+1]) ** 2) - 
-                       math.sqrt((x[i+1] - x[i]) ** 2 + (y[i+1] - y[i]) ** 2)) / frame_step ** 2
-                stats_seqs.append(acc)
-        elif attr == 'dist':
-            stats_seqs = df_meta[:obs_len].dist.apply(lambda x: x.min() if not isinstance(x, float) else np.inf).tolist()
-        elif attr == 'den':
-            stats_seqs = df_meta[:obs_len].dist.apply(lambda x: x[x < radius].shape[0] if not isinstance(x, float) else 0).tolist()
-        else:
-            raise ValueError(f'Cannot compute {attr} statistic')
+    
+    # compute stats
+    if attr == 'vel':
+        stats_seqs = np.sqrt((x[: obs_len-1] - x[1: obs_len]) ** 2 + \
+                             (y[: obs_len-1] - y[1: obs_len]) ** 2) / frame_step
+    elif attr == 'acc':
+        vel = np.sqrt((x[:obs_len-1] - x[1: obs_len]) ** 2 + \
+                      (y[:obs_len-1] - y[1: obs_len]) ** 2) / frame_step
+        stats_seqs = (vel[:obs_len-2] - vel[1: obs_len-1]) / frame_step
+    elif attr == 'dist':
+        stats_seqs = df_meta[:obs_len].dist.apply(
+            lambda x: x.min() if not isinstance(x, float) else np.inf)
+    elif 'den' in attr:
+        stats_seqs = df_meta[:obs_len].dist.apply(
+            lambda x: x[x < int(attr[3:])].shape[0] if not isinstance(x, float) else 0)
+    else:
+        raise ValueError(f'Cannot compute {attr} statistic')
 
     # take statistic for one sequence
     if op == 'max':
@@ -399,14 +407,15 @@ def compute_stats_per_metaId(df, meta_id, varf, obs_len, radius=100):
     return stats, label
 
 
-def create_dataset_by_varf(df, varf, varf_ranges, labels, out_dir, obs_len, radius=100):
+def create_dataset_by_varf(df, varf, varf_ranges, labels, out_dir, obs_len):
     pathlib.Path(out_dir).mkdir(parents=True, exist_ok=True)
     varf_group_dict = {varf_range: {"metaId": [], "sceneId": [], "label": []}
                        for varf_range in varf_ranges}
 
     # categorize by factor of variation
     for meta_id in tqdm(df["metaId"].unique()):
-        stats, label = compute_stats_per_metaId(df, meta_id, varf, obs_len, radius)
+        stats, label = aggregate_per_varf_value_per_metaId(
+            df[df["metaId"] == meta_id], varf, obs_len)
         if label not in labels:
             continue
         for varf_range in varf_group_dict.keys():
@@ -502,80 +511,171 @@ def compute_distance_xy(df_sim, x, y):
     return np.array(dist)
 
 
-def filter_long_tail(distr, mu, sigma, n=3):
-    distr = np.array(distr)
-    mask = (distr < mu + n * sigma) & (distr > mu - n * sigma) & (distr != 0) & (distr != np.inf)
-    distr = distr[mask]
-    return distr, round((~mask).sum()/distr.shape[0], 2)
-
-
-def plot_varf_histograms(df, out_dir, varf, obs_len):
-    stats_dict = gather_all_stats(df, varf, obs_len)
-    stats_all = []
+def plot_varf_histograms(df_varf, out_dir):
+    stats_all = np.array([])
+    varf = df_varf.columns[-1]
     # Visualize data
-    for label, stats in stats_dict.items():
+    for label, indices in df_varf.groupby('label').groups.items():
         if label not in ["Pedestrian", "Biker"]:
             continue
-        print(f'Plottting {label}')
+        stats = df_varf.iloc[indices].loc[:, varf].values
         plot_histogram(stats, f'{label}_{varf}', out_dir)
-        stats_all += stats
+        stats_all = np.append(stats_all, stats)
     plot_histogram(stats_all, f"Mixed_{varf}", out_dir)
 
 
-def plot_histogram(stats, title, out_dir):
+def plot_varf_hist_obs_and_complete(df_varf, out_dir):
+    varf_obs, varf_com = df_varf.columns[-2], df_varf.columns[-1]
+    data_all_diff, data_all_obs, data_all_com = np.array([]), np.array([]), np.array([])
+    # Visualize data
+    for label, indices in df_varf.groupby('label').groups.items():
+        if label not in ["Pedestrian", "Biker"]:
+            continue
+        data_obs = df_varf.iloc[indices].loc[:, varf_obs].values
+        data_com = df_varf.iloc[indices].loc[:, varf_com].values
+        data_diff = data_obs - data_com
+        plot_histogram(data_diff, f'{label}_{varf_obs}_element_diff', out_dir)
+        plot_histogram_overlay(data_obs, data_com, f'{label}_{varf_obs}_distr_diff', out_dir)
+        data_all_diff = np.append(data_all_diff, data_diff)
+        data_all_obs = np.append(data_all_obs, data_obs)
+        data_all_com = np.append(data_all_com, data_com)
+    plot_histogram(data_all_diff, f"Mixed_{varf_obs}_element_diff", out_dir)
+    plot_histogram_overlay(data_all_obs, data_all_com, f'Mixed_{varf_obs}_distr_diff', out_dir)
+
+
+def plot_histogram(data, title, out_dir, format='png'):
     fig = plt.figure()
-    mean = np.round(np.mean(stats, where=np.array(stats)!=np.inf), 2)
-    std = np.round(np.std(stats, where=np.array(stats)!=np.inf), 2)
-    min = np.round(np.min(stats), 2)
-    max = np.round(np.max(stats, where=np.array(stats)!=np.inf), 2)
-    p_zero = np.round((np.array(stats) == 0).sum() / len(stats), 2)
-    stats, p_filter = filter_long_tail(stats, mean, std)
-    sns.histplot(stats, kde=True)
+    data, stats = filter_long_tail_arr(data)
+    mean, std, min, max, p_zero, p_filter = stats
+    sns.histplot(data, kde=True)
     plt.title(
         f"{title}, \nMean: {mean}, Std: {std}, Min: {min}, Max: {max}, Zero: {p_zero}, Filter: {p_filter}")
     pathlib.Path(out_dir).mkdir(parents=True, exist_ok=True)
-    plt.savefig(os.path.join(out_dir, title))
+    plt.savefig(os.path.join(out_dir, title+'.'+format))
     plt.close(fig)
 
 
-def plot_varf_hist_obs_and_complete(df, out_dir, varf, obs_len):
-    if not obs_len:
-        raise ValueError('obs_len cannot be None')
-    stats_dict_obs = gather_all_stats(df, varf, obs_len)
-    stats_dict_com = gather_all_stats(df, varf, None)
-    stats_all, stats_all_obs, stats_all_com = [], [], []
-    # Visualize data
-    for (label, stats_obs), (_, stats_com) in zip(stats_dict_obs.items(), stats_dict_com.items()):
-        if label not in ["Pedestrian", "Biker"]:
-            continue
-        stats = list(np.array(stats_obs) - np.array(stats_com))
-        plot_histogram(stats, f'{label}_{varf}_element_diff', out_dir)
-        plot_histogram_double(stats_obs, stats_com, f'{label}_{varf}_distr_diff', out_dir)
-        stats_all += stats
-        stats_all_obs += stats_obs
-        stats_all_com += stats_com
-    plot_histogram(stats_all, f"Mixed_{varf}_element_diff", out_dir)
-    plot_histogram_double(stats_all_obs, stats_all_com, f'Mixed_{varf}_distr_diff', out_dir)
-
-
-def plot_histogram_double(stats_obs, stats_com, title, out_dir):
+def plot_histogram_overlay(data_obs, data_com, title, out_dir, format='png'):
     fig = plt.figure()
-    data_len = len(stats_obs)
-    stats_obs = np.sort(stats_obs)[: int(data_len * 0.99)]
-    stats_com = np.sort(stats_com)[: int(data_len * 0.99)]
-    stats_obs = stats_obs[stats_obs != 0]
-    stats_com = stats_com[stats_com != 0]
-    df_obs = pd.DataFrame(stats_obs, columns=['value'])
+    data_obs, _ = filter_long_tail_arr(data_obs)
+    data_com, _ = filter_long_tail_arr(data_com)
+    data_obs = data_obs[data_obs != 0]
+    data_com = data_com[data_com != 0]
+    df_obs = pd.DataFrame(data_obs, columns=['value'])
     df_obs['type'] = 'observation'
-    df_com = pd.DataFrame(stats_com, columns=['value'])
+    df_com = pd.DataFrame(data_com, columns=['value'])
     df_com['type'] = 'complete'
     df_cat = pd.concat([df_obs, df_com], axis=0)
     df_cat = df_cat.reset_index(drop=True)
     sns.histplot(data=df_cat, x='value', hue="type")
     plt.title(title)
     pathlib.Path(out_dir).mkdir(parents=True, exist_ok=True)
-    plt.savefig(os.path.join(out_dir, title))
+    plt.savefig(os.path.join(out_dir, title+'.'+format))
     plt.close(fig)
+
+
+def plot_pairplot(df_varfs, varf_list, label, title, out_dir, kind='kde', format='png'):
+    if label == 'Mixed':
+        df_label = df_varfs[
+            (df_varfs.label == 'Pedestrian') | (df_varfs.label == 'Biker')]
+    elif label == 'All':
+        df_label = df_varfs
+    else:
+        df_label = df_varfs[df_varfs.label == label]
+
+    fig = plt.figure()
+    df_label_filter, p_filter = filter_long_tail_df(
+        df_label[['metaId', 'scene', 'label']+varf_list], varf_list)
+    plot_kws = dict(s=1) if kind == 'scatter' else None
+    sns.pairplot(
+        data=df_label_filter, 
+        hue="scene", 
+        vars=varf_list, 
+        plot_kws=plot_kws,
+        diag_kind="hist",
+        kind=kind
+    )
+    title = f'{title}_{label}_{kind}_{str(p_filter)}'
+    pathlib.Path(out_dir).mkdir(parents=True, exist_ok=True)
+    plt.savefig(os.path.join(out_dir, title+'.'+format))
+    plt.close(fig)
+
+
+def plot_jointplot(df_varfs, varf_list, label, title, out_dir, hue, kind='kde', format='png'):
+    if label == 'Mixed':
+        df_label = df_varfs[
+            (df_varfs.label == 'Pedestrian') | (df_varfs.label == 'Biker')]
+    elif label == 'All':
+        df_label = df_varfs
+    else:
+        df_label = df_varfs[df_varfs.label == label]
+
+    for i, varf1 in enumerate(varf_list):
+        for j, varf2 in enumerate(varf_list):
+            if i < j:
+                # todo: filter out the singular value case
+                fig = plt.figure()
+                df_label_filter, p_filter = filter_long_tail_df(
+                    df_label[['metaId', 'scene', 'label', varf1, varf2]], [varf1, varf2])
+                try:
+                    sns.jointplot(data=df_label_filter, x=varf1, y=varf2, 
+                        kind=kind, hue=hue)
+                except np.linalg.LinAlgError:
+                    kind = 'scatter'
+                    sns.jointplot(data=df_label_filter, x=varf1, y=varf2, 
+                        kind=kind, hue=hue)
+                except:
+                    print('Error!')
+                title_save = f'{title}_{hue}_{label}_{varf1}_{varf2}_{kind}_{str(p_filter)}.{format}'
+                pathlib.Path(out_dir).mkdir(parents=True, exist_ok=True)
+                plt.savefig(os.path.join(out_dir, title_save))
+                plt.close(fig)
+
+
+def filter_long_tail_arr(arr, n=3):
+    # for statistics computing
+    n_data = arr.shape[0]
+    arr = arr[~np.isnan(arr) & (arr != np.inf)]
+    if arr.shape[0]:
+        mean = np.round(np.mean(arr), 2)
+        std = np.round(np.std(arr), 2)
+        min = np.round(np.min(arr), 2)
+        max = np.round(np.max(arr), 2)
+    else:
+        raise ValueError('stats array is empty')
+    p_zero = np.round((arr == 0).sum() / n_data, 2)
+    arr = arr[
+        (arr < mean + n * std) & (arr > mean - n * std) & (arr != 0)]
+    p_filter = np.round(arr.shape[0] / n_data, 2)
+    return arr, (mean, std, min, max, p_zero, p_filter)
+
+
+def filter_long_tail_series(series, n=3):
+    full_index = series.index
+    series = series[~series.isnull() & (series != np.inf)]
+    if series.shape[0]:
+        mean = np.round(series.mean(), 2)
+        std = np.round(series.std(), 2)
+    else:
+        raise ValueError('Series is empty')
+    series = series[
+        (series < mean + n * std) & (series > mean - n * std) & (series != 0)]
+    return full_index.drop(series.index)
+
+
+def filter_long_tail_df(df_varfs, varf_list, n=3):
+    idx_out = pd.Index([])
+    for varf in varf_list:
+        idx_out = idx_out.append(filter_long_tail_series(df_varfs[varf]))
+    idx_out_unique = idx_out.unique()
+    df_varfs_filter = df_varfs.drop(idx_out_unique)
+    p_filter = round(len(idx_out_unique) / df_varfs.shape[0], 2)
+    return df_varfs_filter, p_filter
+
+
+def get_scene_statistic(df_varfs):
+    # todo
+    pass
 
 
 def split_df_ratio(df, ratio):
@@ -633,54 +733,94 @@ if __name__ == "__main__":
                         choices=['Biker', 'Bus', 'Car', 'Cart', 'Pedestrian', 'Skater'])
     args = parser.parse_args()
 
-    # Create dataset
+    # # create dataset
     # start = datetime.datetime.now()
     # print('Loading raw dataset')
     # df = load_raw_dataset(args.data_raw, args.step, args.window_size, args.stride)
     # print(f'Time spent to load raw dataset: {datetime.datetime.now() - start}')
-    df = pd.read_pickle(os.path.join(args.data_raw, "data.pkl"))
-
-    # print('Plotting diff')
-    # varf_list = ['abs+avg_acc', 'abs+max_acc']
-    # for varf in varf_list:
-    #     plot_varf_hist_obs_and_complete(df, 'figures/uni_distr/sns/diff', varf, args.obs_len)
-
-    # possibly add a column of distance with neighbors 
-    # varf_list = ['avg_vel', 'max_vel', 'avg_acc', 'max_acc', 'min_acc', 
-    #              'abs+avg_acc', 'abs+max_acc']
-
+    
+    # # possibly add a column of distance with neighbors 
     # start = datetime.datetime.now()
-    # varf_list = ['min_dist', 'avg_den', 'tot_den']
-    # if any('den' in varf for varf in varf_list) or any('dist' in varf for varf in varf_list):
-    #     print('Adding a column of distance with neighbors to df')
-    #     df['dist'] = df.apply(lambda_distance_with_neighbors, axis=1, df=df)
+    # print('Adding a column of distance with neighbors to df')
+    # # df['step'] = np.tile(np.arange(args.window_size), int(df.shape[0]/args.window_size))
+    # # df_obs = df[df.step < args.obs_len]
+    # out = df.groupby('sceneId').apply(compute_distance_with_neighbors)
+    # print('Sucessfully applied')
+    # for idx_1st in out.index.get_level_values('sceneId').unique():
+    #     df.loc[out[idx_1st].index, 'dist'] = out[idx_1st].values
     # print(f'Time spent to add a new column: {datetime.datetime.now() - start}')
 
-    # start = datetime.datetime.now()
-    varf_list = ['min_dist', 'avg_den', 'tot_den']
-    # if any('den' in varf for varf in varf_list) or any('dist' in varf for varf in varf_list):
-    #     print('Adding a column of distance with neighbors to df')
-    #     print(datetime.datetime.now())
-    #     df['step'] = np.tile(np.arange(args.window_size), int(df.shape[0]/args.window_size))
-    #     df_obs = df[df.step < args.obs_len]
-    #     print(datetime.datetime.now())
-    #     out = df_obs.groupby('sceneId').apply(compute_distance_with_neighbors)
-    #     print('Sucessfully applied')
-    #     for idx_1st in out.index.get_level_values('sceneId').unique():
-    #         print(f'Filling {idx_1st} to df')
-    #         df.loc[out[idx_1st].index, 'dist'] = out[idx_1st].values
-    # print(f'Time spent to add a new column: {datetime.datetime.now() - start}')
+    # # save to pickle
     # out_path = os.path.join(args.data_raw, f"data.pkl")
     # df.to_pickle(out_path)
-    # print(f'Saved data to {args.data_raw}/data.pkl')
+    # print(f'Saved data to {out_path}')
 
+
+    # df = pd.read_pickle(os.path.join(args.data_raw, "data.pkl"))
+    # print('Loaded raw dataset')
+
+    varf_list = ['avg_vel', 'max_vel', 
+                 'avg_acc', 'abs+max_acc', 
+                 'min_dist', 'avg_den100', 'avg_den50']
+    # varf_list = ['avg_vel', 'avg_den100']
+
+    # print('---- Getting df_varfs ----')
+    # df_varfs = get_varf_table(df, varf_list, args.obs_len)
+    # df_varfs_com = get_varf_table(df, varf_list, None)
+    # df_varfs = df_varfs.merge(
+    #     df_varfs_com.drop(['label', 'sceneId', 'scene'], axis=1), 
+    #     on='metaId', suffixes=('', '_com'))
+    # out_path = os.path.join(args.data_raw, f"df_varfs.pkl")
+    # df_varfs.to_pickle(out_path)
+    # print(f'Saved df_varfs to {out_path}')
+    df_varfs = pd.read_pickle(os.path.join(args.data_raw, "df_varfs.pkl"))
+    print('Loaded df_varfs')
+
+    print('---- Plotting ----')
+    # for varf in varf_list:
+    #     plot_varf_hist_obs_and_complete(
+    #         df_varfs[['label', varf, varf+'_com']], 
+    #         'figures/univar_distr/filter/diff', 
+    #     )
+    #     plot_varf_histograms(
+    #         df_varfs[['label', varf]], 
+    #         'figures/univar_distr/filter/obs'
+    #     )
+
+    # print('Plotting pairplot')
+    # for label in ['Pedestrian', 'Biker', 'Mixed', 'All']:
+    #     plot_pairplot(
+    #         df_varfs,
+    #         varf_list,
+    #         label,  
+    #         'Pair', 
+    #         'figures/bivar_distr/filter',
+    #         kind='kde'
+    #     )
+
+    print('Plotting joinplot')
+    # for label in ['Pedestrian', 'Biker', 'Mixed', 'All']:
+    #     plot_jointplot(
+    #         df_varfs,
+    #         varf_list, 
+    #         label,
+    #         'Joint',
+    #         'figures/bivar_distr/filter',
+    #         'scene',
+    #         kind='kde'
+    #     )
+    plot_jointplot(
+        df_varfs,
+        varf_list, 
+        'All',
+        'Joint',
+        'figures/bivar_distr/filter',
+        'label',
+        kind='kde'
+    )
+    
 
     # print(f'Creating dataset by {args.varf}')
     # create_dataset_by_varf(df, args.varf, args.varf_ranges,
     #                        args.labels, args.data_filter, args.obs_len)
     # print('Done')
-    
-    print('Plotting univariate distribution')
-    for varf in tqdm(varf_list):
-        print(f'Plotting {varf}')
-        plot_varf_histograms(df, 'figures/uni_distr/sns/obs', varf, args.obs_len)
