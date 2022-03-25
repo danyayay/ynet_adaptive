@@ -613,7 +613,6 @@ def plot_jointplot(df_varfs, varf_list, label, title, out_dir, hue, kind='kde', 
     for i, varf1 in enumerate(varf_list):
         for j, varf2 in enumerate(varf_list):
             if i < j:
-                # todo: filter out the singular value case
                 fig = plt.figure()
                 df_label_filter, p_filter = filter_long_tail_df(
                     df_label[['metaId', 'scene', 'label', varf1, varf2]], [varf1, varf2])
@@ -632,6 +631,50 @@ def plot_jointplot(df_varfs, varf_list, label, title, out_dir, hue, kind='kde', 
                 plt.close(fig)
 
 
+def plot_bivar_scene_w_numeric(df_varfs, var, title, out_dir, format='png'):
+    df_filter, p_filter = filter_long_tail_df(
+        df_varfs[['metaId', 'scene', 'label', var]], [varf])
+    unique_scenes = df_varfs.scene.unique()
+    n_scene = unique_scenes.shape[0]
+    fig, axs = plt.subplots(4, n_scene+1, 
+        figsize=(4*(n_scene+1), 16), sharex=True, sharey=True)
+    for c, scene in enumerate(unique_scenes):
+        data = df_filter[(df_filter.scene == scene)]
+        axs[0, c].set_title(unique_scenes[c])
+        # pedestrain
+        sns.histplot(data=data[data.label == 'Pedestrian'], x=var, 
+            ax=axs[0, c], alpha=0.5, stat='probability')
+        # biker 
+        sns.histplot(data=data[data.label == 'Biker'], x=var, 
+            ax=axs[1, c], alpha=0.5, stat='probability')
+        # mixed 
+        sns.histplot(data=data[(data.label == 'Pedestrian') | (data.label == 'Biker')], x=var, 
+            ax=axs[2, c], hue='label', alpha=0.5, stat='probability', hue_order=['Biekr', 'Pedestrian'])
+        # all 
+        sns.histplot(data=data, x=var, 
+            ax=axs[3, c], alpha=0.5, stat='probability')
+    axs[0, -1].set_title('All scenes')
+    # pedestrain
+    sns.histplot(data=df_filter[df_filter.label == 'Pedestrian'], x=var, 
+        ax=axs[0, -1], alpha=0.5, stat='probability')
+    # biker 
+    sns.histplot(data=df_filter[df_filter.label == 'Biker'], x=var, 
+        ax=axs[1, -1], alpha=0.5, stat='probability')
+    # mixed 
+    sns.histplot(data=df_filter[(df_filter.label == 'Pedestrian') | (df_filter.label == 'Biker')], x=var, 
+        ax=axs[2, -1], hue='label', alpha=0.5, stat='probability', hue_order=['Biekr', 'Pedestrian'])
+    # all 
+    sns.histplot(data=df_filter, x=var, 
+        ax=axs[3, -1], alpha=0.5, stat='probability')
+    axs[0, 0].set_ylabel('Pedestrian')
+    axs[1, 0].set_ylabel('Biker')
+    axs[2, 0].set_ylabel('Pedestrian + Biker')
+    axs[3, 0].set_ylabel('All agent types')
+    pathlib.Path(out_dir).mkdir(parents=True, exist_ok=True)
+    plt.savefig(os.path.join(out_dir, f'{title}_scene_w_{var}_{p_filter}.{format}'))
+    plt.close(fig)
+
+
 def filter_long_tail_arr(arr, n=3):
     # for statistics computing
     n_data = arr.shape[0]
@@ -646,7 +689,7 @@ def filter_long_tail_arr(arr, n=3):
     p_zero = np.round((arr == 0).sum() / n_data, 2)
     arr = arr[
         (arr < mean + n * std) & (arr > mean - n * std) & (arr != 0)]
-    p_filter = np.round(arr.shape[0] / n_data, 2)
+    p_filter = np.round((n_data - arr.shape[0]) / n_data, 2)
     return arr, (mean, std, min, max, p_zero, p_filter)
 
 
@@ -724,8 +767,8 @@ if __name__ == "__main__":
 
     parser.add_argument("--varf", default='avg_vel', type=str, help='variation factor',
                         choices=['avg_vel', 'max_vel', 'avg_acc', 'max_acc', 
-                                 'abs+max_acc', 'abs+avg_acc', 'min_dist', 
-                                 'avg_den', 'tot_den'])
+                                 'abs+max_acc', 'abs+avg_acc', 
+                                 'min_dist', 'avg_den50', 'avg_den100'])
     parser.add_argument("--varf_ranges", help='range of varation factor to take',
                         default=[(0.25, 0.75), (1.25, 1.75), (2.25, 2.75), (3.25, 3.75)])
 
@@ -759,8 +802,8 @@ if __name__ == "__main__":
     # df = pd.read_pickle(os.path.join(args.data_raw, "data.pkl"))
     # print('Loaded raw dataset')
 
-    varf_list = ['avg_vel', 'max_vel', 
-                 'avg_acc', 'abs+max_acc', 
+    varf_list = ['avg_vel', 'max_vel', 'avg_acc', 'max_acc', 
+                 'abs+max_acc', 'abs+avg_acc',
                  'min_dist', 'avg_den100', 'avg_den50']
     # varf_list = ['avg_vel', 'avg_den100']
 
@@ -777,15 +820,15 @@ if __name__ == "__main__":
     print('Loaded df_varfs')
 
     print('---- Plotting ----')
-    # for varf in varf_list:
-    #     plot_varf_hist_obs_and_complete(
-    #         df_varfs[['label', varf, varf+'_com']], 
-    #         'figures/univar_distr/filter/diff', 
-    #     )
-    #     plot_varf_histograms(
-    #         df_varfs[['label', varf]], 
-    #         'figures/univar_distr/filter/obs'
-    #     )
+    for varf in varf_list:
+        plot_varf_hist_obs_and_complete(
+            df_varfs[['label', varf, varf+'_com']], 
+            'figures/filtered_distr/hist/diff', 
+        )
+        plot_varf_histograms(
+            df_varfs[['label', varf]], 
+            'figures/filtered_distr/hist/obs'
+        )
 
     # print('Plotting pairplot')
     # for label in ['Pedestrian', 'Biker', 'Mixed', 'All']:
@@ -809,15 +852,17 @@ if __name__ == "__main__":
     #         'scene',
     #         kind='kde'
     #     )
-    plot_jointplot(
-        df_varfs,
-        varf_list, 
-        'All',
-        'Joint',
-        'figures/bivar_distr/filter',
-        'label',
-        kind='kde'
-    )
+    # plot_jointplot(
+    #     df_varfs,
+    #     varf_list, 
+    #     'All',
+    #     'Joint',
+    #     'figures/bivar_distr/filter',
+    #     'label',
+    #     kind='kde'
+    # )
+    # for varf in varf_list:
+    #     plot_bivar_scene_w_numeric(df_varfs, varf, 'Bivar', 'figures/filtered_distr/bivar')
     
 
     # print(f'Creating dataset by {args.varf}')
