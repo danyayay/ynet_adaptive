@@ -2,6 +2,7 @@
 *.out
 figures/
 ckpts/
+data/
 
 pretrained_models
 sdd_ynet

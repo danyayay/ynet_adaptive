@@ -155,7 +155,10 @@ class YNetTorch(nn.Module):
 		super(YNetTorch, self).__init__()
 
 		if segmentation_model_fp is not None:
-			self.semantic_segmentation = torch.load(segmentation_model_fp)
+			if torch.cuda.is_available():
+				self.semantic_segmentation = torch.load(segmentation_model_fp)
+			else:
+				self.semantic_segmentation = torch.load(segmentation_model_fp, map_location=torch.device('cpu'))
 			if use_features_only:
 				self.semantic_segmentation.segmentation_head = nn.Identity()
 				semantic_classes = 16  # instead of classes use number of feature_dim

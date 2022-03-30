@@ -77,6 +77,7 @@ def resize(images, factor, seg_mask=False):
 def pad(images, division_factor=32):
 	""" Pad image so that it can be divided by division_factor, as many architectures such as UNet needs a specific size
 	at it's bottlenet layer"""
+	# todo: to make sure the cooridnates in df and scene_image are paired after padding 
 	for key, im in images.items():
 		if im.ndim == 3:
 			H, W, C = im.shape

@@ -631,47 +631,54 @@ def plot_jointplot(df_varfs, varf_list, label, title, out_dir, hue, kind='kde', 
                 plt.close(fig)
 
 
-def plot_bivar_scene_w_numeric(df_varfs, var, title, out_dir, format='png'):
+def plot_scene_w_numeric(df_varfs, varf, title, out_dir, format='png'):
     df_filter, p_filter = filter_long_tail_df(
-        df_varfs[['metaId', 'scene', 'label', var]], [varf])
-    unique_scenes = df_varfs.scene.unique()
+        df_varfs[['metaId', 'scene', 'label', varf]], [varf])
+    # filter out scene "quad"
+    df_filter = df_filter[df_filter.scene != 'quad']
+
+    unique_scenes = df_filter.scene.unique()
     n_scene = unique_scenes.shape[0]
     fig, axs = plt.subplots(4, n_scene+1, 
         figsize=(4*(n_scene+1), 16), sharex=True, sharey=True)
+    binwidth = df_filter[varf].max() / 30
     for c, scene in enumerate(unique_scenes):
         data = df_filter[(df_filter.scene == scene)]
         axs[0, c].set_title(unique_scenes[c])
         # pedestrain
-        sns.histplot(data=data[data.label == 'Pedestrian'], x=var, 
-            ax=axs[0, c], alpha=0.5, stat='probability')
+        sns.histplot(data=data[data.label == 'Pedestrian'], x=varf, 
+            ax=axs[0, c], stat='probability', binwidth=binwidth)
         # biker 
-        sns.histplot(data=data[data.label == 'Biker'], x=var, 
-            ax=axs[1, c], alpha=0.5, stat='probability')
+        sns.histplot(data=data[data.label == 'Biker'], x=varf, 
+            ax=axs[1, c], stat='probability', binwidth=binwidth)
         # mixed 
-        sns.histplot(data=data[(data.label == 'Pedestrian') | (data.label == 'Biker')], x=var, 
-            ax=axs[2, c], hue='label', alpha=0.5, stat='probability', hue_order=['Biekr', 'Pedestrian'])
+        sns.histplot(data=data[(data.label == 'Pedestrian') | (data.label == 'Biker')], x=varf, 
+            ax=axs[2, c], hue='label', stat='probability', 
+            hue_order=['Biker', 'Pedestrian'], binwidth=binwidth)
         # all 
-        sns.histplot(data=data, x=var, 
-            ax=axs[3, c], alpha=0.5, stat='probability')
+        sns.histplot(data=data, x=varf, 
+            ax=axs[3, c], stat='probability', binwidth=binwidth)
     axs[0, -1].set_title('All scenes')
     # pedestrain
-    sns.histplot(data=df_filter[df_filter.label == 'Pedestrian'], x=var, 
-        ax=axs[0, -1], alpha=0.5, stat='probability')
+    sns.histplot(data=df_filter[df_filter.label == 'Pedestrian'], x=varf, 
+        ax=axs[0, -1], stat='probability', binwidth=binwidth)
     # biker 
-    sns.histplot(data=df_filter[df_filter.label == 'Biker'], x=var, 
-        ax=axs[1, -1], alpha=0.5, stat='probability')
+    sns.histplot(data=df_filter[df_filter.label == 'Biker'], x=varf, 
+        ax=axs[1, -1], stat='probability', binwidth=binwidth)
     # mixed 
-    sns.histplot(data=df_filter[(df_filter.label == 'Pedestrian') | (df_filter.label == 'Biker')], x=var, 
-        ax=axs[2, -1], hue='label', alpha=0.5, stat='probability', hue_order=['Biekr', 'Pedestrian'])
+    sns.histplot(data=df_filter[(df_filter.label == 'Pedestrian') | (df_filter.label == 'Biker')], x=varf, 
+        ax=axs[2, -1], hue='label', stat='probability', 
+        hue_order=['Biker', 'Pedestrian'], binwidth=binwidth)
     # all 
-    sns.histplot(data=df_filter, x=var, 
-        ax=axs[3, -1], alpha=0.5, stat='probability')
+    sns.histplot(data=df_filter, x=varf, 
+        ax=axs[3, -1], stat='probability', binwidth=binwidth)
     axs[0, 0].set_ylabel('Pedestrian')
     axs[1, 0].set_ylabel('Biker')
     axs[2, 0].set_ylabel('Pedestrian + Biker')
     axs[3, 0].set_ylabel('All agent types')
+    plt.tight_layout()
     pathlib.Path(out_dir).mkdir(parents=True, exist_ok=True)
-    plt.savefig(os.path.join(out_dir, f'{title}_scene_w_{var}_{p_filter}.{format}'))
+    plt.savefig(os.path.join(out_dir, f'{title}_scene_w_{varf}_{p_filter}_noquad.{format}'))
     plt.close(fig)
 
 
@@ -716,11 +723,6 @@ def filter_long_tail_df(df_varfs, varf_list, n=3):
     return df_varfs_filter, p_filter
 
 
-def get_scene_statistic(df_varfs):
-    # todo
-    pass
-
-
 def split_df_ratio(df, ratio):
     meta_ids = np.unique(df["metaId"])
     test_meta_ids, train_meta_ids = np.split(
@@ -757,8 +759,8 @@ def limit_samples(df, num, batch_size, random_ids=True):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--data_raw", default='sdd_ynet/dataset_raw', type=str)
-    parser.add_argument("--data_filter", default='sdd_ynet/dataset_filter', type=str)
+    parser.add_argument("--raw_data_dir", default='data/sdd/raw', type=str)
+    parser.add_argument("--filter_data_dir", default='data/sdd/filter', type=str)
 
     parser.add_argument("--step", default=12, type=int)
     parser.add_argument("--window_size", default=20, type=int)
@@ -774,98 +776,61 @@ if __name__ == "__main__":
 
     parser.add_argument("--labels", default=['Pedestrian', 'Biker'], nargs='+', type=str,
                         choices=['Biker', 'Bus', 'Car', 'Cart', 'Pedestrian', 'Skater'])
+
+    parser.add_argument("--vis", default=False, type=bool)
+
     args = parser.parse_args()
 
-    # # create dataset
-    # start = datetime.datetime.now()
-    # print('Loading raw dataset')
-    # df = load_raw_dataset(args.data_raw, args.step, args.window_size, args.stride)
-    # print(f'Time spent to load raw dataset: {datetime.datetime.now() - start}')
-    
+    # ============== load raw dataset ===============
+    # ## load raw dataset
+    # df = load_raw_dataset(args.raw_data_dir, args.step, args.window_size, args.stride)
+    # print('Loaded raw dataset')
     # # possibly add a column of distance with neighbors 
-    # start = datetime.datetime.now()
-    # print('Adding a column of distance with neighbors to df')
-    # # df['step'] = np.tile(np.arange(args.window_size), int(df.shape[0]/args.window_size))
-    # # df_obs = df[df.step < args.obs_len]
     # out = df.groupby('sceneId').apply(compute_distance_with_neighbors)
     # print('Sucessfully applied')
     # for idx_1st in out.index.get_level_values('sceneId').unique():
     #     df.loc[out[idx_1st].index, 'dist'] = out[idx_1st].values
-    # print(f'Time spent to add a new column: {datetime.datetime.now() - start}')
-
+    # print(f'Added a column of distance with neighbors to df')
     # # save to pickle
-    # out_path = os.path.join(args.data_raw, f"data.pkl")
+    # out_path = os.path.join(args.raw_data_dir, f"data.pkl")
     # df.to_pickle(out_path)
     # print(f'Saved data to {out_path}')
 
+    # ## or load from stored pickle
+    df = pd.read_pickle(os.path.join(args.raw_data_dir, "data.pkl"))
+    print('Loaded raw dataset')
 
-    # df = pd.read_pickle(os.path.join(args.data_raw, "data.pkl"))
-    # print('Loaded raw dataset')
 
-    varf_list = ['avg_vel', 'max_vel', 'avg_acc', 'max_acc', 
-                 'abs+max_acc', 'abs+avg_acc',
-                 'min_dist', 'avg_den100', 'avg_den50']
-    # varf_list = ['avg_vel', 'avg_den100']
+    # ================= plot =================
+    if args.vis:
+        varf_list = ['avg_vel', 'max_vel', 'avg_acc', 'max_acc', 
+                    'abs+max_acc', 'abs+avg_acc', 'min_dist', 'avg_den100', 'avg_den50']
 
-    # print('---- Getting df_varfs ----')
-    # df_varfs = get_varf_table(df, varf_list, args.obs_len)
-    # df_varfs_com = get_varf_table(df, varf_list, None)
-    # df_varfs = df_varfs.merge(
-    #     df_varfs_com.drop(['label', 'sceneId', 'scene'], axis=1), 
-    #     on='metaId', suffixes=('', '_com'))
-    # out_path = os.path.join(args.data_raw, f"df_varfs.pkl")
-    # df_varfs.to_pickle(out_path)
-    # print(f'Saved df_varfs to {out_path}')
-    df_varfs = pd.read_pickle(os.path.join(args.data_raw, "df_varfs.pkl"))
-    print('Loaded df_varfs')
+        # ## get variation factor table 
+        # df_varfs = get_varf_table(df, varf_list, args.obs_len)
+        # df_varfs_com = get_varf_table(df, varf_list, None)
+        # df_varfs = df_varfs.merge(
+        #     df_varfs_com.drop(['label', 'sceneId', 'scene'], axis=1), 
+        #     on='metaId', suffixes=('', '_com'))
+        # out_path = os.path.join(args.raw_data_dir, f"df_varfs.pkl")
+        # df_varfs.to_pickle(out_path)
+        # print(f'Saved df_varfs to {out_path}')
 
-    print('---- Plotting ----')
-    for varf in varf_list:
-        plot_varf_hist_obs_and_complete(
-            df_varfs[['label', varf, varf+'_com']], 
-            'figures/filtered_distr/hist/diff', 
-        )
-        plot_varf_histograms(
-            df_varfs[['label', varf]], 
-            'figures/filtered_distr/hist/obs'
-        )
+        # ## or load from stored one
+        df_varfs = pd.read_pickle(os.path.join(args.raw_data_dir, "df_varfs.pkl"))
+        print('Loaded df_varfs')
 
-    # print('Plotting pairplot')
-    # for label in ['Pedestrian', 'Biker', 'Mixed', 'All']:
-    #     plot_pairplot(
-    #         df_varfs,
-    #         varf_list,
-    #         label,  
-    #         'Pair', 
-    #         'figures/bivar_distr/filter',
-    #         kind='kde'
-    #     )
+        for varf in varf_list:
+            # plot_varf_hist_obs_and_complete(df_varfs[['label', varf, varf+'_com']], 'figures/filtered_distr/hist/diff')
+            plot_varf_histograms(df_varfs[['label', varf]], 'figures/filtered_distr/hist/obs')
+            plot_scene_w_numeric(df_varfs, varf, 'Bivar', 'figures/filtered_distr/bivar')
 
-    print('Plotting joinplot')
-    # for label in ['Pedestrian', 'Biker', 'Mixed', 'All']:
-    #     plot_jointplot(
-    #         df_varfs,
-    #         varf_list, 
-    #         label,
-    #         'Joint',
-    #         'figures/bivar_distr/filter',
-    #         'scene',
-    #         kind='kde'
-    #     )
-    # plot_jointplot(
-    #     df_varfs,
-    #     varf_list, 
-    #     'All',
-    #     'Joint',
-    #     'figures/bivar_distr/filter',
-    #     'label',
-    #     kind='kde'
-    # )
-    # for varf in varf_list:
-    #     plot_bivar_scene_w_numeric(df_varfs, varf, 'Bivar', 'figures/filtered_distr/bivar')
-    
+        for label in ['Pedestrian', 'Biker', 'Mixed', 'All']:
+            plot_jointplot(df_varfs, varf_list,  label, 'Joint', 'figures/bivar_distr/filter', 'scene', kind='kde')
+        plot_jointplot(df_varfs, varf_list, 'All', 'Joint', 'figures/bivar_distr/filter', 'label', kind='kde')
 
-    # print(f'Creating dataset by {args.varf}')
-    # create_dataset_by_varf(df, args.varf, args.varf_ranges,
-    #                        args.labels, args.data_filter, args.obs_len)
-    # print('Done')
+
+    # ============== create designed dataset ================
+    create_dataset_by_varf(df, args.varf, args.varf_ranges,
+                           args.labels, args.filter_data_dir, args.obs_len)
+    print(f'Creating dataset by {args.varf} of {args.labels}')

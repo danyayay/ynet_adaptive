@@ -5,6 +5,7 @@ import numpy as np
 import torch
 import numpy as np
 
+
 class SceneDataset(Dataset):
 	def __init__(self, data, resize, total_len):
 		""" Dataset that contains the trajectories of one scene as one element in the list. It doesn't contain the
@@ -36,6 +37,7 @@ class SceneDataset(Dataset):
 			scene_list.append(meta_df.iloc()[0:1].sceneId.item())
 		return np.array(trajectories), meta, scene_list
 
+
 def scene_collate(batch):
 	trajectories = []
 	meta = []
@@ -45,6 +47,7 @@ def scene_collate(batch):
 		meta.append(_batch[1])
 		scene.append(_batch[2])
 	return torch.Tensor(trajectories).squeeze(0), meta, scene[0]
+
 
 def separate_data_label(df):
 	labels = np.sort(np.unique(df["vel_range"]))
