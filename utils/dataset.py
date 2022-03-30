@@ -407,86 +407,90 @@ def aggregate_per_varf_value_per_metaId(df_meta, varf, obs_len):
     return stats, label
 
 
-def create_dataset_by_varf(df, varf, varf_ranges, labels, out_dir, obs_len):
+def create_dataset_by_varf(df, varf, varf_ranges, labels, out_dir, obs_len, same_group_size=False):
     pathlib.Path(out_dir).mkdir(parents=True, exist_ok=True)
     varf_group_dict = {varf_range: {"metaId": [], "sceneId": [], "label": []}
                        for varf_range in varf_ranges}
+    df_label = df[df.label.apply(lambda x: x in labels)]
 
     # categorize by factor of variation
-    for meta_id in tqdm(df["metaId"].unique()):
-        stats, label = aggregate_per_varf_value_per_metaId(
-            df[df["metaId"] == meta_id], varf, obs_len)
-        if label not in labels:
-            continue
-        for varf_range in varf_group_dict.keys():
-            varf_min, varf_max = varf_range
-            if stats >= varf_min and stats <= varf_max:
+    for meta_id in tqdm(df_label["metaId"].unique(), desc=f'Categorizing by {varf}'):
+        df_meta = df_label[df_label["metaId"] == meta_id]
+        stats, label = aggregate_per_varf_value_per_metaId(df_meta, varf, obs_len)
+        for varf_range in varf_ranges:
+            range_min, range_max = varf_range
+            if stats > range_min and stats <= range_max:
                 varf_group_dict[varf_range]["metaId"].append(meta_id)
-                unique_scene_ids = np.unique(
-                    df[df["metaId"] == meta_id]["sceneId"].values)
+                unique_scene_ids = np.unique(df_meta["sceneId"].values)
                 assert len(unique_scene_ids) == 1
                 scene_id = unique_scene_ids[0]
                 varf_group_dict[varf_range]["sceneId"].append(scene_id)
                 varf_group_dict[varf_range]["label"].append(label)
 
-    # keep each group with the same number of data
-    min_n_metas = min([len(varf_group["metaId"]) for varf_group in varf_group_dict.values()])
+    min_n = min([len(g["metaId"]) for g in varf_group_dict.values()])
     for varf_range, varf_group in varf_group_dict.items():
-        print(f"Group {varf_range}")
-        scene_ids, scene_counts = np.unique(
-            varf_group["sceneId"], return_counts=True)
-        sorted_unique_scene_counts = np.unique(np.sort(scene_counts))
-        total_count = 0
-        prev_count = 0
-        mask = np.zeros_like(scene_counts).astype(bool)
-        for scene_count in sorted_unique_scene_counts:
-            total_count += (scene_counts >= scene_count).sum() * \
-                (scene_count - prev_count)
-            if total_count >= min_n_metas:
-                break
-            mask[scene_counts == scene_count] = True
-            prev_count = scene_count
-        total_counts = np.zeros_like(scene_counts)
-        total_counts[mask] = scene_counts[mask]
-        total_counts[mask == False] = prev_count
-        less = True
-        while less:
-            for i in np.where(mask == False)[0]:
-                total_counts[i] += min(1, min_n_metas - total_counts.sum())
-                if min_n_metas == total_counts.sum():
-                    less = False
-                    break
-        varf_group["sceneId"] = np.array(varf_group["sceneId"])
-        varf_group["metaId"] = np.array(varf_group["metaId"])
-        varf_group["label"] = np.array(varf_group["label"])
-        meta_id_mask = np.zeros_like(varf_group["metaId"]).astype(bool)
-        for scene_idx, scene_id in enumerate(scene_ids):
-            scene_count = total_counts[scene_idx]
-            scene_mask = varf_group["sceneId"] == scene_id
-            scene_labels = varf_group["label"][scene_mask]
-            unique_scene_labels, scene_labels_count = np.unique(
-                scene_labels, return_counts=True)
-            scene_labels_chosen = []
-            while len(scene_labels_chosen) < scene_count:
-                for label_idx, (unique_scene_label, scene_label_count) in enumerate(zip(unique_scene_labels, scene_labels_count)):
-                    if scene_label_count != 0:
-                        scene_labels_chosen.append(unique_scene_label)
-                        scene_labels_count[label_idx] -= 1
-                        if len(scene_labels_chosen) == scene_count:
-                            break
-            labels_chosen, labels_chosen_count = np.unique(
-                scene_labels_chosen, return_counts=True)
-            for label, label_count in zip(labels_chosen, labels_chosen_count):
-                meta_id_idx = np.where(np.logical_and(
-                    varf_group["label"] == label, varf_group["sceneId"] == scene_id))[0][:label_count]
-                meta_id_mask[meta_id_idx] = True
-
-        df_varf = df[np.array(
-            [df["metaId"] == meta_id for meta_id in varf_group["metaId"][meta_id_mask]]).any(axis=0)]
+        if same_group_size:
+            meta_id_mask = reduce_group_size(varf_group, varf_range, min_n)
+            df_varf = df_label[df_label.metaId.isin(varf_group['metaId'][meta_id_mask])]
+        else:
+            df_varf = df_label[df_label.metaId.isin(varf_group['metaId'])]
         varf_range_name = f"{varf_range[0]}_{varf_range[1]}"
-        df_varf["varf_range"] = varf_range_name
+        df_varf.loc[:, "varf_range"] = varf_range_name
         out_path = os.path.join(out_dir, f"{varf_range_name}.pkl")
         df_varf.to_pickle(out_path)
+        print(f'{varf_range}: {int(df_varf.shape[0]/20)}')
+
+
+def reduce_group_size(varf_group, varf_range, min_n):
+    print(f"Group {varf_range}")
+    scene_ids, scene_counts = np.unique(
+        varf_group["sceneId"], return_counts=True)
+    sorted_unique_scene_counts = np.unique(np.sort(scene_counts))
+    total_count = 0
+    prev_count = 0
+    mask = np.zeros_like(scene_counts).astype(bool)
+    for scene_count in sorted_unique_scene_counts:
+        total_count += (scene_counts >= scene_count).sum() * \
+            (scene_count - prev_count)
+        if total_count >= min_n:
+            break
+        mask[scene_counts == scene_count] = True
+        prev_count = scene_count
+    total_counts = np.zeros_like(scene_counts)
+    total_counts[mask] = scene_counts[mask]
+    total_counts[mask == False] = prev_count
+    less = True
+    while less:
+        for i in np.where(mask == False)[0]:
+            total_counts[i] += min(1, min_n - total_counts.sum())
+            if min_n == total_counts.sum():
+                less = False
+                break
+    varf_group["sceneId"] = np.array(varf_group["sceneId"])
+    varf_group["metaId"] = np.array(varf_group["metaId"])
+    varf_group["label"] = np.array(varf_group["label"])
+    meta_id_mask = np.zeros_like(varf_group["metaId"]).astype(bool)
+    for scene_idx, scene_id in enumerate(scene_ids):
+        scene_count = total_counts[scene_idx]
+        scene_mask = varf_group["sceneId"] == scene_id
+        scene_labels = varf_group["label"][scene_mask]
+        unique_scene_labels, scene_labels_count = np.unique(
+            scene_labels, return_counts=True)
+        scene_labels_chosen = []
+        while len(scene_labels_chosen) < scene_count:
+            for label_idx, (unique_scene_label, scene_label_count) in enumerate(zip(unique_scene_labels, scene_labels_count)):
+                if scene_label_count != 0:
+                    scene_labels_chosen.append(unique_scene_label)
+                    scene_labels_count[label_idx] -= 1
+                    if len(scene_labels_chosen) == scene_count:
+                        break
+        labels_chosen, labels_chosen_count = np.unique(
+            scene_labels_chosen, return_counts=True)
+        for label, label_count in zip(labels_chosen, labels_chosen_count):
+            meta_id_idx = np.where(np.logical_and(
+                varf_group["label"] == label, varf_group["sceneId"] == scene_id))[0][:label_count]
+            meta_id_mask[meta_id_idx] = True
+    return meta_id_mask
 
 
 def compute_distance_with_neighbors(df_scene):
@@ -772,33 +776,34 @@ if __name__ == "__main__":
                                  'abs+max_acc', 'abs+avg_acc', 
                                  'min_dist', 'avg_den50', 'avg_den100'])
     parser.add_argument("--varf_ranges", help='range of varation factor to take',
-                        default=[(0.25, 0.75), (1.25, 1.75), (2.25, 2.75), (3.25, 3.75)])
+                        default=[(0.1, 0.4), (0.4, 2.5)])
 
-    parser.add_argument("--labels", default=['Pedestrian', 'Biker'], nargs='+', type=str,
+    parser.add_argument("--labels", default=['Pedestrian'], nargs='+', type=str,
                         choices=['Biker', 'Bus', 'Car', 'Cart', 'Pedestrian', 'Skater'])
 
     parser.add_argument("--vis", default=False, type=bool)
 
     args = parser.parse_args()
+    args.labels.sort()
 
     # ============== load raw dataset ===============
     # ## load raw dataset
-    # df = load_raw_dataset(args.raw_data_dir, args.step, args.window_size, args.stride)
-    # print('Loaded raw dataset')
-    # # possibly add a column of distance with neighbors 
-    # out = df.groupby('sceneId').apply(compute_distance_with_neighbors)
-    # print('Sucessfully applied')
-    # for idx_1st in out.index.get_level_values('sceneId').unique():
-    #     df.loc[out[idx_1st].index, 'dist'] = out[idx_1st].values
-    # print(f'Added a column of distance with neighbors to df')
-    # # save to pickle
-    # out_path = os.path.join(args.raw_data_dir, f"data.pkl")
-    # df.to_pickle(out_path)
-    # print(f'Saved data to {out_path}')
+    df = load_raw_dataset(args.raw_data_dir, args.step, args.window_size, args.stride)
+    print('Loaded raw dataset')
+    # possibly add a column of distance with neighbors 
+    if args.varf in ['min_dist', 'avg_den50', 'avg_den100']:
+        out = df.groupby('sceneId').apply(compute_distance_with_neighbors)
+        for idx_1st in out.index.get_level_values('sceneId').unique():
+            df.loc[out[idx_1st].index, 'dist'] = out[idx_1st].values
+        print(f'Added a column of distance with neighbors to df')
+    # save
+    out_path = os.path.join(args.raw_data_dir, f"data.pkl")
+    df.to_pickle(out_path)
+    print(f'Saved data to {out_path}')
 
     # ## or load from stored pickle
-    df = pd.read_pickle(os.path.join(args.raw_data_dir, "data.pkl"))
-    print('Loaded raw dataset')
+    # df = pd.read_pickle(os.path.join(args.raw_data_dir, "data.pkl"))
+    # print('Loaded raw dataset')
 
 
     # ================= plot =================
@@ -807,18 +812,18 @@ if __name__ == "__main__":
                     'abs+max_acc', 'abs+avg_acc', 'min_dist', 'avg_den100', 'avg_den50']
 
         # ## get variation factor table 
-        # df_varfs = get_varf_table(df, varf_list, args.obs_len)
-        # df_varfs_com = get_varf_table(df, varf_list, None)
-        # df_varfs = df_varfs.merge(
-        #     df_varfs_com.drop(['label', 'sceneId', 'scene'], axis=1), 
-        #     on='metaId', suffixes=('', '_com'))
-        # out_path = os.path.join(args.raw_data_dir, f"df_varfs.pkl")
-        # df_varfs.to_pickle(out_path)
-        # print(f'Saved df_varfs to {out_path}')
+        df_varfs = get_varf_table(df, varf_list, args.obs_len)
+        df_varfs_com = get_varf_table(df, varf_list, None)
+        df_varfs = df_varfs.merge(
+            df_varfs_com.drop(['label', 'sceneId', 'scene'], axis=1), 
+            on='metaId', suffixes=('', '_com'))
+        out_path = os.path.join(args.raw_data_dir, f"df_varfs.pkl")
+        df_varfs.to_pickle(out_path)
+        print(f'Saved df_varfs to {out_path}')
 
         # ## or load from stored one
-        df_varfs = pd.read_pickle(os.path.join(args.raw_data_dir, "df_varfs.pkl"))
-        print('Loaded df_varfs')
+        # df_varfs = pd.read_pickle(os.path.join(args.raw_data_dir, "df_varfs.pkl"))
+        # print('Loaded df_varfs')
 
         for varf in varf_list:
             # plot_varf_hist_obs_and_complete(df_varfs[['label', varf, varf+'_com']], 'figures/filtered_distr/hist/diff')
@@ -831,6 +836,6 @@ if __name__ == "__main__":
 
 
     # ============== create designed dataset ================
-    create_dataset_by_varf(df, args.varf, args.varf_ranges,
-                           args.labels, args.filter_data_dir, args.obs_len)
-    print(f'Creating dataset by {args.varf} of {args.labels}')
+    create_dataset_by_varf(df, args.varf, args.varf_ranges, args.labels, 
+        os.path.join(args.filter_data_dir, args.varf, '_'.join(args.labels)), args.obs_len)
+    print(f'Created dataset by {args.varf} using {args.labels}')

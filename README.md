@@ -38,6 +38,8 @@ If you find this code useful for your research, please cite our paper:
 
 ### Setup
 
+Use `python=3.8`.
+
 Install PyTorch, for example using pip
 
 ```
@@ -66,6 +68,24 @@ unzip sdd_ynet.zip
 ```
 
 After unzipping the file the directory should have following structure:
+```
+data
+├── sdd
+│   ├── raw
+│   │    ├── annotations/
+│   │    ├── data.pkl
+│   │    └── df_varfs.pkl    
+│   └── filter
+│        ├── avg_vel
+│        │    └── Pedestrian
+│        │         ├── 0.1_0.4.pkl
+│        │         └── 0.4_2.5.pkl
+│        ├── avg_den100/...
+│        └── ...
+└── ynet_additional_files
+```
+
+Previously 
 ```
 sdd_ynet
 ├── dataset_raw
