@@ -1,3 +1,4 @@
+from multiprocessing.sharedctypes import Value
 import numpy as np
 import torch
 import random
@@ -407,38 +408,70 @@ def aggregate_per_varf_value_per_metaId(df_meta, varf, obs_len):
     return stats, label
 
 
-def create_dataset_by_varf(df, varf, varf_ranges, labels, out_dir, obs_len, same_group_size=False):
+def add_range_column(df, varf, varf_ranges, obs_len):
+    df_stats = aggregate_per_varf_value(df, varf, obs_len)
+    for r in varf_ranges:
+        df_stats.loc[df_stats[varf].between(r[0], r[1], inclusive='right'), f'{varf}_range'] = f'{r[0]}_{r[1]}'
+    df = df.merge(df_stats[['metaId', f'{varf}_range']], on='metaId')
+    return df
+
+
+def convert_df_to_dict(df_gb):
+    varf_group_dict = dict()
+    for g_range in df_gb.groups.keys():
+        df_g = df_gb.get_group(g_range)[['metaId', 'sceneId', 'label']].drop_duplicates()
+        assert df_g.metaId.nunique() == df_g.shape[0]
+        varf_group_dict[g_range] = df_g.to_dict('list')
+    return varf_group_dict
+
+
+def create_customized_dataset(df, varf, varf_ranges, labels, out_dir, 
+        obs_len, statistic_only, same_group_size=False):
+    """_summary_
+
+    Args:
+        df (pd.DataFrame): _description_
+        varf (str | list of str): _description_
+        varf_ranges (list of tuple | list of list of tuple): _description_
+        labels (_type_): _description_
+        out_dir (_type_): _description_
+        obs_len (_type_): _description_
+        statistic_only (bool): 
+            Whether store the generated dataset or give statistic of categorized dataset only.
+        same_group_size (bool, optional): _description_. Defaults to False.
+    """
     pathlib.Path(out_dir).mkdir(parents=True, exist_ok=True)
-    varf_group_dict = {varf_range: {"metaId": [], "sceneId": [], "label": []}
-                       for varf_range in varf_ranges}
-    df_label = df[df.label.apply(lambda x: x in labels)]
+    df_label = df[df.label.isin(labels)]
 
     # categorize by factor of variation
-    for meta_id in tqdm(df_label["metaId"].unique(), desc=f'Categorizing by {varf}'):
-        df_meta = df_label[df_label["metaId"] == meta_id]
-        stats, label = aggregate_per_varf_value_per_metaId(df_meta, varf, obs_len)
-        for varf_range in varf_ranges:
-            range_min, range_max = varf_range
-            if stats > range_min and stats <= range_max:
-                varf_group_dict[varf_range]["metaId"].append(meta_id)
-                unique_scene_ids = np.unique(df_meta["sceneId"].values)
-                assert len(unique_scene_ids) == 1
-                scene_id = unique_scene_ids[0]
-                varf_group_dict[varf_range]["sceneId"].append(scene_id)
-                varf_group_dict[varf_range]["label"].append(label)
+    if isinstance(varf, str):
+        df_label = add_range_column(df_label, varf, varf_ranges, obs_len)
+        varf_range_name = f'{varf}_range'
+    elif isinstance(varf, list):
+        for f, r in zip(varf, varf_ranges):
+            df_label = add_range_column(df_label, f, r, obs_len)
+        varf_range_name = '__'.join(varf)+'_range'
+        nonan_mask = df_label.isna().any(axis=1)
+        df_label.loc[~nonan_mask, varf_range_name] = \
+            df_label.loc[~nonan_mask, [f + '_range' for f in varf]].agg('__'.join, axis=1)
+    else:
+        raise ValueError(f'Cannot process {varf}.')
+    df_gb = df_label.groupby(by=varf_range_name, dropna=True)
+    print('Statistics:\n', df_gb.count()['metaId'] / 20)
+    print('# total:', (df_gb.count()['metaId'] / 20).sum())
 
-    min_n = min([len(g["metaId"]) for g in varf_group_dict.values()])
-    for varf_range, varf_group in varf_group_dict.items():
-        if same_group_size:
-            meta_id_mask = reduce_group_size(varf_group, varf_range, min_n)
-            df_varf = df_label[df_label.metaId.isin(varf_group['metaId'][meta_id_mask])]
-        else:
-            df_varf = df_label[df_label.metaId.isin(varf_group['metaId'])]
-        varf_range_name = f"{varf_range[0]}_{varf_range[1]}"
-        df_varf.loc[:, "varf_range"] = varf_range_name
-        out_path = os.path.join(out_dir, f"{varf_range_name}.pkl")
-        df_varf.to_pickle(out_path)
-        print(f'{varf_range}: {int(df_varf.shape[0]/20)}')
+    # save categorized dataset
+    if not statistic_only:
+        varf_group_dict = convert_df_to_dict(df_gb)
+        for varf_range, varf_group in varf_group_dict.items():
+            if same_group_size:
+                min_n = min([len(g["metaId"]) for g in varf_group_dict.values()])
+                meta_id_mask = reduce_group_size(varf_group, varf_range, min_n)
+                df_varf = df_label[df_label.metaId.isin(varf_group['metaId'][meta_id_mask])]
+            else:
+                df_varf = df_label[df_label.metaId.isin(varf_group['metaId'])] 
+            out_path = os.path.join(out_dir, f"{varf_range_name}.pkl")
+            df_varf.to_pickle(out_path)
 
 
 def reduce_group_size(varf_group, varf_range, min_n):
@@ -498,13 +531,13 @@ def compute_distance_with_neighbors(df_scene):
 
 
 def lambda_distance_with_neighbors(row, df_scene, step=12):
-    start = datetime.datetime.now()
+    # start = datetime.datetime.now()
     frame_diff = df_scene.frame - row.frame
     df_sim = df_scene[(frame_diff < step/2) & \
         (frame_diff >= -step/2) & (df_scene.metaId != row.metaId)]
     dist = np.inf if df_sim.shape[0] == 0 else compute_distance_xy(df_sim, row.x, row.y)
-    duration = datetime.datetime.now() - start
-    print(f'### meta_id = {row.metaId}, time = {duration}')
+    # duration = datetime.datetime.now() - start
+    # print(f'### meta_id = {row.metaId}, time = {duration}')
     return dist
 
 
@@ -765,45 +798,51 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--raw_data_dir", default='data/sdd/raw', type=str)
     parser.add_argument("--filter_data_dir", default='data/sdd/filter', type=str)
-
+    parser.add_argument("--reload", action='store_true')
+    parser.add_argument("--statistic_only", action="store_true", 
+                        help='False to save also the categorized dataset')
+    
     parser.add_argument("--step", default=12, type=int)
     parser.add_argument("--window_size", default=20, type=int)
     parser.add_argument("--stride", default=20, type=int)
     parser.add_argument("--obs_len", default=8, type=int)
 
-    parser.add_argument("--varf", default='avg_vel', type=str, help='variation factor',
-                        choices=['avg_vel', 'max_vel', 'avg_acc', 'max_acc', 
-                                 'abs+max_acc', 'abs+avg_acc', 
-                                 'min_dist', 'avg_den50', 'avg_den100'])
+    parser.add_argument("--varf", default=['avg_vel', 'avg_den100'], 
+                        help="variation factors from: 'avg_vel', 'max_vel', "+\
+                            "'avg_acc', 'max_acc', 'abs+max_acc', 'abs+avg_acc', "+\
+                            "'min_dist', 'avg_den50', 'avg_den100'")
     parser.add_argument("--varf_ranges", help='range of varation factor to take',
-                        default=[(0.1, 0.4), (0.4, 2.5)])
+                        # default=[(0.1, 0.4), (0.4, 2.5)])
+                        # default=[(-0.1, 0), (0, 1), (1, 2), (2, 3), (3, 4), (4, 6)])
+                        default=[[(0.1, 0.4), (0.4, 2.5)], [(-0.1, 0), (0, 1), (1, 2), (2, 3), (3, 4), (4, 6)]])
 
     parser.add_argument("--labels", default=['Pedestrian'], nargs='+', type=str,
                         choices=['Biker', 'Bus', 'Car', 'Cart', 'Pedestrian', 'Skater'])
 
-    parser.add_argument("--vis", default=False, type=bool)
+    parser.add_argument("--vis", action='store_true') 
 
     args = parser.parse_args()
     args.labels.sort()
 
     # ============== load raw dataset ===============
-    # ## load raw dataset
-    df = load_raw_dataset(args.raw_data_dir, args.step, args.window_size, args.stride)
-    print('Loaded raw dataset')
-    # possibly add a column of distance with neighbors 
-    if args.varf in ['min_dist', 'avg_den50', 'avg_den100']:
-        out = df.groupby('sceneId').apply(compute_distance_with_neighbors)
-        for idx_1st in out.index.get_level_values('sceneId').unique():
-            df.loc[out[idx_1st].index, 'dist'] = out[idx_1st].values
-        print(f'Added a column of distance with neighbors to df')
-    # save
-    out_path = os.path.join(args.raw_data_dir, f"data.pkl")
-    df.to_pickle(out_path)
-    print(f'Saved data to {out_path}')
-
-    # ## or load from stored pickle
-    # df = pd.read_pickle(os.path.join(args.raw_data_dir, "data.pkl"))
-    # print('Loaded raw dataset')
+    if not args.reload:
+        # ## load raw dataset
+        df = load_raw_dataset(args.raw_data_dir, args.step, args.window_size, args.stride)
+        print('Loaded raw dataset')
+        # possibly add a column of distance with neighbors 
+        if 'dist' in args.varf or 'den' in args.varf or np.array(['dist' in f or 'den' in f for f in args.varf]).any():
+            out = df.groupby('sceneId').apply(compute_distance_with_neighbors)
+            for idx_1st in out.index.get_level_values('sceneId').unique():
+                df.loc[out[idx_1st].index, 'dist'] = out[idx_1st].values
+            print(f'Added a column of distance with neighbors to df')
+        # save
+        out_path = os.path.join(args.raw_data_dir, f"data.pkl")
+        df.to_pickle(out_path)
+        print(f'Saved data to {out_path}')
+    else:  # reload = True
+        # ## or load from stored pickle
+        df = pd.read_pickle(os.path.join(args.raw_data_dir, "data.pkl"))
+        print('Reloaded raw dataset')
 
 
     # ================= plot =================
@@ -811,19 +850,20 @@ if __name__ == "__main__":
         varf_list = ['avg_vel', 'max_vel', 'avg_acc', 'max_acc', 
                     'abs+max_acc', 'abs+avg_acc', 'min_dist', 'avg_den100', 'avg_den50']
 
-        # ## get variation factor table 
-        df_varfs = get_varf_table(df, varf_list, args.obs_len)
-        df_varfs_com = get_varf_table(df, varf_list, None)
-        df_varfs = df_varfs.merge(
-            df_varfs_com.drop(['label', 'sceneId', 'scene'], axis=1), 
-            on='metaId', suffixes=('', '_com'))
-        out_path = os.path.join(args.raw_data_dir, f"df_varfs.pkl")
-        df_varfs.to_pickle(out_path)
-        print(f'Saved df_varfs to {out_path}')
-
-        # ## or load from stored one
-        # df_varfs = pd.read_pickle(os.path.join(args.raw_data_dir, "df_varfs.pkl"))
-        # print('Loaded df_varfs')
+        if not args.reload:
+            # ## get variation factor table 
+            df_varfs = get_varf_table(df, varf_list, args.obs_len)
+            df_varfs_com = get_varf_table(df, varf_list, None)
+            df_varfs = df_varfs.merge(
+                df_varfs_com.drop(['label', 'sceneId', 'scene'], axis=1), 
+                on='metaId', suffixes=('', '_com'))
+            out_path = os.path.join(args.raw_data_dir, f"df_varfs.pkl")
+            df_varfs.to_pickle(out_path)
+            print(f'Saved df_varfs to {out_path}')
+        else:
+            # ## or load from stored one
+            df_varfs = pd.read_pickle(os.path.join(args.raw_data_dir, "df_varfs.pkl"))
+            print('Loaded df_varfs')
 
         for varf in varf_list:
             # plot_varf_hist_obs_and_complete(df_varfs[['label', varf, varf+'_com']], 'figures/filtered_distr/hist/diff')
@@ -836,6 +876,12 @@ if __name__ == "__main__":
 
 
     # ============== create designed dataset ================
-    create_dataset_by_varf(df, args.varf, args.varf_ranges, args.labels, 
-        os.path.join(args.filter_data_dir, args.varf, '_'.join(args.labels)), args.obs_len)
+    if isinstance(args.varf, str):
+        out_dir = os.path.join(args.filter_data_dir, args.varf, '_'.join(args.labels))
+    elif isinstance(args.varf, list):
+        out_dir = os.path.join(args.filter_data_dir, '__'.join(args.varf), '_'.join(args.labels))
+    else:
+        raise ValueError(f'Cannot process {varf}')
+    create_customized_dataset(df, args.varf, args.varf_ranges, args.labels, 
+        out_dir, obs_len=args.obs_len, statistic_only=args.statistic_only)
     print(f'Created dataset by {args.varf} using {args.labels}')
