@@ -1,8 +1,9 @@
-from typing import List
-import pathlib
 import os
 import csv
+import pathlib
 import numpy as np
+from typing import List
+
 
 def write_csv(out_dir: str, seed: int, ade: float, fde: float, num_epochs: int, num_batches: int, train_net: str, dataset: str,
               val_files: List[str], train_files: List[str] = None, ade_final: float = None, fde_final: float = None):
@@ -12,10 +13,12 @@ def write_csv(out_dir: str, seed: int, ade: float, fde: float, num_epochs: int, 
     else:
         train_name = "None"
     out_name = f"{num_batches}.csv"
-    out_dir = os.path.join(out_dir, dataset, train_name.strip("_"), val_name.strip("_"), train_net, str(seed))
+    out_dir = os.path.join(out_dir, dataset, train_name.strip(
+        "_"), val_name.strip("_"), train_net, str(seed))
     out_path = os.path.join(out_dir, out_name)
     pathlib.Path(out_dir).mkdir(parents=True, exist_ok=True)
-    out_data = [round_val(min(ade)), round_val(np.mean(ade))] + [round_val(ade_val) for ade_val in ade]
+    out_data = [round_val(min(ade)), round_val(np.mean(ade))] + \
+        [round_val(ade_val) for ade_val in ade]
     if ade_final is not None:
         out_data = [round_val(ade_final)] + out_data
     out_data = convert_to_str(out_data)
@@ -23,11 +26,13 @@ def write_csv(out_dir: str, seed: int, ade: float, fde: float, num_epochs: int, 
         wr = csv.writer(f, dialect='excel')
         wr.writerows(out_data)
 
+
 def round_val(num: float, ndig: int = 4):
     if num is None:
         return 0.0
     else:
         return str(round(num, ndig))
+
 
 def convert_to_str(in_list: List):
     out_list = []

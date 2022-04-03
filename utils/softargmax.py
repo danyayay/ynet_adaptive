@@ -1,11 +1,10 @@
 # Credits to PyTorch geometry
 # https://kornia.readthedocs.io/en/v0.1.2/_modules/torchgeometry/contrib/spatial_soft_argmax2d.html
 
-from typing import Optional
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from typing import Optional
 
 
 def create_meshgrid(
@@ -19,7 +18,8 @@ def create_meshgrid(
         ys = torch.linspace(-1.0, 1.0, height, device=_device, dtype=_dtype)
     else:
         xs = torch.linspace(0, width - 1, width, device=_device, dtype=_dtype)
-        ys = torch.linspace(0, height - 1, height, device=_device, dtype=_dtype)
+        ys = torch.linspace(0, height - 1, height,
+                            device=_device, dtype=_dtype)
     return torch.meshgrid(ys, xs)  # pos_y, pos_x
 
 

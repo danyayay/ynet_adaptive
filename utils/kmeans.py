@@ -1,9 +1,10 @@
-import numpy as np
 import torch
+import numpy as np
 from tqdm import tqdm
 # Thank you subhadarship for the implementation
 # https://github.com/subhadarship/kmeans_pytorch
 # Modified to solve a bug see https://github.com/subhadarship/kmeans_pytorch/issues/16
+
 
 def initialize(X, num_clusters):
     """
@@ -22,7 +23,7 @@ def kmeans(
         X,
         num_clusters,
         distance='euclidean',
-        cluster_centers = [],
+        cluster_centers=[],
         tol=1e-4,
         tqdm_flag=True,
         iter_limit=0,
@@ -54,7 +55,7 @@ def kmeans(
     X = X.to(device)
 
     # initialize
-    if type(cluster_centers) == list: #ToDo: make this less annoyingly weird
+    if type(cluster_centers) == list:  # ToDo: make this less annoyingly weird
         initial_state = initialize(X, num_clusters)
     else:
         print('resuming')
@@ -64,12 +65,12 @@ def kmeans(
         choice_points = torch.argmin(dis, dim=0)
         initial_state = X[choice_points]
         initial_state = initial_state.to(device)
-        
+
     iteration = 0
     if tqdm_flag:
         tqdm_meter = tqdm(desc='[running kmeans]')
     while True:
-        
+
         dis = pairwise_distance_function(X, initial_state)
 
         choice_cluster = torch.argmin(dis, dim=1)
@@ -177,4 +178,3 @@ def pairwise_cosine(data1, data2, device=torch.device('cpu')):
     # return N*N matrix for pairwise distance
     cosine_dis = 1 - cosine.sum(dim=-1).squeeze()
     return cosine_dis
-

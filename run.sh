@@ -13,4 +13,4 @@ source ~/.bashrc
 conda activate ynetv
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/dli/anaconda3/lib/
 
-bash create_custom_dataset.sh
+bash run_train.sh
