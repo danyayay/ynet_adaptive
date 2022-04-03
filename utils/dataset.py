@@ -408,10 +408,10 @@ def aggregate_per_varf_value_per_metaId(df_meta, varf, obs_len):
     return stats, label
 
 
-def add_range_column(df, varf, varf_ranges, obs_len):
+def add_range_column(df, varf, varf_ranges, obs_len, inclusive='both'):
     df_stats = aggregate_per_varf_value(df, varf, obs_len)
     for r in varf_ranges:
-        df_stats.loc[df_stats[varf].between(r[0], r[1], inclusive='right'), f'{varf}_range'] = f'{r[0]}_{r[1]}'
+        df_stats.loc[df_stats[varf].between(r[0], r[1], inclusive=inclusive), f'{varf}_range'] = f'{r[0]}_{r[1]}'
     df = df.merge(df_stats[['metaId', f'{varf}_range']], on='metaId')
     return df
 
@@ -426,7 +426,7 @@ def convert_df_to_dict(df_gb):
 
 
 def create_customized_dataset(df, varf, varf_ranges, labels, out_dir, 
-        obs_len, statistic_only, same_group_size=False):
+        obs_len, statistic_only, inclusive='both', same_group_size=False):
     """_summary_
 
     Args:
@@ -438,18 +438,21 @@ def create_customized_dataset(df, varf, varf_ranges, labels, out_dir,
         obs_len (_type_): _description_
         statistic_only (bool): 
             Whether store the generated dataset or give statistic of categorized dataset only.
-        same_group_size (bool, optional): _description_. Defaults to False.
+        inclusive (str):
+            Choices = [both, right, left, neither]
+        same_group_size (bool, optional): 
+            _description_. Defaults to False.
     """
     pathlib.Path(out_dir).mkdir(parents=True, exist_ok=True)
     df_label = df[df.label.isin(labels)]
 
     # categorize by factor of variation
     if isinstance(varf, str):
-        df_label = add_range_column(df_label, varf, varf_ranges, obs_len)
+        df_label = add_range_column(df_label, varf, varf_ranges, obs_len, inclusive=inclusive)
         varf_range_name = f'{varf}_range'
     elif isinstance(varf, list):
         for f, r in zip(varf, varf_ranges):
-            df_label = add_range_column(df_label, f, r, obs_len)
+            df_label = add_range_column(df_label, f, r, obs_len, inclusive=inclusive)
         varf_range_name = '__'.join(varf)+'_range'
         nonan_mask = df_label.isna().any(axis=1)
         df_label.loc[~nonan_mask, varf_range_name] = \
@@ -807,14 +810,17 @@ if __name__ == "__main__":
     parser.add_argument("--stride", default=20, type=int)
     parser.add_argument("--obs_len", default=8, type=int)
 
-    parser.add_argument("--varf", default=['avg_vel', 'avg_den100'], 
+    parser.add_argument("--varf", default='avg_den100', 
                         help="variation factors from: 'avg_vel', 'max_vel', "+\
                             "'avg_acc', 'max_acc', 'abs+max_acc', 'abs+avg_acc', "+\
                             "'min_dist', 'avg_den50', 'avg_den100'")
     parser.add_argument("--varf_ranges", help='range of varation factor to take',
-                        # default=[(0.1, 0.4), (0.4, 2.5)])
-                        # default=[(-0.1, 0), (0, 1), (1, 2), (2, 3), (3, 4), (4, 6)])
-                        default=[[(0.1, 0.4), (0.4, 2.5)], [(-0.1, 0), (0, 1), (1, 2), (2, 3), (3, 4), (4, 6)]])
+                        # default=[(0.1, 0.3), (0.5, 1.5)])
+                        # default=[(0.1, 0.2), (0.6, 1.4)])
+                        # default=[(0, 0.2), (0.8, 1.2), (1.8, 2.2), (2.8, 3.2), (3.8, 4.2)])
+                        default=[(0, 0.3), (0.7, 1.3), (1.7, 2.3), (2.7, 3.3), (3.7, 4.3)])
+                        # default=[[(0.1, 0.3), (0.5, 1.5)], [(0, 0.3), (0.7, 1.3), (1.7, 2.3), (2.7, 3.3), (3.7, 4.3)]])
+                        # default=[[(0.1, 0.2), (0.6, 1.4)], [(0, 0.2), (0.8, 1.2), (1.8, 2.2), (2.8, 3.2), (3.8, 4.2)]])
 
     parser.add_argument("--labels", default=['Pedestrian'], nargs='+', type=str,
                         choices=['Biker', 'Bus', 'Car', 'Cart', 'Pedestrian', 'Skater'])
