@@ -1,117 +1,100 @@
-import torch
-import torch.nn as nn
-from utils.image_utils import get_patch, image2world
+import os
+import yaml
+import time
+import numpy as np
+import pandas as pd
+
+from model import YNetTrainer
+from utils.parser import get_parser
+from utils.write_files import write_csv, get_out_dir
+from utils.dataset import set_random_seeds, limit_samples, dataset_split
+
+import warnings
+warnings.filterwarnings("ignore")
 
 
-def train(model, train_loader, train_images, e, obs_len, pred_len, batch_size, params, gt_template, device, input_template, optimizer, criterion, dataset_name, homo_mat, with_style=False):
-    """
-    Run training for one epoch
+# ## configuration
+tic = time.time()
+args = get_parser(train=True)
+set_random_seeds(args.seed)
+if args.gpu: os.environ["CUDA_VISIBLE_DEVICES"] = str(args.gpu)
 
-    :param model: torch model
-    :param train_loader: torch dataloader
-    :param train_images: dict with keys: scene_name value: preprocessed image as torch.Tensor
-    :param e: epoch number
-    :param params: dict of hyperparameters
-    :param gt_template:  precalculated Gaussian heatmap template as torch.Tensor
-    :return: train_ADE, train_FDE, train_loss for one epoch
-    """
-    train_loss = 0
-    train_ADE = []
-    train_FDE = []
-    model.train()
-    counter = 0
+with open(os.path.join('config', 'sdd_raw_train.yaml')) as file:
+    params = yaml.load(file, Loader=yaml.FullLoader)
 
-    # outer loop, for loop over each scene as scenes have different image size and to calculate segmentation only once
-    for batch, (trajectory, meta, scene) in enumerate(train_loader):
+params['segmentation_model_fp'] = os.path.join(args.data_dir, args.dataset_name, 'segmentation_model.pth')
+params.update(vars(args))
+# set lr depending on the model
+# if args.train_net == 'modulator': params['lr'] = 0.01
+print(params)
 
-        # Get scene image and apply semantic segmentation
-        if e < params['unfreeze']:  # before unfreeze only need to do semantic segmentation once
-            model.eval()
-            scene_image = train_images[scene].to(device).unsqueeze(0)
-            scene_image = model.segmentation(scene_image)
-            model.train()
+# ## set up data
+print('############ Prepare dataset ##############')
+IMAGE_PATH = os.path.join(args.data_dir, args.dataset_name, 'raw', 'annotations')
+assert os.path.isdir(IMAGE_PATH), 'raw data dir error'
+DATA_PATH = os.path.join(args.data_dir, args.dataset_name, args.dataset_path)
 
-        counter += len(trajectory)
-        # print('Batch number of trajectories: {:d}'.format(len(trajectory)))
+if args.train_files == args.val_files:
+    # train_files and val_files are fully overlapped 
+    df_train, df_val, df_test = dataset_split(
+        DATA_PATH, args.train_files, args.val_ratio, args.n_leftouts)
+else:
+    # train_files and val_files are fully non-overlapped
+    df_train, _, df_test = dataset_split(
+        DATA_PATH, args.train_files, 0, args.n_leftouts)
+    df_val = pd.concat([pd.read_pickle(os.path.join(DATA_PATH, val_file)) for val_file in args.val_files])
+df_train = limit_samples(df_train, args.n_train_batch, args.batch_size)
+print(f"df_train: {df_train.shape}; #={df_train.shape[0]/(params['obs_len']+params['pred_len'])}")
+print(f"df_val: {df_val.shape}; #={df_val.shape[0]/(params['obs_len']+params['pred_len'])}")
+if df_test is not None: print(f"df_test: {df_test.shape}; #={df_test.shape[0]/(params['obs_len']+params['pred_len'])}")
 
-        # inner loop, for each trajectory in the scene
-        for i in range(0, len(trajectory), batch_size):
-            if e >= params['unfreeze']:
-                scene_image = train_images[scene].to(device).unsqueeze(0)
-                scene_image = model.segmentation(scene_image)
+# ## model
+model = YNetTrainer(params=params)
 
-            # Create Heatmaps for past and ground-truth future trajectories
-            _, _, H, W = scene_image.shape  # image shape
+if args.train_net == "modulator": model.model.initialize_style()
 
-            observed = trajectory[i:i+batch_size,
-                                  :obs_len, :].reshape(-1, 2).cpu().numpy()
-            observed_map = get_patch(input_template, observed, H, W)
-            observed_map = torch.stack(
-                observed_map).reshape([-1, obs_len, H, W])
+if args.ckpt is not None:
+    model.load(args.ckpt)
+    print(f"Loaded checkpoint {args.ckpt}")
+else:
+    print("Training from scratch")
 
-            gt_future = trajectory[i:i + batch_size, obs_len:].to(device)
-            gt_future_map = get_patch(
-                gt_template, gt_future.reshape(-1, 2).cpu().numpy(), H, W)
-            gt_future_map = torch.stack(
-                gt_future_map).reshape([-1, pred_len, H, W])
+EXPERIMENT_NAME = ""
+EXPERIMENT_NAME += f"Seed_{args.seed}"
+EXPERIMENT_NAME += f"_Train_{'_'.join(['_'+f.split('.pkl')[0] for f in args.train_files])}_"
+EXPERIMENT_NAME += f"_Val_{'_'.join(['_'+f.split('.pkl')[0] for f in args.val_files])}_"
+EXPERIMENT_NAME += f"_Val_Ratio_{args.val_ratio}"
+EXPERIMENT_NAME += f"_{(args.dataset_path).replace('/', '_')}"
+EXPERIMENT_NAME += f"_train_{args.train_net}"
+print(f"Experiment {EXPERIMENT_NAME} has started")
 
-            gt_waypoints = gt_future[:, params['waypoints']]
-            gt_waypoint_map = get_patch(
-                input_template, gt_waypoints.reshape(-1, 2).cpu().numpy(), H, W)
-            gt_waypoint_map = torch.stack(gt_waypoint_map).reshape(
-                [-1, gt_waypoints.shape[1], H, W])
+# ## training
+# TODO: why df_val is exposed to training while final evaluation uses df_val during finetuning
+print('############ Train model ##############')
+val_ade, val_fde = model.train(df_train, df_val, IMAGE_PATH, IMAGE_PATH, EXPERIMENT_NAME)
+print(f'val_ade: {val_ade}, val_fde: {val_fde}')
+print(f'val_ade: {np.min(np.array(val_ade))}, val_fde: {np.min(np.array(val_fde))}')
 
-            # Concatenate heatmap and semantic map
-            semantic_map = scene_image.expand(
-                observed_map.shape[0], -1, -1, -1)  # expand to match heatmap size
-            feature_input = torch.cat([semantic_map, observed_map], dim=1)
+# test for leftout data 
+if args.out_csv_dir and args.n_leftouts:
+    print('############ Test leftout data ##############')
+    # test
+    test_ade, test_fde, _ = model.test(df_test, IMAGE_PATH, args.train_net == "modulator")
+    print(f'test_ade: {test_ade}, test_fde: {test_fde}')
+    # save csv results
+    out_dir = get_out_dir(args.out_csv_dir, args.dataset_path, args.seed, args.train_net, args.val_files, args.train_files)
+    write_csv(out_dir, 'fine_tune.csv', val_ade, val_fde, test_ade, test_fde)
 
-            # Forward pass
-            # Calculate features
-            features = model.pred_features(feature_input)
+# test for fine tuning
+# if args.out_csv_dir and args.fine_tune:
+#     print('############ Test finetune data ##############')
+#     # test 
+#     ade_final, fde_final = model.test(df_val, IMAGE_PATH, args.train_net == "modulator")
+#     print(f'ade_final: {ade_final}, fde_final: {fde_final}')
+#     # save csv results
+#     n_train_batch = len(df_train) // ((params['OBS_LEN'] + params['PRED_LEN']) * args.batch_size)
+#     out_dir = get_out_dir(args.out_csv_dir, args.dataset_path, args.seed, args.train_net, args.val_files, args.train_files)
+#     write_csv(out_dir, f'{n_train_batch}.csv', val_ade, val_fde, ade_final, fde_final)
 
-            # Style integrator
-            if with_style:
-                features = model.stylize_features(features, 0)
-
-            # Predict goal and waypoint probability distribution
-            pred_goal_map = model.pred_goal(features)
-            goal_loss = criterion(pred_goal_map, gt_future_map) * \
-                params['loss_scale']  # BCEWithLogitsLoss
-
-            # Prepare (downsample) ground-truth goal and trajectory heatmap representation for conditioning trajectory decoder
-            gt_waypoints_maps_downsampled = [nn.AvgPool2d(
-                kernel_size=2**i, stride=2**i)(gt_waypoint_map) for i in range(1, len(features))]
-            gt_waypoints_maps_downsampled = [
-                gt_waypoint_map] + gt_waypoints_maps_downsampled
-
-            # Predict trajectory distribution conditioned on goal and waypoints
-            traj_input = [torch.cat([feature, goal], dim=1) for feature, goal in zip(
-                features, gt_waypoints_maps_downsampled)]
-            pred_traj_map = model.pred_traj(traj_input)
-            traj_loss = criterion(pred_traj_map, gt_future_map) * \
-                params['loss_scale']  # BCEWithLogitsLoss
-
-            # Backprop
-            loss = goal_loss + traj_loss
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
-
-            with torch.no_grad():
-                train_loss += loss
-                # Evaluate using Softargmax, not a very exact evaluation but a lot faster than full prediction
-                pred_traj = model.softargmax(pred_traj_map)
-                pred_goal = model.softargmax(pred_goal_map[:, -1:])
-
-                train_ADE.append(
-                    ((((gt_future - pred_traj) / params['resize']) ** 2).sum(dim=2) ** 0.5).mean(dim=1))
-                train_FDE.append(
-                    ((((gt_future[:, -1:] - pred_goal[:, -1:]) / params['resize']) ** 2).sum(dim=2) ** 0.5).mean(dim=1))
-
-    train_ADE = torch.cat(train_ADE).mean()
-    train_FDE = torch.cat(train_FDE).mean()
-
-    # print('Total number of trajectories: {:d}'.format(counter))
-
-    return train_ADE.item(), train_FDE.item(), train_loss.item()
+toc = time.time()
+print(time.strftime("%Hh%Mm%Ss", time.gmtime(toc - tic)))

@@ -36,7 +36,7 @@ class SceneDataset(Dataset):
                 'float32').reshape(-1, total_len, 2))
             meta.append(meta_df)
             scene_list.append(meta_df.iloc()[0:1].sceneId.item())
-        return np.array(trajectories), meta, scene_list
+        return np.array(trajectories, dtype=object), meta, scene_list
 
 
 def scene_collate(batch):

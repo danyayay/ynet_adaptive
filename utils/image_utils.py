@@ -38,6 +38,17 @@ def create_dist_mat(size, normalize=True):
 
 
 def get_patch(template, traj, H, W):
+    """_summary_ 
+
+    Args:
+        template (torch.float32): (size, size)
+        traj (ndarray): (batch_size, n_coord)
+        H (int): 
+        W (int): 
+
+    Returns:
+        _type_: _description_
+    """
     x = np.round(traj[:, 0]).astype('int')
     y = np.round(traj[:, 1]).astype('int')
 
@@ -84,7 +95,7 @@ def resize(images, factor, seg_mask=False):
 def pad(images, division_factor=32):
     """ Pad image so that it can be divided by division_factor, as many architectures such as UNet needs a specific size
     at it's bottlenet layer"""
-    # todo: to make sure the cooridnates in df and scene_image are paired after padding
+    # TODO: to make sure the cooridnates in df and scene_image are paired after padding
     for key, im in images.items():
         if im.ndim == 3:
             H, W, C = im.shape

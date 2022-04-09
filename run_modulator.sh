@@ -1,7 +1,7 @@
-seeds=(1 2 3) # Fine-tune the model on different seeds
+list_seed=(1 2 3) # Fine-tune the model on different seeds
 batch_size=1
-num_epochs=50
-list_num_batches=(1 2 3 4 5) # Fine-tune the model with a given number of batches
+n_epoch=50
+list_n_train_batch=(1 2 3 4 5) # Fine-tune the model with a given number of batches
 
 dataset_name=sdd
 dataset_path=sherwin/dataset_ped_biker/gap/
@@ -19,10 +19,10 @@ val_ratio=0.5 # Split train dataset into a train and val split in case the domai
 ckpt=ckpts/Seed_1_Train__0.25_0.75__1.25_1.75__2.25_2.75__Val__0.25_0.75__1.25_1.75__2.25_2.75__Val_Ratio_0.3_dataset_ped_biker_gap_weights.pt # Pre-trained model
 
 
-for seed in ${seeds[@]}
+for seed in ${list_seed[@]}
 do
-    for num in ${list_num_batches[@]}
+    for n_train_batch in ${list_n_train_batch[@]}
     do
-        python train_SDD.py --fine_tune --seed $seed --batch_size $batch_size --num_epochs $num_epochs --dataset_name $dataset_name --dataset_path $dataset_path --out_csv_dir $out_csv_dir --train_files $train_files --val_files $val_files --val_ratio $val_ratio --num_train_batches $num --train_net $train_net --ckpt $ckpt --learning_rate 0.01
+        python train.py --fine_tune --seed $seed --batch_size $batch_size --n_epoch $n_epoch --dataset_name $dataset_name --dataset_path $dataset_path --out_csv_dir $out_csv_dir --train_files $train_files --val_files $val_files --val_ratio $val_ratio --n_train_batch $n_train_batch --train_net $train_net --ckpt $ckpt --lr 0.01
     done
 done

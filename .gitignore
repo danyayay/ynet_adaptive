@@ -3,6 +3,7 @@
 figures/
 ckpts/
 data/
+logs/
 
 pretrained_models
 sdd_ynet

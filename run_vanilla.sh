@@ -1,27 +1,79 @@
-seeds=(1 2 3) # Fine-tune the model on different seeds
-num_epochs=30
-list_batch_size=(1)
-list_num_batches=(1 2 3 4 5) # Fine-tune the model with a given number of batches
+list_seed=(1) # Fine-tune the model on different seeds
+n_epoch=100
+batch_size=8
+# list_batch_size=(1)
+# list_n_train_batch=(1 2 3 4 5) # Fine-tune the model with a given number of batches
 
 dataset_name=sdd 
-dataset_path=sherwin/dataset_ped_biker/gap/ 
-out_csv_dir=csv # where the output results are written to
+out_csv_dir=csv 
+val_ratio=0.1
+train_net=all 
 
-train_files='3.25_3.75.pkl' # Position the dataset files in /path/to/dataset_path/{dataset}
-val_files='3.25_3.75.pkl' # Position the dataset files in /path/to/dataset_path/{dataset}
-val_ratio=0.5 # Split train dataset into a train and val split in case the domains are the same
+declare -A A=( ["dataset_path"]="filter/avg_vel/Pedestrian/" ["filename"]="0.1_0.3.pkl" ["n_test"]=100 \
+    ["ckpt"]="ckpts/Seed_1_Train__0.1_0.3__Val__0.1_0.3__Val_Ratio_0.1_filter_avg_vel_Pedestrian__train_all_weights.pt")
+declare -A B=( ["dataset_path"]="filter/avg_vel/Pedestrian/" ["filename"]="0.5_1.5.pkl" ["n_test"]=990 \
+    ["ckpt"]="ckpts/Seed_1_Train__0.5_1.5__Val__0.5_1.5__Val_Ratio_0.1_filter_avg_vel_Pedestrian__train_all_weights.pt")
+declare -A C=( ["dataset_path"]="filter/avg_den100/Pedestrian/" ["filename"]="0_1.3.pkl" ["n_test"]=1000 \
+    ["ckpt"]="ckpts/Seed_1_Train__0_1.3__Val__0_1.3__Val_Ratio_0.1_filter_avg_den100_Pedestrian__train_all_weights.pt")
+declare -A D=( ["dataset_path"]="filter/avg_den100/Pedestrian/" ["filename"]="1.7_4.3.pkl" ["n_test"]=350 \
+    ["ckpt"]="ckpts/Seed_1_Train__1.7_4.3__Val__1.7_4.3__Val_Ratio_0.1_filter_avg_den100_Pedestrian__train_all_weights.pt")
+declare -A E=( ["dataset_path"]="filter/agent_type/" ["filename"]="Pedestrian.pkl" ["n_test"]=1500 \
+    ["ckpt"]="ckpts/Seed_1_Train__Pedestrian__Val__Pedestrian__Val_Ratio_0.1_filter_agent_type__train_all_weights.pt")
+declare -A F=( ["dataset_path"]="filter/agent_type/" ["filename"]="Biker.pkl" ["n_test"]=500 \
+    ["ckpt"]="ckpts/Seed_1_Train__Biker__Val__Biker__Val_Ratio_0.1_filter_agent_type__train_all_weights.pt")
 
-ckpt=ckpts/Seed_1_Train__0.25_0.75__1.25_1.75__2.25_2.75__Val__0.25_0.75__1.25_1.75__2.25_2.75__Val_Ratio_0.3_dataset_ped_biker_gap_weights.pt # Pre-trained model
+# ## pretrained_on: 
+dataset_path=${F["dataset_path"]}
+ckpt=${F["ckpt"]}
+# ## finetune_on
+train_files=${E["filename"]}
+val_files=${E["filename"]}
+n_leftouts=${E["n_test"]}
 
-train_net=all # Train either all parameters, only the encoder or the modulator: (all encoder modulator)
 
-for seed in ${seeds[@]}
-do
-    for nb in ${list_num_batches[@]}
-    do
-    	for bs in ${list_batch_size[@]}
-    	do
-        python train_SDD.py --fine_tune --seed $seed --batch_size $bs --num_epochs $num_epochs --dataset_name $dataset_name --dataset_path $dataset_path --out_csv_dir $out_csv_dir --train_files $train_files --val_files $val_files --val_ratio $val_ratio --num_train_batches $nb --train_net $train_net --ckpt $ckpt --learning_rate 0.00005
-        done
-    done
+for seed in ${list_seed[@]}; do
+#     for n_train_batch in ${list_n_train_batch[@]}
+#     do
+#     	for batch_size in ${list_batch_size[@]}
+#     	do
+    python train.py --fine_tune --seed $seed --batch_size $batch_size --n_epoch $n_epoch --dataset_name $dataset_name --dataset_path $dataset_path --out_csv_dir $out_csv_dir --train_files $train_files --val_files $val_files --val_ratio $val_ratio --n_leftouts $n_leftouts --train_net $train_net --ckpt $ckpt --lr 0.00005
+#         done
+#     done
 done
+
+
+# ## pretrain on B, full finetune on A 
+# train_files='0.1_0.3.pkl' 
+# val_files='0.1_0.3.pkl' 
+# n_leftout=100
+# ckpt=ckpts/Seed_1_Train__0.5_1.5__Val__0.5_1.5__Val_Ratio_0.1_filter_avg_vel_Pedestrian__train_all_weights.pt  
+
+# ## pretrain on A, full finetune on B
+# train_files='0.5_1.5.pkl'
+# val_files='0.5_1.5.pkl'
+# n_leftout=990
+# ckpt=ckpts/Seed_1_Train__0.1_0.3__Val__0.1_0.3__Val_Ratio_0.1_filter_avg_vel_Pedestrian__train_all_weights.pt  
+
+# ## pretrain on C, full finetune on D
+# train_files='1.7_4.3.pkl'
+# val_files='1.7_4.3.pkl'
+# n_leftout=350
+# ckpt=ckpts/Seed_1_Train__0_1.3__Val__0_1.3__Val_Ratio_0.1_filter_avg_den100_Pedestrian__train_all_weights.pt
+
+# ## pretrain on D, full finetune on C
+# train_files='0_1.3.pkl'
+# val_files='0_1.3.pkl'
+# n_leftout=1000
+# ckpt=ckpts/Seed_1_Train__1.7_4.3__Val__1.7_4.3__Val_Ratio_0.1_filter_avg_den100_Pedestrian__train_all_weights.pt
+
+# ## pretrain on E, full finetune on F
+# train_files='Biker.pkl' 
+# val_files='Biker.pkl' 
+# n_leftout=500
+# ckpt=ckpts/Seed_1_Train__Pedestrian__Val__Pedestrian__Val_Ratio_0.1_filter_agent_type__train_all_weights.pt
+
+# ## pretrain on F, full finetune on E 
+# train_files='Pedestrian.pkl' 
+# val_files='Pedestrian.pkl' 
+# n_leftout=1500
+# ckpt=ckpts/Seed_1_Train__1.7_4.3__Val__1.7_4.3__Val_Ratio_0.1_filter_avg_den100_Pedestrian__train_all_weights.pt

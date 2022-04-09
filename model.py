@@ -1,3 +1,4 @@
+from cv2 import dft
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -6,13 +7,14 @@ from tqdm import tqdm
 import numpy as np
 from copy import deepcopy
 
+from utils.train import train_epoch
 from utils.softargmax import SoftArgmax2D, create_meshgrid
 from utils.dataset import augment_data, create_images_dict
-from utils.image_utils import create_gaussian_heatmap_template, create_dist_mat, \
+from utils.image_utils import create_gaussian_heatmap_template, create_dist_mat, get_patch, \
     preprocess_image_for_segmentation, pad, resize
 from utils.dataloader import SceneDataset, scene_collate
-from test import evaluate
-from train import train
+from utils.evaluate import evaluate
+from utils.visualize import plot_feature_space, plot_input_space
 
 
 class StyleModulator(nn.Module):
@@ -38,34 +40,38 @@ class YNetEncoder(nn.Module):
     def __init__(self, in_channels, channels=(64, 128, 256, 512, 512)):
         """
         Encoder model
-        :param in_channels: int, semantic_classes + obs_len
+        :param in_channels: int, n_semantic_classes + obs_len
         :param channels: list, hidden layer channels
         """
         super(YNetEncoder, self).__init__()
         self.stages = nn.ModuleList()
 
         # First block
-        self.stages.append(nn.Sequential(
-            nn.Conv2d(in_channels, channels[0], kernel_size=(
-                3, 3), stride=(1, 1), padding=(1, 1)),
-            nn.ReLU(inplace=True),
-        ))
+        self.stages.append(
+            nn.Sequential(
+                nn.Conv2d(in_channels, channels[0], kernel_size=(3, 3), stride=(1, 1), padding=(1, 1)),
+                nn.ReLU(inplace=True),
+            )
+        )
 
         # Subsequent blocks, each starting with MaxPool
         for i in range(len(channels)-1):
-            self.stages.append(nn.Sequential(
-                nn.MaxPool2d(kernel_size=2, stride=2, padding=0,
-                             dilation=1, ceil_mode=False),
-                nn.Conv2d(channels[i], channels[i+1],
-                          kernel_size=(3, 3), stride=(1, 1), padding=(1, 1)),
-                nn.ReLU(inplace=True),
-                nn.Conv2d(channels[i+1], channels[i+1],
-                          kernel_size=(3, 3), stride=(1, 1), padding=(1, 1)),
-                nn.ReLU(inplace=True)))
+            self.stages.append(
+                nn.Sequential(
+                    nn.MaxPool2d(kernel_size=2, stride=2, padding=0, dilation=1, ceil_mode=False),
+                    nn.Conv2d(channels[i], channels[i+1], kernel_size=(3, 3), stride=(1, 1), padding=(1, 1)),
+                    nn.ReLU(inplace=True),
+                    nn.Conv2d(channels[i+1], channels[i+1], kernel_size=(3, 3), stride=(1, 1), padding=(1, 1)),
+                    nn.ReLU(inplace=True)
+                )
+            )
 
         # Last MaxPool layer before passing the features into decoder
-        self.stages.append(nn.Sequential(nn.MaxPool2d(
-            kernel_size=2, stride=2, padding=0, dilation=1, ceil_mode=False)))
+        self.stages.append(
+            nn.Sequential(
+                nn.MaxPool2d(kernel_size=2, stride=2, padding=0, dilation=1, ceil_mode=False)
+            )
+        )
 
     def forward(self, x):
         # Saves the feature maps Tensor of each layer into a list, as we will later need them again for the decoder
@@ -89,7 +95,7 @@ class YNetDecoder(nn.Module):
 
         # The trajectory decoder takes in addition the conditioned goal and waypoints as an additional image channel
         if traj:
-            encoder_channels = [channel+traj for channel in encoder_channels]
+            encoder_channels = [channel + traj for channel in encoder_channels]
         # reverse channels to start from head of encoder
         encoder_channels = encoder_channels[::-1]
         center_channels = encoder_channels[0]
@@ -98,38 +104,31 @@ class YNetDecoder(nn.Module):
 
         # The center layer (the layer with the smallest feature map size)
         self.center = nn.Sequential(
-            nn.Conv2d(center_channels, center_channels*2,
-                      kernel_size=(3, 3), stride=(1, 1), padding=(1, 1)),
+            nn.Conv2d(center_channels, center_channels*2, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1)),
             nn.ReLU(inplace=True),
-            nn.Conv2d(center_channels*2, center_channels*2,
-                      kernel_size=(3, 3), stride=(1, 1), padding=(1, 1)),
+            nn.Conv2d(center_channels*2, center_channels*2, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1)),
             nn.ReLU(inplace=True)
         )
 
         # Determine the upsample channel dimensions
         upsample_channels_in = [center_channels*2] + decoder_channels[:-1]
-        upsample_channels_out = [num_channel //
-                                 2 for num_channel in upsample_channels_in]
+        upsample_channels_out = [num_channel // 2 for num_channel in upsample_channels_in]
 
         # Upsampling consists of bilinear upsampling + 3x3 Conv, here the 3x3 Conv is defined
-        self.upsample_conv = [
-            nn.Conv2d(in_channels_, out_channels_, kernel_size=(
-                3, 3), stride=(1, 1), padding=(1, 1))
+        self.upsample_conv = [nn.Conv2d(
+            in_channels_, out_channels_, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
             for in_channels_, out_channels_ in zip(upsample_channels_in, upsample_channels_out)]
         self.upsample_conv = nn.ModuleList(self.upsample_conv)
 
         # Determine the input and output channel dimensions of each layer in the decoder
         # As we concat the encoded feature and decoded features we have to sum both dims
-        in_channels = [enc + dec for enc,
-                       dec in zip(encoder_channels, upsample_channels_out)]
+        in_channels = [enc + dec for enc, dec in zip(encoder_channels, upsample_channels_out)]
         out_channels = decoder_channels
 
         self.decoder = [nn.Sequential(
-            nn.Conv2d(in_channels_, out_channels_, kernel_size=(
-                3, 3), stride=(1, 1), padding=(1, 1)),
+            nn.Conv2d(in_channels_, out_channels_, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1)),
             nn.ReLU(inplace=True),
-            nn.Conv2d(out_channels_, out_channels_, kernel_size=(
-                3, 3), stride=(1, 1), padding=(1, 1)),
+            nn.Conv2d(out_channels_, out_channels_, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1)),
             nn.ReLU(inplace=True))
             for in_channels_, out_channels_ in zip(in_channels, out_channels)]
         self.decoder = nn.ModuleList(self.decoder)
@@ -146,8 +145,7 @@ class YNetDecoder(nn.Module):
         x = self.center(center_feature)
         for i, (feature, module, upsample_conv) in enumerate(zip(features[1:], self.decoder, self.upsample_conv)):
             # bilinear interpolation for upsampling
-            x = F.interpolate(x, scale_factor=2,
-                              mode='bilinear', align_corners=False)
+            x = F.interpolate(x, scale_factor=2, mode='bilinear', align_corners=False)
             x = upsample_conv(x)  # 3x3 conv for upsampling
             # concat encoder and decoder features
             x = torch.cat([x, feature], dim=1)
@@ -157,40 +155,42 @@ class YNetDecoder(nn.Module):
 
 
 class YNet(nn.Module):
-    def __init__(self, obs_len, pred_len, segmentation_model_fp, use_features_only=False, semantic_classes=6,
-                 encoder_channels=[], decoder_channels=[], waypoints=1):
+    def __init__(self, obs_len, pred_len, segmentation_model_fp, use_features_only=False, n_semantic_classes=6,
+                 encoder_channels=[], decoder_channels=[], n_waypoints=1):
         """
         Complete Y-net Architecture including semantic segmentation backbone, heatmap embedding and ConvPredictor
         :param obs_len: int, observed timesteps
         :param pred_len: int, predicted timesteps
         :param segmentation_model_fp: str, filepath to pretrained segmentation model
         :param use_features_only: bool, if True -> use segmentation features from penultimate layer, if False -> use softmax class predictions
-        :param semantic_classes: int, number of semantic classes
+        :param n_semantic_classes: int, number of semantic classes
         :param encoder_channels: list, encoder channel structure
         :param decoder_channels: list, decoder channel structure
-        :param waypoints: int, number of waypoints
+        :param n_waypoints: int, number of waypoints
         """
         super(YNet, self).__init__()
 
         if segmentation_model_fp is not None:
             if torch.cuda.is_available():
                 self.semantic_segmentation = torch.load(segmentation_model_fp)
+                print('Loaded segmentation model to GPU')
             else:
                 self.semantic_segmentation = torch.load(
                     segmentation_model_fp, map_location=torch.device('cpu'))
+                print('Loaded segmentation model to CPU')
             if use_features_only:
                 self.semantic_segmentation.segmentation_head = nn.Identity()
-                semantic_classes = 16  # instead of classes use number of feature_dim
+                n_semantic_classes = 16  # instead of classes use number of feature_dim
         else:
             self.semantic_segmentation = nn.Identity()
 
         self.encoder = YNetEncoder(
-            in_channels=semantic_classes + obs_len, channels=encoder_channels)
+            in_channels=n_semantic_classes + obs_len, channels=encoder_channels)
 
         self.goal_decoder = YNetDecoder(
             encoder_channels, decoder_channels, output_len=pred_len)
         self.traj_decoder = YNetDecoder(
-            encoder_channels, decoder_channels, output_len=pred_len, traj=waypoints)
+            encoder_channels, decoder_channels, output_len=pred_len, traj=n_waypoints)
 
         self.softargmax_ = SoftArgmax2D(normalized_coordinates=False)
 
@@ -250,106 +250,65 @@ class YNet(nn.Module):
 
 
 class YNetTrainer:
-    def __init__(self, obs_len, pred_len, params):
+    def __init__(self, params, device=None):
         """
         Ynet class, following a sklearn similar class structure
         :param obs_len: observed timesteps
         :param pred_len: predicted timesteps
         :param params: dictionary with hyperparameters
         """
-        self.obs_len = obs_len
-        self.pred_len = pred_len
+        self.params = params
+        if device:
+            self.device = device
+        else:
+            self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        print(f'Working on {self.device}')
+
         self.division_factor = 2 ** len(params['encoder_channels'])
+        self.template_size = int(4200 * params['resize_factor'])
 
-        self.model = YNet(obs_len=obs_len,
-                          pred_len=pred_len,
-                          segmentation_model_fp=params['segmentation_model_fp'],
-                          use_features_only=params['use_features_only'],
-                          semantic_classes=params['semantic_classes'],
-                          encoder_channels=params['encoder_channels'],
-                          decoder_channels=params['decoder_channels'],
-                          waypoints=len(params['waypoints']))
+        self.model = YNet(
+            obs_len=params['obs_len'], pred_len=params['pred_len'],
+            segmentation_model_fp=params['segmentation_model_fp'],
+            use_features_only=params['use_features_only'],
+            n_semantic_classes=params['n_semantic_classes'],
+            encoder_channels=params['encoder_channels'],
+            decoder_channels=params['decoder_channels'],
+            n_waypoints=len(params['waypoints'])
+        )
+    
+    def train(self, df_train, df_val, train_image_path, val_image_path, experiment_name):
+        return self._train(df_train, df_val, train_image_path, val_image_path, experiment_name, **self.params)
 
-    def train(self, train_data, val_data, params, train_image_path, val_image_path, experiment_name, batch_size=8, num_goals=20, num_traj=1, device=None, dataset_name=None, use_raw_data=False, epochs_checkpoints=None, train_net="all", fine_tune=False):
+    def _train(
+        self, df_train, df_val, train_image_path, val_image_path, experiment_name, 
+        dataset_name, resize_factor, obs_len, pred_len, batch_size, lr, n_epoch, 
+        waypoints, n_goal, n_traj, kernlen, nsig, e_unfreeze, loss_scale, temperature,
+        use_raw_data=False, save_every_n=10, train_net="all", fine_tune=False, 
+        use_CWS=False, resl_thresh=0.002, CWS_params=None, **kwargs):
         """
         Train function
-        :param train_data: pd.df, train data
-        :param val_data: pd.df, val data
+        :param df_train: pd.df, train data
+        :param df_val: pd.df, val data
         :param params: dictionary with training hyperparameters
         :param train_image_path: str, filepath to train images
         :param val_image_path: str, filepath to val images
         :param experiment_name: str, arbitrary name to name weights file
         :param batch_size: int, batch size
-        :param num_goals: int, number of goals per trajectory, K_e in paper
-        :param num_traj: int, number of trajectory per goal, K_a in paper
-        :param device: torch.device, if None -> 'cuda' if torch.cuda.is_available() else 'cpu'
+        :param n_goal: int, number of goals per trajectory, K_e in paper
+        :param n_traj: int, number of trajectory per goal, K_a in paper
         :return:
         """
-        if device is None:
-            device = torch.device(
-                'cuda' if torch.cuda.is_available() else 'cpu')
+        # get data
+        train_images, train_loader, self.homo_mat = self.prepare_data(
+            df_train, train_image_path, dataset_name, 'train', 
+            obs_len, pred_len, resize_factor, use_raw_data, fine_tune)
+        val_images, val_loader, _ = self.prepare_data(
+            df_val, val_image_path, dataset_name, 'val', 
+            obs_len, pred_len, resize_factor, use_raw_data, fine_tune)
 
-        obs_len = self.obs_len
-        pred_len = self.pred_len
-        total_len = pred_len + obs_len
-
-        print('Preprocess data')
-        dataset_name = dataset_name.lower()
-        if dataset_name == 'sdd':
-            image_file_name = 'reference.jpg'
-        elif dataset_name == 'ind':
-            image_file_name = 'reference.png'
-        elif dataset_name == 'eth':
-            image_file_name = 'oracle.png'
-        else:
-            raise ValueError(f'{dataset_name} dataset is not supported')
-
-        # ETH/UCY specific: Homography matrix is needed to convert pixel to world coordinates
-        if dataset_name == 'eth':
-            self.homo_mat = {}
-            for scene in ['eth', 'hotel', 'students001', 'students003', 'uni_examples', 'zara1', 'zara2', 'zara3']:
-                self.homo_mat[scene] = torch.Tensor(
-                    np.loadtxt(f'data/eth_ucy/{scene}_H.txt')).to(device)
-            seg_mask = True
-        else:
-            self.homo_mat = None
-            seg_mask = False
-
-        # Load train images and augment train data and images
-        if fine_tune:
-            train_images = create_images_dict(
-                train_data, image_path=train_image_path, image_file=image_file_name, use_raw_data=use_raw_data)
-        else:
-            train_data, train_images = augment_data(train_data, image_path=train_image_path, image_file=image_file_name,
-                                                    seg_mask=seg_mask, use_raw_data=use_raw_data)
-
-        # Load val scene images
-        val_images = create_images_dict(
-            val_data, image_path=val_image_path, image_file=image_file_name, use_raw_data=use_raw_data)
-
-        # Initialize dataloaders
-        train_dataset = SceneDataset(
-            train_data, resize=params['resize'], total_len=total_len)
-        train_loader = DataLoader(
-            train_dataset, batch_size=1, collate_fn=scene_collate, shuffle=True)
-
-        val_dataset = SceneDataset(
-            val_data, resize=params['resize'], total_len=total_len)
-        val_loader = DataLoader(
-            val_dataset, batch_size=1, collate_fn=scene_collate)
-
-        # Preprocess images, in particular resize, pad and normalize as semantic segmentation backbone requires
-        resize(train_images, factor=params['resize'], seg_mask=seg_mask)
-        # make sure that image shape is divisible by 32, for UNet segmentation
-        pad(train_images, division_factor=self.division_factor)
-        preprocess_image_for_segmentation(train_images, seg_mask=seg_mask)
-
-        resize(val_images, factor=params['resize'], seg_mask=seg_mask)
-        # make sure that image shape is divisible by 32, for UNet segmentation
-        pad(val_images, division_factor=self.division_factor)
-        preprocess_image_for_segmentation(val_images, seg_mask=seg_mask)
-
-        model = self.model.to(device)
+        # model 
+        model = self.model.to(self.device)
 
         # Freeze segmentation model
         for param in model.semantic_segmentation.parameters():
@@ -365,8 +324,7 @@ class YNetTrainer:
                 for param in model.style_modulators.parameters():
                     param.requires_grad = True
 
-        optimizer = torch.optim.Adam(
-            model.parameters(), lr=params["learning_rate"])
+        optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
         print('The number of trainable parameters: {:d}'.format(
             sum(param.numel() for param in model.parameters() if param.requires_grad)))
@@ -374,51 +332,45 @@ class YNetTrainer:
         criterion = nn.BCEWithLogitsLoss()
 
         # Create template
-        size = int(4200 * params['resize'])
+        input_template = torch.Tensor(create_dist_mat(size=self.template_size)).to(self.device)
+        gt_template = torch.Tensor(create_gaussian_heatmap_template(
+            size=self.template_size, kernlen=kernlen, nsig=nsig, normalize=False)).to(self.device)
 
-        input_template = create_dist_mat(size=size)
-        input_template = torch.Tensor(input_template).to(device)
-
-        gt_template = create_gaussian_heatmap_template(
-            size=size, kernlen=params['kernlen'], nsig=params['nsig'], normalize=False)
-        gt_template = torch.Tensor(gt_template).to(device)
-
-        best_test_ADE = 99999999999999
-
+        # train 
+        best_val_ADE = 99999999999999
         self.val_ADE = []
         self.val_FDE = []
 
         with_style = train_net == "modulator"
         print('Start training')
-        for e in tqdm(range(params['num_epochs']), desc='Epoch'):
-            train_ADE, train_FDE, train_loss = train(model, train_loader, train_images, e, obs_len, pred_len,
-                                                     batch_size, params, gt_template, device,
-                                                     input_template, optimizer, criterion, dataset_name, self.homo_mat, with_style=with_style)
+        for e in tqdm(range(n_epoch), desc='Epoch'):
+            train_ADE, train_FDE, train_loss = train_epoch(
+                model, train_loader, train_images, optimizer, criterion, loss_scale, self.device, 
+                dataset_name, self.homo_mat, gt_template, input_template, waypoints,
+                e, obs_len, pred_len, batch_size, e_unfreeze, resize_factor, with_style)
 
             # For faster inference, we don't use TTST and CWS here, only for the test set evaluation
-            val_ADE, val_FDE = evaluate(model, val_loader, val_images, num_goals, num_traj,
-                                        obs_len=obs_len, batch_size=batch_size,
-                                        device=device, input_template=input_template,
-                                        waypoints=params['waypoints'], resize=params['resize'],
-                                        temperature=params['temperature'], use_TTST=False,
-                                        use_CWS=False, dataset_name=dataset_name,
-                                        homo_mat=self.homo_mat, mode='val', with_style=with_style)
+            val_ADE, val_FDE, _ = evaluate(
+                model, val_loader, val_images, self.device, 
+                dataset_name, self.homo_mat, input_template, waypoints, 'val', 
+                n_goal, n_traj, obs_len, batch_size, resize_factor, with_style,
+                temperature, False, use_CWS, resl_thresh, CWS_params)
 
             print(
-                f'Epoch {e}: 	Train (Top-1) ADE: {train_ADE:.2f} FDE: {train_FDE:.2f} 		Valid (Top-k) ADE: {val_ADE:.2f} FDE: {val_FDE:.2f}')
+                f'Epoch {e}: 	Train (Top-1) ADE: {train_ADE:.2f} FDE: {train_FDE:.2f} 		Val (Top-k) ADE: {val_ADE:.2f} FDE: {val_FDE:.2f}')
             self.val_ADE.append(val_ADE)
             self.val_FDE.append(val_FDE)
 
-            if val_ADE < best_test_ADE:
-                best_test_ADE = val_ADE
+            if val_ADE < best_val_ADE:
+                best_val_ADE = val_ADE
                 best_state_dict = deepcopy(model.state_dict())
 
-            if e % epochs_checkpoints == 0 and not fine_tune:
+            if e % save_every_n == 0 and not fine_tune:
                 torch.save(model.state_dict(), 'ckpts/' +
                            experiment_name + f'_weights_epoch_{e}.pt')
 
             # early stop in case of clear overfitting
-            if best_test_ADE < min(self.val_ADE[-5:]):
+            if best_val_ADE < min(self.val_ADE[-5:]):
                 print(f'Early stop at epoch {e}')
                 break
 
@@ -426,36 +378,90 @@ class YNetTrainer:
         model.load_state_dict(best_state_dict, strict=True)
 
         # # Save best model
-        if not fine_tune:
-            torch.save(best_state_dict, 'ckpts/' +
-                       experiment_name + '_weights.pt')
+        if fine_tune:
+            torch.save(best_state_dict, f'ckpts/{experiment_name}_FT_weights.pt')
+        else:
+            torch.save(best_state_dict, f'ckpts/{experiment_name}_weights.pt')
 
         return self.val_ADE, self.val_FDE
 
-    def evaluate(self, data, params, image_path, batch_size=8, num_goals=20, num_traj=1, rounds=1, device=None, dataset_name=None, use_raw_data=False, with_style=False):
+    def test(self, df_test, image_path, with_style):
+        return self._test(df_test, image_path, with_style=with_style, **self.params)
+
+    def _test(
+        self, df_test, image_path, dataset_name, resize_factor, 
+        batch_size, n_round, obs_len, pred_len, 
+        waypoints, n_goal, n_traj, temperature, rel_threshold, 
+        use_TTST, use_CWS, CWS_params, use_raw_data=False, with_style=False, 
+        **kwargs):
         """
         Val function
-        :param data: pd.df, val data
+        :param df_test: pd.df, val data
         :param params: dictionary with training hyperparameters
         :param image_path: str, filepath to val images
         :param batch_size: int, batch size
-        :param num_goals: int, number of goals per trajectory, K_e in paper
-        :param num_traj: int, number of trajectory per goal, K_a in paper
-        :param rounds: int, number of epochs to evaluate
-        :param device: torch.device, if None -> 'cuda' if torch.cuda.is_available() else 'cpu'
+        :param n_goal: int, number of goals per trajectory, K_e in paper
+        :param n_traj: int, number of trajectory per goal, K_a in paper
+        :param n_round: int, number of epochs to evaluate
         :return:
         """
 
-        if device is None:
-            device = torch.device(
-                'cuda' if torch.cuda.is_available() else 'cpu')
-            print('Working on GPU: ', torch.cuda.is_available())
+        # get data 
+        test_images, test_loader, self.homo_mat = self.prepare_data(
+            df_test, image_path, dataset_name, 'test', 
+            obs_len, pred_len, resize_factor, use_raw_data)
 
-        obs_len = self.obs_len
-        pred_len = self.pred_len
-        total_len = pred_len + obs_len
+        # model 
+        model = self.model.to(self.device)
 
-        print('Preprocess data')
+        # Create template
+        input_template = torch.Tensor(create_dist_mat(size=self.template_size)).to(self.device)
+
+        self.eval_ADE = []
+        self.eval_FDE = []
+        list_out = []
+
+        print("TTST setting:", use_TTST)
+        print('Start testing')
+        for e in tqdm(range(n_round), desc='Round'):
+            test_ADE, test_FDE, df_out = evaluate(
+                model, test_loader, test_images, self.device, 
+                dataset_name, self.homo_mat, input_template, waypoints, 'test',
+                n_goal, n_traj, obs_len, batch_size, resize_factor, with_style,
+                temperature, use_TTST, use_CWS, rel_threshold, CWS_params)
+            print(f'Round {e}: \nTest ADE: {test_ADE} \nTest FDE: {test_FDE}')
+            self.eval_ADE.append(test_ADE)
+            self.eval_FDE.append(test_FDE)
+            list_out.append(df_out)
+
+        avg_ade = sum(self.eval_ADE) / len(self.eval_ADE)
+        avg_fde = sum(self.eval_FDE) / len(self.eval_FDE)
+        print(
+            f'\nAverage performance (by {n_round}): \nTest ADE: {avg_ade} \nTest FDE: {avg_fde}')
+        return avg_ade, avg_fde, list_out 
+    
+    def prepare_data(
+        self, df, image_path, dataset_name, mode, obs_len, pred_len, 
+        resize_factor, use_raw_data, fine_tune=False):
+        """
+        Prepare dataset for training, validation, and testing. 
+
+        Args:
+            df (pd.DataFrame): df_train / df_val / df_test 
+            image_path (str): path storing scene images 
+            dataset_name (str): name of the dataset
+            mode (str): choices=[train, val, test]
+            resize_factor (float): _description_
+            use_raw_data (bool): _description_
+            fine_tune (bool, optional): _description_. Defaults to False.
+
+        Raises:
+            ValueError: _description_
+
+        Returns:
+            _type_: _description_
+        """
+        # get image filename 
         dataset_name = dataset_name.lower()
         if dataset_name == 'sdd':
             image_file_name = 'reference.jpg'
@@ -464,67 +470,109 @@ class YNetTrainer:
         elif dataset_name == 'eth':
             image_file_name = 'oracle.png'
         else:
-            raise ValueError(f'{dataset_name} dataset is not supported')
+            raise ValueError(f'{dataset_name} dataset is not supported') 
 
         # ETH/UCY specific: Homography matrix is needed to convert pixel to world coordinates
         if dataset_name == 'eth':
-            self.homo_mat = {}
+            homo_mat = {}
             for scene in ['eth', 'hotel', 'students001', 'students003', 'uni_examples', 'zara1', 'zara2', 'zara3']:
-                self.homo_mat[scene] = torch.Tensor(
-                    np.loadtxt(f'data/eth_ucy/{scene}_H.txt')).to(device)
+                homo_mat[scene] = torch.Tensor(np.loadtxt(f'data/eth_ucy/{scene}_H.txt')).to(self.device)
             seg_mask = True
         else:
-            self.homo_mat = None
+            homo_mat = None
             seg_mask = False
+                
+        # Load scene images 
+        if (fine_tune & (mode == 'train')) | (mode == 'val') | (mode == 'test'):
+            images_dict = create_images_dict(
+                df.sceneId.unique(), image_path=image_path, 
+                image_file=image_file_name, use_raw_data=use_raw_data)
+        else: # mode == 'train' & not fine_tune
+            # augment train data and images
+            df, images_dict = augment_data(
+                df, image_path=image_path, image_file=image_file_name,
+                seg_mask=seg_mask, use_raw_data=use_raw_data)
 
-        test_images = create_images_dict(
-            data, image_path=image_path, image_file=image_file_name, use_raw_data=use_raw_data)
-
-        test_dataset = SceneDataset(
-            data, resize=params['resize'], total_len=total_len)
-        test_loader = DataLoader(
-            test_dataset, batch_size=1, collate_fn=scene_collate)
+        # Initialize dataloaders
+        dataset = SceneDataset(df, resize=resize_factor, total_len=obs_len+pred_len)
+        dataloader = DataLoader(dataset, batch_size=1, collate_fn=scene_collate, 
+            shuffle=True if mode=='train' else False)
 
         # Preprocess images, in particular resize, pad and normalize as semantic segmentation backbone requires
-        resize(test_images, factor=params['resize'], seg_mask=seg_mask)
-        # make sure that image shape is divisible by 32, for UNet architecture
-        pad(test_images, division_factor=self.division_factor)
-        preprocess_image_for_segmentation(test_images, seg_mask=seg_mask)
+        resize(images_dict, factor=resize_factor, seg_mask=seg_mask)
+        # make sure that image shape is divisible by 32, for UNet segmentation
+        pad(images_dict, division_factor=self.division_factor)
+        preprocess_image_for_segmentation(images_dict, seg_mask=seg_mask)
 
-        model = self.model.to(device)
+        return images_dict, dataloader, homo_mat
 
-        # Create template
-        size = int(4200 * params['resize'])
+    def _viz_feature_space_per_metaId(self, df_meta, image_path, depth=0):
+        images_dict, dataloader, _ = self.prepare_data(
+            df_meta, image_path, self.params['dataset_name'], 'test', 
+            self.params['obs_len'], self.params['pred_len'], 
+            self.params['resize_factor'], self.params['use_raw_data'], False)
+        meta_id = df_meta.metaId.unique()[0]
 
-        input_template = torch.Tensor(create_dist_mat(size=size)).to(device)
+        input_template = torch.Tensor(create_dist_mat(size=self.template_size)).to(self.device)
 
-        self.eval_ADE = []
-        self.eval_FDE = []
+        self.model.eval()
+        with torch.no_grad():
+            for traj, _, scene in dataloader: 
+                print(f'Plotting feature space of meta_id={meta_id}, scene={scene}')
+                # prepare scene image 
+                scene_image = images_dict[scene].unsqueeze(0)
+                scene_image = self.model.segmentation(scene_image) 
+                _, _, H, W = scene_image.shape
 
-        print("TTST setting:", params['use_TTST'])
-        print('Start testing')
-        for e in tqdm(range(rounds), desc='Round'):
-            test_ADE, test_FDE = evaluate(model, test_loader, test_images, num_goals, num_traj,
-                                          obs_len=obs_len, batch_size=batch_size,
-                                          device=device, input_template=input_template,
-                                          waypoints=params['waypoints'], resize=params['resize'],
-                                          temperature=params['temperature'], use_TTST=params['use_TTST'],
-                                          use_CWS=params['use_CWS'],
-                                          rel_thresh=params['rel_threshold'], CWS_params=params['CWS_params'],
-                                          dataset_name=dataset_name, homo_mat=self.homo_mat, mode='test', with_style=with_style)
-            print(f'Round {e}: \nTest ADE: {test_ADE} \nTest FDE: {test_FDE}')
-
-            self.eval_ADE.append(test_ADE)
-            self.eval_FDE.append(test_FDE)
-
-        ade = sum(self.eval_ADE) / len(self.eval_ADE)
-        fde = sum(self.eval_FDE) / len(self.eval_FDE)
-        print(
-            f'\n\nAverage performance over {rounds} rounds: \nTest ADE: {ade} \nTest FDE: {fde}')
-        return ade, fde
+                # prepare trajectory image 
+                observed = traj[:, :self.params['obs_len'], :].reshape(-1, 2).cpu().numpy()  
+                observed_map = get_patch(input_template, observed, H, W)  
+                observed_map = torch.stack(observed_map).reshape([-1, self.params['obs_len'], H, W])  
+                semantic_image = scene_image.expand(observed_map.shape[0], -1, -1, -1) 
+                
+                # concatenate input 
+                feature_input = torch.cat([semantic_image, observed_map], dim=1)  
+                
+                # visualize input space
+                name = f'{meta_id}_{scene}'
+                plot_input_space(semantic_image, observed_map, 
+                    'figures/input_space', f'{name}_input_space')
+                # visualize feature space
+                if depth == 0:
+                    # depth = 0: viz output of encoder 
+                    features = self.model.pred_features(feature_input)  # n_block of (batch_size, n_channel, height, width)
+                    features = [features[-1]]
+                    features_name = ['encoder_output']
+                elif depth == 1:
+                    # depth = 1: viz each conv block
+                    features = self.model.pred_features(feature_input)
+                    features_name = [f'block_{i+1}' for i in len(features)]
+                else:
+                    # depth = 2: viz each layer
+                    features, features_name = [], []
+                    out = feature_input
+                    for i, block in enumerate(self.model.encoder.stages):
+                        for layer in block:
+                            out = layer(out)
+                            features.append(out)
+                            features_name.append(f'block_{i+1}: {str(layer).split("(")[0]}')
+                n_channel_max = max([l.shape[1] for l in features])
+                plot_feature_space(features, features_name, n_channel_max, 
+                    'figures/feature_space', f'{name}_feature_space')
+    
+    def viz_feature_space(self, df_test, image_path, depth=0, n_example=1):
+        unique_meta_id = df_test.metaId.unique()
+        np.random.shuffle(unique_meta_id)
+        for i in range(n_example):
+            meta_id = unique_meta_id[i]
+            df_meta = df_test[df_test.metaId == meta_id]
+            self._viz_feature_space_per_metaId(df_meta, image_path, depth)
 
     def load(self, path):
-        print(self.model.load_state_dict(torch.load(path), strict=False))
+        if self.device == 'cuda':
+            print(self.model.load_state_dict(torch.load(path), strict=False))
+        else:  # self.device == 'cpu'
+            print(self.model.load_state_dict(torch.load(path, map_location='cpu'), strict=False))
 
     def save(self, path):
         torch.save(self.model.state_dict(), path)

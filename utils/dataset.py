@@ -295,9 +295,9 @@ def resize_and_pad_image(images, size, pad=2019):
         images[key] = im
 
 
-def create_images_dict(data, image_path, image_file='reference.jpg', use_raw_data=False):
+def create_images_dict(unique_scene, image_path, image_file='reference.jpg', use_raw_data=False):
     images = {}
-    for scene in data.sceneId.unique():
+    for scene in unique_scene:
         if image_file == 'oracle.png':
             im = cv2.imread(os.path.join(image_path, scene, image_file), 0)
         else:
@@ -309,6 +309,7 @@ def create_images_dict(data, image_path, image_file='reference.jpg', use_raw_dat
                 im_path = os.path.join(image_path, scene, image_file)
             im = cv2.imread(im_path)
         images[scene] = im
+    # images channel: blue, green, red 
     return images
 
 
@@ -422,6 +423,25 @@ def convert_df_to_dict(df_gb):
     return varf_group_dict
 
 
+def create_dataset_by_agent_type(df, labels, out_dir, statistic_only, same_group_size=False):
+    pathlib.Path(out_dir).mkdir(parents=True, exist_ok=True)
+    df_label = df[df.label.isin(labels)]
+    df_gb = df_label.groupby(by='label', dropna=True)
+    print('Statistics:\n', df_gb.count()['metaId'] / 20)
+    print('# total:', (df_gb.count()['metaId'] / 20).sum())
+    if not statistic_only:
+        varf_group_dict = convert_df_to_dict(df_gb)
+        for varf_range, varf_group in varf_group_dict.items():
+            if same_group_size:
+                min_n = min([len(g["metaId"]) for g in varf_group_dict.values()])
+                meta_id_mask = reduce_group_size(varf_group, varf_range, min_n)
+                df_varf = df_label[df_label.metaId.isin(varf_group['metaId'][meta_id_mask])]
+            else:
+                df_varf = df_label[df_label.metaId.isin(varf_group['metaId'])] 
+            out_path = os.path.join(out_dir, f"{varf_range}.pkl")
+            df_varf.to_pickle(out_path)
+    
+
 def create_customized_dataset(df, varf, varf_ranges, labels, out_dir, 
         obs_len, statistic_only, inclusive='both', same_group_size=False):
     """_summary_
@@ -446,17 +466,17 @@ def create_customized_dataset(df, varf, varf_ranges, labels, out_dir,
     # categorize by factor of variation
     if isinstance(varf, str):
         df_label = add_range_column(df_label, varf, varf_ranges, obs_len, inclusive=inclusive)
-        varf_range_name = f'{varf}_range'
+        varf_col_name = f'{varf}_range'
     elif isinstance(varf, list):
         for f, r in zip(varf, varf_ranges):
             df_label = add_range_column(df_label, f, r, obs_len, inclusive=inclusive)
-        varf_range_name = '__'.join(varf)+'_range'
+        varf_col_name = '__'.join(varf)+'_range'
         nonan_mask = df_label.isna().any(axis=1)
-        df_label.loc[~nonan_mask, varf_range_name] = \
+        df_label.loc[~nonan_mask, varf_col_name] = \
             df_label.loc[~nonan_mask, [f + '_range' for f in varf]].agg('__'.join, axis=1)
     else:
         raise ValueError(f'Cannot process {varf}.')
-    df_gb = df_label.groupby(by=varf_range_name, dropna=True)
+    df_gb = df_label.groupby(by=varf_col_name, dropna=True)
     print('Statistics:\n', df_gb.count()['metaId'] / 20)
     print('# total:', (df_gb.count()['metaId'] / 20).sum())
 
@@ -470,7 +490,7 @@ def create_customized_dataset(df, varf, varf_ranges, labels, out_dir,
                 df_varf = df_label[df_label.metaId.isin(varf_group['metaId'][meta_id_mask])]
             else:
                 df_varf = df_label[df_label.metaId.isin(varf_group['metaId'])] 
-            out_path = os.path.join(out_dir, f"{varf_range_name}.pkl")
+            out_path = os.path.join(out_dir, f"{varf_range}.pkl")
             df_varf.to_pickle(out_path)
 
 
@@ -760,13 +780,38 @@ def filter_long_tail_df(df_varfs, varf_list, n=3):
     return df_varfs_filter, p_filter
 
 
-def split_df_ratio(df, ratio):
-    meta_ids = np.unique(df["metaId"])
-    test_meta_ids, train_meta_ids = np.split(
-        meta_ids, [int(ratio * len(meta_ids))])
+def dataset_split(data_path, train_files, val_ratio, n_leftouts):
+    print(f"Split {train_files} given val_ratio={val_ratio}, n_leftout={n_leftouts}")
+    df_train, df_val, df_test = pd.DataFrame([]), pd.DataFrame([]), pd.DataFrame([])
+    for train_file, n_leftout in zip(train_files, n_leftouts):
+        df_train_ = pd.read_pickle(os.path.join(data_path, train_file))
+        df_train_, df_val_, df_test_ = split_df(df_train_, val_ratio, n_leftout)
+        df_train = pd.concat([df_train, df_train_])
+        df_val = pd.concat([df_val, df_val_])
+        if df_test_ is not None:
+            df_test = pd.concat([df_test, df_test_])
+    return df_train, df_val, df_test
+
+
+def split_df(df, val_ratio, n_test=None, shuffle=False):
+    # idx
+    unique_meta_ids = np.unique(df["metaId"])
+    if shuffle:
+        print('Shuffling raw data')
+        np.random.shuffle(unique_meta_ids)
+    n_metaId = unique_meta_ids.shape[0]
+    # split
+    if n_test:
+        val_meta_ids, train_meta_ids, test_meta_ids = np.split(
+            unique_meta_ids, [int(val_ratio * n_metaId), n_metaId - n_test])
+        df_test = reduce_df_meta_ids(df, test_meta_ids)
+    else:
+        val_meta_ids, train_meta_ids = np.split(
+            unique_meta_ids, [int(val_ratio * len(unique_meta_ids))])
+        df_test = None
     df_train = reduce_df_meta_ids(df, train_meta_ids)
-    df_test = reduce_df_meta_ids(df, test_meta_ids)
-    return df_train, df_test
+    df_val = reduce_df_meta_ids(df, val_meta_ids)
+    return df_train, df_val, df_test
 
 
 def reduce_df_meta_ids(df, meta_ids):
@@ -807,25 +852,27 @@ if __name__ == "__main__":
     parser.add_argument("--stride", default=20, type=int)
     parser.add_argument("--obs_len", default=8, type=int)
 
-    parser.add_argument("--varf", default='avg_den100', 
+    parser.add_argument("--varf", default='agent_type', 
                         help="variation factors from: 'avg_vel', 'max_vel', "+\
                             "'avg_acc', 'max_acc', 'abs+max_acc', 'abs+avg_acc', "+\
-                            "'min_dist', 'avg_den50', 'avg_den100'")
+                            "'min_dist', 'avg_den50', 'avg_den100', 'agent_type'")
     parser.add_argument("--varf_ranges", help='range of varation factor to take',
-                        # default=[(0.1, 0.3), (0.5, 1.5)])
-                        # default=[(0.1, 0.2), (0.6, 1.4)])
-                        # default=[(0, 0.2), (0.8, 1.2), (1.8, 2.2), (2.8, 3.2), (3.8, 4.2)])
-                        default=[(0, 0.3), (0.7, 1.3), (1.7, 2.3), (2.7, 3.3), (3.7, 4.3)])
+                        # default=[(0.1, 0.3), (0.5, 1.5)])  # small gap 
+                        # default=[(0.1, 0.2), (0.6, 1.4)])  # big gap 
+                        default=[(0, 1.3), (1.7, 4.3)])  # small gap, two groups
+                        # default=[(0, 0.3), (0.7, 1.3), (1.7, 2.3), (2.7, 3.3), (3.7, 4.3)])  # small gap 
+                        # default=[(0, 0.2), (0.8, 1.2), (1.8, 2.2), (2.8, 3.2), (3.8, 4.2)])  # big gap 
                         # default=[[(0.1, 0.3), (0.5, 1.5)], [(0, 0.3), (0.7, 1.3), (1.7, 2.3), (2.7, 3.3), (3.7, 4.3)]])
                         # default=[[(0.1, 0.2), (0.6, 1.4)], [(0, 0.2), (0.8, 1.2), (1.8, 2.2), (2.8, 3.2), (3.8, 4.2)]])
 
-    parser.add_argument("--labels", default=['Pedestrian'], nargs='+', type=str,
+    parser.add_argument("--labels", default=['Pedestrian', 'Biker'], nargs='+', type=str,
                         choices=['Biker', 'Bus', 'Car', 'Cart', 'Pedestrian', 'Skater'])
 
     parser.add_argument("--vis", action='store_true') 
 
     args = parser.parse_args()
     args.labels.sort()
+    print(args)
 
     # ============== load raw dataset ===============
     if not args.reload:
@@ -885,6 +932,10 @@ if __name__ == "__main__":
         out_dir = os.path.join(args.filter_data_dir, '__'.join(args.varf), '_'.join(args.labels))
     else:
         raise ValueError(f'Cannot process {varf}')
-    create_customized_dataset(df, args.varf, args.varf_ranges, args.labels, 
-        out_dir, obs_len=args.obs_len, statistic_only=args.statistic_only)
+    if args.varf == 'agent_type':
+        out_dir = os.path.join(args.filter_data_dir, args.varf)
+        create_dataset_by_agent_type(df, args.labels, out_dir, statistic_only=args.statistic_only)
+    else:
+        create_customized_dataset(df, args.varf, args.varf_ranges, args.labels, 
+            out_dir, obs_len=args.obs_len, statistic_only=args.statistic_only)
     print(f'Created dataset by {args.varf} using {args.labels}')
