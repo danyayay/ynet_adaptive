@@ -47,7 +47,7 @@ else:
 
 # ## test
 print('############ Test model ##############')
-ade, fde, _ = model.test(df_test, IMAGE_PATH, args.train_net == "modulator")
+ade, fde = model.test(df_test, IMAGE_PATH, args.train_net == "modulator")
 if args.out_csv_dir is not None:
     out_dir = get_out_dir(args.out_csv_dir, args.dataset_path, args.seed, args.train_net, args.val_files)
     write_csv(out_dir, 'out-of-domain.csv', [ade], [fde])

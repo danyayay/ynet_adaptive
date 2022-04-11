@@ -79,7 +79,7 @@ print(f'val_ade: {np.min(np.array(val_ade))}, val_fde: {np.min(np.array(val_fde)
 if args.out_csv_dir and args.n_leftouts:
     print('############ Test leftout data ##############')
     # test
-    test_ade, test_fde, _ = model.test(df_test, IMAGE_PATH, args.train_net == "modulator")
+    test_ade, test_fde = model.test(df_test, IMAGE_PATH, args.train_net == "modulator")
     print(f'test_ade: {test_ade}, test_fde: {test_fde}')
     # save csv results
     out_dir = get_out_dir(args.out_csv_dir, args.dataset_path, args.seed, args.train_net, args.val_files, args.train_files)

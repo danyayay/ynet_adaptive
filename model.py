@@ -70,16 +70,28 @@ class YNetEncoder(nn.Module):
         self.stages.append(
             nn.Sequential(
                 nn.MaxPool2d(kernel_size=2, stride=2, padding=0, dilation=1, ceil_mode=False)
+                )
             )
-        )
 
-    def forward(self, x):
+    def forward(self, x, depth=1):
         # Saves the feature maps Tensor of each layer into a list, as we will later need them again for the decoder
         features = []
+        x_copy = x.clone()
         for stage in self.stages:
             x = stage(x)
             features.append(x)
-        return features
+
+        # for detailed feature visualization
+        if depth == 2:
+            detailed_features = []
+            x = x_copy
+            for stage in self.stages:
+                for layer in stage:
+                    x = layer(x)
+                    detailed_features.append(x)
+            return features, detailed_features
+        else:
+            return features 
 
 
 class YNetDecoder(nn.Module):
@@ -115,43 +127,61 @@ class YNetDecoder(nn.Module):
         upsample_channels_out = [num_channel // 2 for num_channel in upsample_channels_in]
 
         # Upsampling consists of bilinear upsampling + 3x3 Conv, here the 3x3 Conv is defined
-        self.upsample_conv = [nn.Conv2d(
-            in_channels_, out_channels_, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
-            for in_channels_, out_channels_ in zip(upsample_channels_in, upsample_channels_out)]
-        self.upsample_conv = nn.ModuleList(self.upsample_conv)
+        self.upsample_conv = nn.ModuleList([
+            nn.Conv2d(in_channels_, out_channels_, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1)) 
+                for in_channels_, out_channels_ in zip(upsample_channels_in, upsample_channels_out)])
 
         # Determine the input and output channel dimensions of each layer in the decoder
         # As we concat the encoded feature and decoded features we have to sum both dims
         in_channels = [enc + dec for enc, dec in zip(encoder_channels, upsample_channels_out)]
         out_channels = decoder_channels
 
-        self.decoder = [nn.Sequential(
-            nn.Conv2d(in_channels_, out_channels_, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1)),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(out_channels_, out_channels_, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1)),
-            nn.ReLU(inplace=True))
+        self.decoder = nn.ModuleList([
+            nn.Sequential(
+                nn.Conv2d(in_channels_, out_channels_, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1)),
+                nn.ReLU(inplace=True),
+                nn.Conv2d(out_channels_, out_channels_, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1)),
+                nn.ReLU(inplace=True))
             for in_channels_, out_channels_ in zip(in_channels, out_channels)]
-        self.decoder = nn.ModuleList(self.decoder)
+        )
 
         # Final 1x1 Conv prediction to get our heatmap logits (before softmax)
         self.predictor = nn.Conv2d(
             in_channels=decoder_channels[-1], out_channels=output_len, kernel_size=1, stride=1, padding=0)
 
-    def forward(self, features):
+    def forward(self, features, depth=0):
         # Takes in the list of feature maps from the encoder. Trajectory predictor in addition the goal and waypoint heatmaps
         # reverse the order of encoded features, as the decoder starts from the smallest image
         features = features[::-1]
+        detailed_features = []
+        # decoder: layer 1
         center_feature = features[0]
         x = self.center(center_feature)
-        for i, (feature, module, upsample_conv) in enumerate(zip(features[1:], self.decoder, self.upsample_conv)):
+        if depth == 1:
+            detailed_features.append(x)
+        elif depth == 2:
+            x = center_feature
+            for layer in self.center:
+                x = layer(x)
+                detailed_features.append(x)
+        # decoder: layer 2-6
+        for f, d, up in zip(features[1:], self.decoder, self.upsample_conv):
             # bilinear interpolation for upsampling
             x = F.interpolate(x, scale_factor=2, mode='bilinear', align_corners=False)
-            x = upsample_conv(x)  # 3x3 conv for upsampling
+            x = up(x)  # 3x3 conv for upsampling
+            if depth == 2: detailed_features.append(x)
             # concat encoder and decoder features
-            x = torch.cat([x, feature], dim=1)
-            x = module(x)  # Conv
-        x = self.predictor(x)  # last predictor layer
-        return x
+            x = torch.cat([x, f], dim=1)
+            x = d(x)
+            if depth > 0: detailed_features.append(x)    
+        # decoder: layer 7 (last predictor layer)
+        x = self.predictor(x) 
+    
+        if depth > 0: 
+            detailed_features.append(x)
+            return x, detailed_features
+        else:
+            return x
 
 
 class YNet(nn.Module):
@@ -204,24 +234,20 @@ class YNet(nn.Module):
         return self.semantic_segmentation(image)
 
     # Forward pass for goal decoder
-    def pred_goal(self, features):
-        goal = self.goal_decoder(features)
-        return goal
+    def pred_goal(self, features, depth=0):
+        return self.goal_decoder(features, depth)
 
     # Forward pass for trajectory decoder
-    def pred_traj(self, features):
-        traj = self.traj_decoder(features)
-        return traj
+    def pred_traj(self, features, depth=0):
+        return self.traj_decoder(features, depth)
 
     # Forward pass for feature encoder, returns list of feature maps
-    def pred_features(self, x):
-        features = self.encoder(x)
-        return features
+    def pred_features(self, x, depth=1):
+        return self.encoder(x, depth)
 
     # Used for style encoding
     def stylize_features(self, x, style_class):
-        stylized_features = self.style_modulators[style_class](x)
-        return stylized_features
+        return self.style_modulators[style_class](x)
 
     # Softmax for Image data as in dim=NxCxHxW, returns softmax image shape=NxCxHxW
     def softmax(self, x):
@@ -378,22 +404,23 @@ class YNetTrainer:
         model.load_state_dict(best_state_dict, strict=True)
 
         # # Save best model
-        if fine_tune:
+        if fine_tune & (train_net == 'all'):
             torch.save(best_state_dict, f'ckpts/{experiment_name}_FT_weights.pt')
         else:
             torch.save(best_state_dict, f'ckpts/{experiment_name}_weights.pt')
 
         return self.val_ADE, self.val_FDE
 
-    def test(self, df_test, image_path, with_style):
-        return self._test(df_test, image_path, with_style=with_style, **self.params)
+    def test(self, df_test, image_path, with_style, return_features=False):
+        return self._test(df_test, image_path, with_style=with_style, 
+            return_features=return_features, **self.params)
 
     def _test(
         self, df_test, image_path, dataset_name, resize_factor, 
         batch_size, n_round, obs_len, pred_len, 
         waypoints, n_goal, n_traj, temperature, rel_threshold, 
         use_TTST, use_CWS, CWS_params, use_raw_data=False, with_style=False, 
-        **kwargs):
+        return_features=False, depth=0, **kwargs):
         """
         Val function
         :param df_test: pd.df, val data
@@ -419,26 +446,41 @@ class YNetTrainer:
 
         self.eval_ADE = []
         self.eval_FDE = []
-        list_out = []
+        list_metrics, list_features, list_trajs = [], [], []
 
         print("TTST setting:", use_TTST)
         print('Start testing')
         for e in tqdm(range(n_round), desc='Round'):
-            test_ADE, test_FDE, df_out = evaluate(
-                model, test_loader, test_images, self.device, 
-                dataset_name, self.homo_mat, input_template, waypoints, 'test',
-                n_goal, n_traj, obs_len, batch_size, resize_factor, with_style,
-                temperature, use_TTST, use_CWS, rel_threshold, CWS_params)
+            if return_features:
+                test_ADE, test_FDE, df_metrics, features_dict, trajs_dict = evaluate(
+                    model, test_loader, test_images, self.device, 
+                    dataset_name, self.homo_mat, input_template, waypoints, 'test',
+                    n_goal, n_traj, obs_len, batch_size, resize_factor, with_style,
+                    temperature, use_TTST, use_CWS, rel_threshold, CWS_params,
+                    True, depth)
+            else:
+                test_ADE, test_FDE = evaluate(
+                    model, test_loader, test_images, self.device, 
+                    dataset_name, self.homo_mat, input_template, waypoints, 'test',
+                    n_goal, n_traj, obs_len, batch_size, resize_factor, with_style,
+                    temperature, use_TTST, use_CWS, rel_threshold, CWS_params,
+                    False, depth)
             print(f'Round {e}: \nTest ADE: {test_ADE} \nTest FDE: {test_FDE}')
             self.eval_ADE.append(test_ADE)
             self.eval_FDE.append(test_FDE)
-            list_out.append(df_out)
+            list_metrics.append(df_metrics)
+            list_features.append(features_dict)
+            list_trajs.append(trajs_dict)
 
         avg_ade = sum(self.eval_ADE) / len(self.eval_ADE)
         avg_fde = sum(self.eval_FDE) / len(self.eval_FDE)
         print(
             f'\nAverage performance (by {n_round}): \nTest ADE: {avg_ade} \nTest FDE: {avg_fde}')
-        return avg_ade, avg_fde, list_out 
+
+        if return_features:
+            return avg_ade, avg_fde, list_metrics, list_features, list_trajs
+        else:
+            return avg_ade, avg_fde
     
     def prepare_data(
         self, df, image_path, dataset_name, mode, obs_len, pred_len, 
