@@ -9,19 +9,6 @@ from model import YNetTrainer
 from utils.dataset import set_random_seeds, dataset_split
 from utils.visualize import plot_obs_pred_trajs, plot_feature_space
 
-# import socket
-# print(socket.gethostname())
-# print(socket.gethostbyname(socket.gethostname()))
-
-# import debugpy
-# # 5678 is the default attach port in the VS Code debug configurations. Unless a host and port are specified, host defaults to 127.0.0.1
-# # debugpy.listen(5678)
-# debugpy.listen(5678)
-# print("Waiting for debugger attach")
-# debugpy.wait_for_client()
-# debugpy.breakpoint()
-# print('break on this line')
-
 
 def main(args):
     # ## configuration
@@ -56,7 +43,7 @@ def main(args):
             model = YNetTrainer(params=params)
             model.load(ckpt)
             val_ade, val_fde, list_metrics, list_features, list_trajs = \
-                model.test(df_test, IMAGE_PATH, False, True)
+                model.test(df_test, IMAGE_PATH, False, True, False) # True if not args.limit_by else False
             # store ade/fde comparison
             df_to_merge = list_metrics[0].rename({
                 'ade': f'ade_{ckpt_name}', 'fde': f'fde_{ckpt_name}'}, axis=1)
@@ -67,7 +54,7 @@ def main(args):
             # store features and trajectories, taking only the first round results for now 
             dict_features[ckpt_name] = list_features[0]
             dict_trajs[ckpt_name] = list_trajs[0]
-        name = args.ckpts[0].split('_filter_')[1].split('__')[0] + '__' + '_'.join(args.val_files).rstrip('.pkl')
+        name = str(args.seed) + '__' + args.ckpts[0].split('_filter_')[1].split('__')[0] + '__' + '_'.join(args.val_files).rstrip('.pkl')
         out_path = f"csv/comparison/{name}__{'_'.join(args.ckpts_name)}.csv"
         df_result.to_csv(out_path, index=False)
 
@@ -86,13 +73,12 @@ def main(args):
             df_test_focus = df_test[df_test.metaId.isin(meta_ids_focus)]
             # repeat the above process 
             dict_features, dict_trajs = dict(), dict()
-            breakpoint()
             for i, (ckpt, ckpt_name) in enumerate(zip(args.ckpts, args.ckpts_name)):
                 set_random_seeds(args.seed)
                 model = YNetTrainer(params=params)
                 model.load(ckpt)
                 val_ade, val_fde, list_metrics, list_features, list_trajs = \
-                    model.test(df_test_focus, IMAGE_PATH, False, True)
+                    model.test(df_test_focus, IMAGE_PATH, False, True, True)
                 # store ade/fde comparison
                 df_to_merge = list_metrics[0].rename({
                     'ade': f'ade_{ckpt_name}', 'fde': f'fde_{ckpt_name}'}, axis=1)
@@ -111,9 +97,10 @@ def main(args):
             print(f'Visualize all n_test={args.n_leftouts} test samples')
 
         # visualize
-        # TODO: pass diff columns and save it in the name 
-        plot_obs_pred_trajs(IMAGE_PATH, dict_trajs, f'figures/prediction/{name}')
-        plot_feature_space(dict_features, f'figures/feature_space/{name}')
+        if args.viz:
+            # TODO: pass diff columns and save it in the name 
+            plot_obs_pred_trajs(IMAGE_PATH, dict_trajs, f'figures/prediction/{name}')
+            plot_feature_space(dict_features, f'figures/feature_space/{name}')
     else:
         raise ValueError('No checkpoint given!')
 
@@ -132,8 +119,9 @@ if __name__ == '__main__':
     parser.add_argument('--dataset_path', default=None, type=str)
     parser.add_argument('--val_files', default=None, type=str, nargs='+')
     parser.add_argument('--n_leftouts', default=None, type=int, nargs='+')
+    # visualization
+    parser.add_argument('--viz', action='store_true')
     parser.add_argument('--depth', default=0, type=int)
-    # limit number of data for visualization
     parser.add_argument('--limit_by', default=None, choices=[None, 'n_viz', 'threshold'])
     parser.add_argument('--n_viz', default=10, type=int)
     parser.add_argument('--threshold', default=4.0, type=float)

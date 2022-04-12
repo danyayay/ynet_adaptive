@@ -88,16 +88,19 @@ def evaluate(
             # depth = 2: viz each layer
             features_name = []
             for i, block in enumerate(model.encoder.stages):
-                features_name.append(f'Encoder_B{i+1}_L{len(block)}')
+                for j in range(len(block)):
+                    features_name.append(f'Encoder_B{i+1}_L{j+1}')
             for dec_name in ['GoalDecoder']:
                 goal_dec_name = [f'{dec_name}_B1_L1']
-                goal_dec_name += [f'{dec_name}_B{i}_L{j}' for i in range(2,6) for j in range(1,3)]
+                goal_dec_name += [f'{dec_name}_B{i}_L{j}' for i in range(2,7) for j in range(1,3)]
                 goal_dec_name += [f'{dec_name}_B7_L1']
                 features_name += goal_dec_name                 
         else:
             raise ValueError(f'No support for depth={depth}')
         features_dict = dict()
         trajs_dict = {'groundtruth': [], 'prediction': []}
+    else:
+        depth = 0
 
     with torch.no_grad():
         # outer loop, for loop over each scene as scenes have different image size and to calculate segmentation only once
@@ -107,8 +110,9 @@ def evaluate(
             scene_image = model.segmentation(scene_image)
             meta_ids = df_batch[0].metaId.unique()
             n_data = trajectory.shape[0]
-            features_dict[scene_id] = {k: [] for k in features_name}
-            features_dict[scene_id]['metaId'] = meta_ids
+            if return_features:
+                features_dict[scene_id] = {k: [] for k in features_name}
+                features_dict[scene_id]['metaId'] = meta_ids
 
             if dataset_name == 'eth': 
                 print(counter)
@@ -128,8 +132,10 @@ def evaluate(
                 semantic_image = scene_image.expand(observed_map.shape[0], -1, -1, -1)  # (batch_size, n_class, height, width)
 
                 if viz_input:
-                    plot_input_space(semantic_image, observed_map, 
-                        'figures/input_space', f'{name}_input_space')
+                    plot_input_space(semantic_image.cpu().detach().numpy(), 
+                        observed_map.cpu().detach().numpy(), meta_ids[i:i+batch_size], 
+                        scene_id, 'figures/input_space')
+
                 # Forward pass
                 feature_input = torch.cat([semantic_image, observed_map], dim=1)  # (batch_size, n_class+obs_len, height, width)
                 if depth == 0:
@@ -154,7 +160,8 @@ def evaluate(
                 # Predict goal and waypoint probability distributions
                 if depth == 0:
                     pred_waypoint_map = model.pred_goal(features)  # (batch_size, pred_len, height, width)
-                    features_dict[scene_id]['GoalDecoder'].append(pred_waypoint_map.cpu().detach().numpy())
+                    if return_features:
+                        features_dict[scene_id]['GoalDecoder'].append(pred_waypoint_map.cpu().detach().numpy())
                 elif (depth == 1) | (depth == 2):
                     pred_waypoint_map, details = model.pred_goal(features, depth)
                     for i, fn in enumerate(features_name[n_filled:(n_filled+len(details))]):
@@ -309,12 +316,13 @@ def evaluate(
                 ade_batch = ((((gt_future - future_samples) / resize_factor) ** 2).sum(dim=3) ** 0.5).mean(dim=2)
                 fde_batch = ((((gt_goal - waypoint_samples[:, :, -1:]) / resize_factor) ** 2).sum(dim=3) ** 0.5)
                 
-                trajs_dict['groundtruth'].append(
-                    trajectory.cpu().detach().numpy() / resize_factor)  # (batch_size, tot_len, n_coor)
-                # take the most accurate prediction only 
-                trajs_dict['prediction'].append((future_samples[
-                    ade_batch.argmin(axis=0), range(future_samples.shape[1]), ...] 
-                    / resize_factor).cpu().detach().numpy())  # (n_goal, batch_size, n_coor)
+                if return_features:
+                    trajs_dict['groundtruth'].append(
+                        trajectory.cpu().detach().numpy() / resize_factor)  # (batch_size, tot_len, n_coor)
+                    # take the most accurate prediction only 
+                    trajs_dict['prediction'].append((future_samples[
+                        ade_batch.argmin(axis=0), range(future_samples.shape[1]), ...] 
+                        / resize_factor).cpu().detach().numpy())  # (n_goal, batch_size, n_coor)
                 
                 ade = ade_batch.min(dim=0)[0].cpu().detach().numpy()  # (batch_size, )
                 fde = fde_batch.min(dim=0)[0][:,0].cpu().detach().numpy()  # (batch_size, )

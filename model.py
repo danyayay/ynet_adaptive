@@ -14,7 +14,6 @@ from utils.image_utils import create_gaussian_heatmap_template, create_dist_mat,
     preprocess_image_for_segmentation, pad, resize
 from utils.dataloader import SceneDataset, scene_collate
 from utils.evaluate import evaluate
-from utils.visualize import plot_feature_space, plot_input_space
 
 
 class StyleModulator(nn.Module):
@@ -411,16 +410,16 @@ class YNetTrainer:
 
         return self.val_ADE, self.val_FDE
 
-    def test(self, df_test, image_path, with_style, return_features=False):
+    def test(self, df_test, image_path, with_style, return_features=False, viz_input=False):
         return self._test(df_test, image_path, with_style=with_style, 
-            return_features=return_features, **self.params)
+            return_features=return_features, viz_input=viz_input, **self.params)
 
     def _test(
         self, df_test, image_path, dataset_name, resize_factor, 
         batch_size, n_round, obs_len, pred_len, 
         waypoints, n_goal, n_traj, temperature, rel_threshold, 
         use_TTST, use_CWS, CWS_params, use_raw_data=False, with_style=False, 
-        return_features=False, depth=0, **kwargs):
+        return_features=False, viz_input=False, depth=0, **kwargs):
         """
         Val function
         :param df_test: pd.df, val data
@@ -457,20 +456,20 @@ class YNetTrainer:
                     dataset_name, self.homo_mat, input_template, waypoints, 'test',
                     n_goal, n_traj, obs_len, batch_size, resize_factor, with_style,
                     temperature, use_TTST, use_CWS, rel_threshold, CWS_params,
-                    True, depth)
+                    True, viz_input, depth)
+                list_metrics.append(df_metrics)
+                list_features.append(features_dict)
+                list_trajs.append(trajs_dict)
             else:
-                test_ADE, test_FDE = evaluate(
+                test_ADE, test_FDE, _ = evaluate(
                     model, test_loader, test_images, self.device, 
                     dataset_name, self.homo_mat, input_template, waypoints, 'test',
                     n_goal, n_traj, obs_len, batch_size, resize_factor, with_style,
                     temperature, use_TTST, use_CWS, rel_threshold, CWS_params,
-                    False, depth)
+                    False, viz_input, depth)
             print(f'Round {e}: \nTest ADE: {test_ADE} \nTest FDE: {test_FDE}')
             self.eval_ADE.append(test_ADE)
             self.eval_FDE.append(test_FDE)
-            list_metrics.append(df_metrics)
-            list_features.append(features_dict)
-            list_trajs.append(trajs_dict)
 
         avg_ade = sum(self.eval_ADE) / len(self.eval_ADE)
         avg_fde = sum(self.eval_FDE) / len(self.eval_FDE)
@@ -547,68 +546,6 @@ class YNetTrainer:
         preprocess_image_for_segmentation(images_dict, seg_mask=seg_mask)
 
         return images_dict, dataloader, homo_mat
-
-    def _viz_feature_space_per_metaId(self, df_meta, image_path, depth=0):
-        images_dict, dataloader, _ = self.prepare_data(
-            df_meta, image_path, self.params['dataset_name'], 'test', 
-            self.params['obs_len'], self.params['pred_len'], 
-            self.params['resize_factor'], self.params['use_raw_data'], False)
-        meta_id = df_meta.metaId.unique()[0]
-
-        input_template = torch.Tensor(create_dist_mat(size=self.template_size)).to(self.device)
-
-        self.model.eval()
-        with torch.no_grad():
-            for traj, _, scene in dataloader: 
-                print(f'Plotting feature space of meta_id={meta_id}, scene={scene}')
-                # prepare scene image 
-                scene_image = images_dict[scene].unsqueeze(0)
-                scene_image = self.model.segmentation(scene_image) 
-                _, _, H, W = scene_image.shape
-
-                # prepare trajectory image 
-                observed = traj[:, :self.params['obs_len'], :].reshape(-1, 2).cpu().numpy()  
-                observed_map = get_patch(input_template, observed, H, W)  
-                observed_map = torch.stack(observed_map).reshape([-1, self.params['obs_len'], H, W])  
-                semantic_image = scene_image.expand(observed_map.shape[0], -1, -1, -1) 
-                
-                # concatenate input 
-                feature_input = torch.cat([semantic_image, observed_map], dim=1)  
-                
-                # visualize input space
-                name = f'{meta_id}_{scene}'
-                plot_input_space(semantic_image, observed_map, 
-                    'figures/input_space', f'{name}_input_space')
-                # visualize feature space
-                if depth == 0:
-                    # depth = 0: viz output of encoder 
-                    features = self.model.pred_features(feature_input)  # n_block of (batch_size, n_channel, height, width)
-                    features = [features[-1]]
-                    features_name = ['encoder_output']
-                elif depth == 1:
-                    # depth = 1: viz each conv block
-                    features = self.model.pred_features(feature_input)
-                    features_name = [f'block_{i+1}' for i in len(features)]
-                else:
-                    # depth = 2: viz each layer
-                    features, features_name = [], []
-                    out = feature_input
-                    for i, block in enumerate(self.model.encoder.stages):
-                        for layer in block:
-                            out = layer(out)
-                            features.append(out)
-                            features_name.append(f'block_{i+1}: {str(layer).split("(")[0]}')
-                n_channel_max = max([l.shape[1] for l in features])
-                plot_feature_space(features, features_name, n_channel_max, 
-                    'figures/feature_space', f'{name}_feature_space')
-    
-    def viz_feature_space(self, df_test, image_path, depth=0, n_example=1):
-        unique_meta_id = df_test.metaId.unique()
-        np.random.shuffle(unique_meta_id)
-        for i in range(n_example):
-            meta_id = unique_meta_id[i]
-            df_meta = df_test[df_test.metaId == meta_id]
-            self._viz_feature_space_per_metaId(df_meta, image_path, depth)
 
     def load(self, path):
         if self.device == 'cuda':
