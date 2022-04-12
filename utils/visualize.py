@@ -4,8 +4,9 @@ import argparse
 import numpy as np
 import pandas as pd
 import seaborn as sns
-import matplotlib.pyplot as plt
 import matplotlib
+import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 matplotlib.use('Agg')
 from utils.dataset import create_images_dict
 
@@ -72,65 +73,46 @@ def create_few_shot_plot(results_dir, out_dir, fontsize=16):
     plt.savefig(f'{out_dir}/result.png', bbox_inches='tight', pad_inches=0)
 
 
-def plot_input_space(semantic_images, observed_map, out_dir='figures', title='input_space', format='png'):
+def plot_input_space(semantic_images, observed_map, meta_ids, scene_id, out_dir='figures', format='png'):
     # semantic_images: (batch_size, n_class, height, width)
     # observed_map: (batch_size, obs_len, height, width)
-    fig, axes = plt.subplots(1, 2, figsize=(5, 10))
-    semantic_images = np.squeeze(semantic_images)
-    observed_map = np.squeeze(observed_map)
-    # plot semantic map
-    axes[0].imshow(np.transpose(semantic_images, (1,2,0)), interpolation='nearest')
-    axes[0].colorbar()
-    axes[0].set_title('Semantic map')
-    # plot observed trajectory map
-    for i in range(observed_map.shape[0]):
-        axes[1].imshow(observed_map[i])
-    axes[1].colorbar()
-    axes[1].set_title('Observed trajectory map')
-    pathlib.Path(out_dir).mkdir(parents=True, exist_ok=True)
-    out_path = os.path.join(out_dir, title+'.'+format)
-    plt.savefig(out_path, bbox_inches='tight', pad_inches=0)
-    print(f'Saved feature space plot in {out_path}')
-
-
-# def plot_feature_space(
-#     features, features_name, n_channel_max, 
-#     out_dir='figures', title='feature_space', format='png'):
-#     # features: n_row list of (batch_size, n_channel, height, width)
-#     fig, axes = plt.subplots(
-#         len(features_name), n_channel_max, 
-#         figsize=(n_channel_max*5, len(features_name)*5)
-#     )
-#     if len(features_name) == 1:
-#         feature = np.squeeze(features[0])
-#         for c in range(feature.shape[0]):
-#             axes[c].imshow(feature[c])
-#         axes[0].set_ylabel(features_name[0])
-#         axes[len(features_name) // 2].set_title(title)
-#     else:
-#         for r in range(len(features)):
-#             feature = np.squeeze(features[r])
-#             for c in range(feature.shape[0]):
-#                 axes[r,c].imshow(feature[c])
-#             axes[r, 0].set_ylabel(features_name[r])
-#         axes[0, len(features_name) // 2].set_title(title)
-#     plt.xlabel('Channel')
-#     plt.colorbar()
-#     pathlib.Path(out_dir).mkdir(parents=True, exist_ok=True)
-#     out_path = os.path.join(out_dir, title+'.'+format)
-#     plt.savefig(out_path, bbox_inches='tight', pad_inches=0)
-#     print(f'Saved feature space plot in {out_path}')
+    fig, axes = plt.subplots(2, observed_map.shape[1], figsize=(observed_map.shape[1]*4, 2*4))
+    for i, meta_id in enumerate(meta_ids):
+        observed_map_i = observed_map[i]
+        semantic_image_i = semantic_images[i]
+        # plot semantic map
+        for c in range(semantic_image_i.shape[0]):
+            im = axes[0, c].imshow(semantic_image_i[c], vmin=0, vmax=1, interpolation='nearest')
+        divider = make_axes_locatable(axes[0, c])
+        cax = divider.append_axes('right', size='5%', pad=0.05)
+        fig.colorbar(im, cax=cax, orientation='vertical')
+        axes[0, c // 2].set_title('Semantic map')
+        # hide empty plots
+        for c in range(semantic_image_i.shape[0], observed_map_i.shape[0]):
+            axes[0, c].axis('off')
+        # plot observed trajectory map
+        for t in range(observed_map_i.shape[0]):
+            axes[1, t].imshow(observed_map_i[t], vmin=0, vmax=1)
+        axes[1, t // 2].set_title('Observed trajectory map')
+        # save
+        pathlib.Path(out_dir).mkdir(parents=True, exist_ok=True)
+        out_name = f'{meta_id}__{scene_id}'
+        out_path = os.path.join(out_dir, out_name + '.' + format)
+        plt.savefig(out_path, bbox_inches='tight')
+        plt.close(fig)
+        print(f'Saved {out_path}')
 
 
 def plot_feature_space(dict_features, out_dir='figures/feature_space', format='png'):
+    # TODO: show colorbar 
+    # TODO: depth=2 output image number is not correct
     first_dict = dict_features[list(dict_features)[0]]
     for scene_id, dict_scene in first_dict.items():
         for i, meta_id in enumerate(dict_scene['metaId']):
-            breakpoint()
             features_name = list(dict_scene)
             features_name.remove('metaId')
             # for each sample, visualize feature space
-            for l, feature_name in enumerate(features_name):
+            for _, feature_name in enumerate(features_name):
                 n_channel = dict_scene[feature_name].shape[1]
                 n_ckpt = len(dict_features)
                 fig, axes = plt.subplots(n_ckpt, n_channel, 
