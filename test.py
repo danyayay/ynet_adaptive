@@ -32,6 +32,7 @@ if args.n_leftouts:
     _, _, df_test = dataset_split(DATA_PATH, args.val_files, args.val_ratio, args.n_leftouts)
 else:
     _, df_test, _ = dataset_split(DATA_PATH, args.val_files, args.val_ratio)
+print(df_test.metaId.unique())
 print(f"df_test: {df_test.shape}; #={df_test.shape[0]/(params['obs_len']+params['pred_len'])}")
 
 # ## model
@@ -47,6 +48,7 @@ else:
 
 # ## test
 print('############ Test model ##############')
+set_random_seeds(args.seed)
 ade, fde = model.test(df_test, IMAGE_PATH, args.train_net == "modulator")
 if args.out_csv_dir is not None:
     out_dir = get_out_dir(args.out_csv_dir, args.dataset_path, args.seed, args.train_net, args.val_files)
