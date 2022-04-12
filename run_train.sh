@@ -4,7 +4,7 @@ n_epoch=100
 
 dataset_name=sdd
 out_csv_dir=csv # /path/to/csv where the output results are written to
-val_ratio=0.1 # Split train dataset into a train and val split in case the domains are the same
+val_ratio=0.2 # Split train dataset into a train and val split in case the domains are the same
 train_net=all # Train either all parameters, only the encoder or the modulator: (all encoder modulator)
 
 declare -A A=( ["dataset_path"]="filter/avg_vel/Pedestrian/" ["filename"]="0.1_0.3.pkl" ["n_test"]=100)
@@ -15,10 +15,10 @@ declare -A E=( ["dataset_path"]="filter/agent_type/" ["filename"]="Pedestrian.pk
 declare -A F=( ["dataset_path"]="filter/agent_type/" ["filename"]="Biker.pkl" ["n_test"]=500)
 declare -A AB=( ["dataset_path"]="filter/avg_vel/Pedestrian/" ["filename"]="0.1_0.3.pkl 0.5_1.5.pkl" ["n_test"]="100 990")
 
-dataset_path=${AB["dataset_path"]}
-train_files=${AB["filename"]}
-val_files=${AB["filename"]}
-n_leftouts=${AB["n_test"]}
+dataset_path=${A["dataset_path"]}
+train_files=${A["filename"]}
+val_files=${A["filename"]}
+n_leftouts=${A["n_test"]}
 
 for seed in ${list_seed[@]}
 do    

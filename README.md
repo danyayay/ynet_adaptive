@@ -85,19 +85,6 @@ data
 └── ynet_additional_files
 ```
 
-Previously 
-```
-sdd_ynet
-├── dataset_raw
-├── dataset_filter
-│   ├── dataset_ped
-│   ├── dataset_biker
-│   │   ├── gap
-│   │   └── no_gap
-│   └── ...
-└── ynet_additional_files
-```
-
 In addition to our custom datasets in sdd_ynet/dataset_filter, you can create custom datasets:
 ```
 bash create_custom_dataset.sh
