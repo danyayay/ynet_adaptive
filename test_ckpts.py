@@ -7,7 +7,7 @@ import pandas as pd
 
 from model import YNetTrainer
 from utils.dataset import set_random_seeds, dataset_split
-from utils.visualize import plot_obs_pred_trajs, plot_feature_space
+from utils.visualize import plot_feature_space, plot_feature_space_diff_evolution
 
 
 def main(args):
@@ -65,7 +65,7 @@ def main(args):
             df_result.loc[:, 'ade_OODG_FT'] = np.absolute(df_result.ade_OODG.values - df_result.ade_FT.values)
             df_result = df_result[df_result.sceneId != 'avg']
             if args.limit_by == 'n_viz':
-                meta_ids_focus = df_result.sort_values(by='ade_OODG_FT', ascending=False).head(args.n_viz).metaId.values              
+                meta_ids_focus = df_result.sort_values(by='ade_OODG_FT', ascending=False).head(args.n_viz).metaId.values
             else: # args.limit_by == 'threshold'
                 meta_ids_focus = df_result[df_result.ade_OODG_FT >= args.threshold].metaId.values
                 while meta_ids_focus.shape[0] == 0:
@@ -100,7 +100,8 @@ def main(args):
         # visualize
         if args.viz:
             # plot_obs_pred_trajs(IMAGE_PATH, dict_trajs, f'figures/prediction/{name}')
-            plot_feature_space(dict_features, f'figures/feature_space/{name}')
+            # plot_feature_space(dict_features, f'figures/feature_space/{name}', show_diff=True)
+            plot_feature_space_diff_evolution(dict_features, f'figures/feature_space_diff/{name}')
     else:
         raise ValueError('No checkpoint given!')
 

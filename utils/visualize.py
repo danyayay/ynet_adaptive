@@ -103,45 +103,135 @@ def plot_input_space(semantic_images, observed_map, meta_ids, scene_id, out_dir=
         print(f'Saved {out_path}')
 
 
-def plot_feature_space(dict_features, out_dir='figures/feature_space', plot_diff=False, format='png'):
-    # TODO: show colorbar 
-    # TODO: add plot_diff
-    # TODO: add plot only first k figures
+def plot_feature_space(dict_features, out_dir='figures/feature_space', show_diff=True, format='png'):
+    """Plot feature space 
 
+    Args:
+        dict_features (dict): 
+            {ckpt_name: 
+                {scene_id: 
+                    {feature_name:
+                        {np.array()},
+                     ...,
+                     meta_ids:
+                        list(),
+                    }
+                }
+            }
+        out_dir (str, optional): _description_. Defaults to 'figures/feature_space'.
+        plot_diff (bool, optional): _description_. Defaults to False.
+        format (str, optional): _description_. Defaults to 'png'.
+    """
+    # TODO: show colorbar 
+    # TODO: add plot only first k figures
     first_dict = dict_features[list(dict_features)[0]]
     for scene_id, dict_scene in first_dict.items():
         for i, meta_id in enumerate(dict_scene['metaId']):
             features_name = list(dict_scene)
             features_name.remove('metaId')
             # for each sample, visualize feature space
-            for _, feature_name in enumerate(features_name):
-                n_channel = dict_scene[feature_name].shape[1]
-                n_ckpt = len(dict_features)
-                fig, axes = plt.subplots(n_ckpt, n_channel, 
-                    figsize=(n_channel*4+2, n_ckpt*3+2))
-                for k, (ckpt_name, dict_ckpt) in enumerate(dict_features.items()):
-                    feature_i = dict_ckpt[scene_id][feature_name][i]  # (n_channel, height, width)
-                    for c in range(n_channel):
-                        axes[k, c].imshow(feature_i[c])
-                        axes[k, c].set_xlabel(f'channel_{c+1}')
-                        if c == 0: axes[k, c].set_ylabel(labels_ckpt[ckpt_name])
-                title = f'meta_id={meta_id}, scene_id={scene_id}, feature_name={feature_name}'
-                axes[0, n_channel//2].set_title(title)
-                pathlib.Path(out_dir).mkdir(parents=True, exist_ok=True)
-                out_name = f'{meta_id}__{scene_id}__{feature_name}'
-                out_path = os.path.join(out_dir, out_name + '.' + format)
-                plt.savefig(out_path, bbox_inches='tight')
-                plt.close(fig)
-                print(f'Saved {out_path}')
+            if show_diff:
+                # show the difference between OODG and FT / ET
+                for _, feature_name in enumerate(features_name):
+                    n_channel = dict_scene[feature_name].shape[1]
+                    diff_i = {}
+                    for ckpt_name in ['FT', 'ET']:
+                        if ('OODG' in dict_features.keys()) & (ckpt_name in dict_features.keys()):
+                            diff_i[ckpt_name] = dict_features['OODG'][scene_id][feature_name][i] - \
+                                dict_features[ckpt_name][scene_id][feature_name][i]
+                    fig, axes = plt.subplots(len(diff_i), n_channel, 
+                        figsize=(n_channel*4+2, len(diff_i)*3+2))
+                    for k, ckpt_name in enumerate(diff_i):
+                        for c in range(n_channel):
+                            axes[k, c].imshow(diff_i[ckpt_name][c])
+                            axes[k, c].set_xlabel(f'channel_{c+1}')
+                            if c == 0: axes[k, c].set_ylabel(labels_ckpt[ckpt_name])
+                    title = f'meta_id={meta_id}, scene_id={scene_id}, feature_name={feature_name}'
+                    axes[0, n_channel//2].set_title(title)
+                    pathlib.Path(out_dir).mkdir(parents=True, exist_ok=True)
+                    out_name = f'{meta_id}__{scene_id}__{feature_name}_diff'
+                    out_path = os.path.join(out_dir, out_name + '.' + format)
+                    plt.savefig(out_path, bbox_inches='tight')
+                    plt.close(fig)
+                    print(f'Saved {out_path}')
+            else:
+                # show the original feature space 
+                for _, feature_name in enumerate(features_name):
+                    n_channel = dict_scene[feature_name].shape[1]
+                    n_ckpt = len(dict_features)
+                    fig, axes = plt.subplots(n_ckpt, n_channel, 
+                        figsize=(n_channel*4+2, n_ckpt*3+2))
+                    for k, (ckpt_name, dict_ckpt) in enumerate(dict_features.items()):
+                        feature_i = dict_ckpt[scene_id][feature_name][i]  # (n_channel, height, width)
+                        for c in range(n_channel):
+                            axes[k, c].imshow(feature_i[c])
+                            axes[k, c].set_xlabel(f'channel_{c+1}')
+                            if c == 0: axes[k, c].set_ylabel(labels_ckpt[ckpt_name])
+                    title = f'meta_id={meta_id}, scene_id={scene_id}, feature_name={feature_name}'
+                    axes[0, n_channel//2].set_title(title)
+                    pathlib.Path(out_dir).mkdir(parents=True, exist_ok=True)
+                    out_name = f'{meta_id}__{scene_id}__{feature_name}'
+                    out_path = os.path.join(out_dir, out_name + '.' + format)
+                    plt.savefig(out_path, bbox_inches='tight')
+                    plt.close(fig)
+                    print(f'Saved {out_path}')
 
 
-def calculate_feature_space_diff(dict_features, is_avg=True):
-    # TODO: average change over pixels, or not
-    pass
+def plot_feature_space_diff_evolution(
+    dict_features, out_dir='figures/feature_space_diff', is_avg=True, format='png'):
+    diff = {}
+    for ckpt_name in ['FT', 'ET']:
+        if ('OODG' in dict_features.keys()) & (ckpt_name in dict_features.keys()):
+            name = f'diff_OODG_{ckpt_name}'
+            diff[name] = {}
+            for s, (scene_id, dict_scene) in enumerate(dict_features[list(dict_features)[0]].items()):
+                features_name = list(dict_scene)
+                features_name.remove('metaId')
+                if s == 0:
+                    for feature_name in features_name:
+                        diff[name][feature_name] = []
+                for feature_name in features_name:
+                    if is_avg:
+                        diff[name][feature_name].extend((
+                            dict_features['OODG'][scene_id][feature_name] - 
+                            dict_features[ckpt_name][scene_id][feature_name]).sum(axis=(1,2,3)) / (
+                                dict_features['OODG'][scene_id][feature_name][0].reshape(-1).shape[0]))
+                    else:
+                        diff[name][feature_name].extend((
+                            dict_features['OODG'][scene_id][feature_name] - 
+                            dict_features['FT'][scene_id][feature_name]).sum(axis=(1,2,3)))
+            # average over samples
+            df = pd.DataFrame()
+            for feature_name in features_name:
+                df.loc[feature_name, name] = np.mean(diff[name][feature_name])
+                df.loc[feature_name, name+'_std'] = np.std(diff[name][feature_name])
 
-
-def plot_feature_space_evolution():
-    pass
+            # plot evolution
+            if df.shape[0] == 3:
+                fig_size, depth = 4, 0
+            elif df.shape[0] == 20: # 6+7+7
+                fig_size, depth = 10, 1
+            elif df.shape[0] == 83: # 23+30+30
+                fig_size, depth = 20, 2
+            else: 
+                fig_size, depth = df.shape[0]*0.25, 'unknown'
+            fig, ax = plt.subplots(figsize=(fig_size, 4))
+            plt.plot(df.index, df[name].values)
+            plt.fill_between(df.index, df[name].values-df[name+'_std'].values, 
+                df[name].values+df[name+'_std'].values, alpha=0.2)
+            plt.title(f'Feature space difference between ODDG and {ckpt_name}')
+            plt.ylabel('Difference')
+            plt.xlabel('Layers')
+            if (depth == 0) | (depth == 1):
+                plt.xticks(rotation=45, ha='right')
+            else: # (depth == 2) | (depth == unknown)
+                plt.xticks(rotation=90, ha='right')
+            pathlib.Path(out_dir).mkdir(parents=True, exist_ok=True)
+            out_name = f'{name}_D{depth}_avg' if is_avg else f'{name}_D{depth}'
+            out_path = os.path.join(out_dir, out_name + '.' + format)
+            plt.savefig(out_path, bbox_inches='tight')
+            plt.close(fig)
+            print(f'Saved {out_path}')
 
 
 def plot_all_trajectories(df_biker, df_ped, out_dir):

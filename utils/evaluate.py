@@ -282,10 +282,8 @@ def evaluate(
                     waypoint_samples = sampling(
                         pred_waypoint_map_sigmoid[:, :-1], num_samples=n_goal * n_traj)
                     waypoint_samples = waypoint_samples.permute(2, 0, 1, 3)
-                    goal_samples = goal_samples.repeat(
-                        n_traj, 1, 1, 1)  # repeat K_a times
-                    waypoint_samples = torch.cat(
-                        [waypoint_samples, goal_samples], dim=2)
+                    goal_samples = goal_samples.repeat(n_traj, 1, 1, 1)  # repeat K_a times
+                    waypoint_samples = torch.cat([waypoint_samples, goal_samples], dim=2)
 
                 # Interpolate trajectories given goal and waypoints
                 future_samples = []
@@ -318,7 +316,7 @@ def evaluate(
                     pred_traj = model.softargmax(pred_traj_map)  # (batch_size, pred_len, n_coord)
                     future_samples.append(pred_traj)
                 future_samples = torch.stack(future_samples)  # (n_goal, batch_size, pred_len, n_coord)
-
+                
                 gt_goal = gt_future[:, -1:]  # (batch_size, 1, n_coord)
 
                 # converts ETH/UCY pixel coordinates back into world-coordinates
@@ -334,17 +332,17 @@ def evaluate(
                     trajs_dict['groundtruth'].append(
                         trajectory.cpu().detach().numpy() / resize_factor)  # (batch_size, tot_len, n_coor)
                     # take the most accurate prediction only 
-                    best_idx = ade_batch.argmin(axis=0)
+                    best_indices = ade_batch.argmin(axis=0)
                     trajs_dict['prediction'].append((future_samples[
-                        best_idx, range(future_samples.shape[1]), ...] 
+                        best_indices, range(future_samples.shape[1]), ...] 
                         / resize_factor).cpu().detach().numpy())  # (n_goal, batch_size, n_coor)
                     # store 
                     if depth == 0:
-                        features_dict[scene_id]['TrajDecoder'].append(list_traj_pred[best_idx]['TrajDecoder'])
+                        features_dict[scene_id]['TrajDecoder'].append(list_traj_pred[best_indices]['TrajDecoder'])
                     elif (depth == 1) | (depth == 2):
                         for i, fn in enumerate(features_name[n_filled:]):
-                            for idx in best_idx:
-                                features_dict[scene_id][fn].append(list_traj_pred[idx][fn])
+                            for sample_idx, best_idx in enumerate(best_indices):
+                                features_dict[scene_id][fn].append(list_traj_pred[best_idx][fn][sample_idx])
                 
                 ade = ade_batch.min(dim=0)[0].cpu().detach().numpy()  # (batch_size, )
                 fde = fde_batch.min(dim=0)[0][:,0].cpu().detach().numpy()  # (batch_size, )
@@ -368,7 +366,9 @@ def evaluate(
     if return_features:
         for s, d in features_dict.items():
             for key, value in d.items():
-                if key != 'metaId':
+                if 'TrajDecoder' in key:
+                    features_dict[s][key] = np.array(value)
+                elif key != 'metaId':
                     features_dict[s][key] = np.concatenate(value, axis=0)
         for key, value in trajs_dict.items():
             trajs_dict[key] = np.concatenate(value, axis=0)

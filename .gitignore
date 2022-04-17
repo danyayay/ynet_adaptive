@@ -5,6 +5,7 @@ ckpts/
 data/
 logs/
 
+run_try.sh
 pretrained_models
 sdd_ynet
 csv
