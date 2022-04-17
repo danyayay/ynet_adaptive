@@ -46,7 +46,6 @@ else:
 df_train = limit_samples(df_train, args.n_train_batch, args.batch_size)
 print(f"df_train: {df_train.shape}; #={df_train.shape[0]/(params['obs_len']+params['pred_len'])}")
 print(f"df_val: {df_val.shape}; #={df_val.shape[0]/(params['obs_len']+params['pred_len'])}")
-print(df_test.metaId.unique())
 if df_test is not None: print(f"df_test: {df_test.shape}; #={df_test.shape[0]/(params['obs_len']+params['pred_len'])}")
 
 # ## model
@@ -81,7 +80,7 @@ if args.out_csv_dir and args.n_leftouts:
     print('############ Test leftout data ##############')
     set_random_seeds(args.seed)
     # test
-    test_ade, test_fde = model.test(df_test, IMAGE_PATH, args.train_net == "modulator")
+    test_ade, test_fde, _ = model.test(df_test, IMAGE_PATH, args.train_net == "modulator")
     # save csv results
     out_dir = get_out_dir(args.out_csv_dir, args.dataset_path, args.seed, args.train_net, args.val_files, args.train_files)
     write_csv(out_dir, 'fine_tune.csv', val_ade, val_fde, test_ade, test_fde)

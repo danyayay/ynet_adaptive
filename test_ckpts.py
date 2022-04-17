@@ -39,6 +39,7 @@ def main(args):
     if args.ckpts:
         dict_features, dict_trajs = dict(), dict()
         for i, (ckpt, ckpt_name) in enumerate(zip(args.ckpts, args.ckpts_name)):
+            print(f'====== Testing for {ckpt_name} ======')
             set_random_seeds(args.seed)
             model = YNetTrainer(params=params)
             model.load(ckpt)
@@ -98,8 +99,7 @@ def main(args):
 
         # visualize
         if args.viz:
-            # TODO: pass diff columns and save it in the name 
-            plot_obs_pred_trajs(IMAGE_PATH, dict_trajs, f'figures/prediction/{name}')
+            # plot_obs_pred_trajs(IMAGE_PATH, dict_trajs, f'figures/prediction/{name}')
             plot_feature_space(dict_features, f'figures/feature_space/{name}')
     else:
         raise ValueError('No checkpoint given!')

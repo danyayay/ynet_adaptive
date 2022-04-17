@@ -82,13 +82,13 @@ class YNetEncoder(nn.Module):
 
         # for detailed feature visualization
         if depth == 2:
-            detailed_features = []
+            details = []
             x = x_copy
             for stage in self.stages:
                 for layer in stage:
                     x = layer(x)
-                    detailed_features.append(x)
-            return features, detailed_features
+                    details.append(x)
+            return features, details
         else:
             return features 
 
@@ -152,33 +152,40 @@ class YNetDecoder(nn.Module):
         # Takes in the list of feature maps from the encoder. Trajectory predictor in addition the goal and waypoint heatmaps
         # reverse the order of encoded features, as the decoder starts from the smallest image
         features = features[::-1]
-        detailed_features = []
+        details = []
         # decoder: layer 1
         center_feature = features[0]
         x = self.center(center_feature)
         if depth == 1:
-            detailed_features.append(x)
+            details.append(x)
         elif depth == 2:
             x = center_feature
             for layer in self.center:
                 x = layer(x)
-                detailed_features.append(x)
+                details.append(x)
         # decoder: layer 2-6
         for f, d, up in zip(features[1:], self.decoder, self.upsample_conv):
             # bilinear interpolation for upsampling
             x = F.interpolate(x, scale_factor=2, mode='bilinear', align_corners=False)
             x = up(x)  # 3x3 conv for upsampling
-            if depth == 2: detailed_features.append(x)
+            if depth == 2: details.append(x)
             # concat encoder and decoder features
             x = torch.cat([x, f], dim=1)
-            x = d(x)
-            if depth > 0: detailed_features.append(x)    
+            if depth == 0:
+                x = d(x)
+            elif depth == 1:
+                x = d(x)
+                details.append(x)   
+            elif depth == 2:
+                for layer in d:
+                    x = layer(x)
+                    details.append(x)
         # decoder: layer 7 (last predictor layer)
         x = self.predictor(x) 
     
         if depth > 0: 
-            detailed_features.append(x)
-            return x, detailed_features
+            details.append(x)
+            return x, details
         else:
             return x
 
@@ -404,7 +411,9 @@ class YNetTrainer:
 
         # # Save best model
         if fine_tune & (train_net == 'all'):
-            torch.save(best_state_dict, f'ckpts/{experiment_name}_FT_weights.pt')
+            torch.save(best_state_dict, f'ckpts/{experiment_name}_FT_{str(int((df_train.shape[0])/20))}_weights.pt')
+        elif fine_tune & (train_net == 'encoder'):
+            torch.save(best_state_dict, f'ckpts/{experiment_name}_{str(int((df_train.shape[0])/20))}_weights.pt')
         else:
             torch.save(best_state_dict, f'ckpts/{experiment_name}_weights.pt')
 
@@ -457,16 +466,16 @@ class YNetTrainer:
                     n_goal, n_traj, obs_len, batch_size, resize_factor, with_style,
                     temperature, use_TTST, use_CWS, rel_threshold, CWS_params,
                     True, viz_input, depth)
-                list_metrics.append(df_metrics)
                 list_features.append(features_dict)
                 list_trajs.append(trajs_dict)
             else:
-                test_ADE, test_FDE, _ = evaluate(
+                test_ADE, test_FDE, df_metrics = evaluate(
                     model, test_loader, test_images, self.device, 
                     dataset_name, self.homo_mat, input_template, waypoints, 'test',
                     n_goal, n_traj, obs_len, batch_size, resize_factor, with_style,
                     temperature, use_TTST, use_CWS, rel_threshold, CWS_params,
                     False, viz_input, depth)
+            list_metrics.append(df_metrics)
             print(f'Round {e}: \nTest ADE: {test_ADE} \nTest FDE: {test_FDE}')
             self.eval_ADE.append(test_ADE)
             self.eval_FDE.append(test_FDE)
@@ -479,7 +488,7 @@ class YNetTrainer:
         if return_features:
             return avg_ade, avg_fde, list_metrics, list_features, list_trajs
         else:
-            return avg_ade, avg_fde
+            return avg_ade, avg_fde, list_metrics
     
     def prepare_data(
         self, df, image_path, dataset_name, mode, obs_len, pred_len, 

@@ -103,9 +103,11 @@ def plot_input_space(semantic_images, observed_map, meta_ids, scene_id, out_dir=
         print(f'Saved {out_path}')
 
 
-def plot_feature_space(dict_features, out_dir='figures/feature_space', format='png'):
+def plot_feature_space(dict_features, out_dir='figures/feature_space', plot_diff=False, format='png'):
     # TODO: show colorbar 
-    # TODO: depth=2 output image number is not correct
+    # TODO: add plot_diff
+    # TODO: add plot only first k figures
+
     first_dict = dict_features[list(dict_features)[0]]
     for scene_id, dict_scene in first_dict.items():
         for i, meta_id in enumerate(dict_scene['metaId']):
@@ -131,6 +133,15 @@ def plot_feature_space(dict_features, out_dir='figures/feature_space', format='p
                 plt.savefig(out_path, bbox_inches='tight')
                 plt.close(fig)
                 print(f'Saved {out_path}')
+
+
+def calculate_feature_space_diff(dict_features, is_avg=True):
+    # TODO: average change over pixels, or not
+    pass
+
+
+def plot_feature_space_evolution():
+    pass
 
 
 def plot_all_trajectories(df_biker, df_ped, out_dir):
@@ -166,15 +177,15 @@ def plot_obs_pred_trajs(image_path, dict_trajs, out_dir='figures/prediction', fo
         scene_image = scene_images[scene_id]
         plt.imshow(scene_image)
         j = 0
-        s = 2
+        ms = 3
         for ckpt_name, value in dict_trajs.items():
             gt_traj = value['groundtruth'][i]
             pred_traj = value['prediction'][i]
             if j == 0:
-                plt.scatter(gt_traj[:obs_len][:,0], gt_traj[:obs_len][:,1], s=s, c=colors['OB'], label='observed')
-                plt.scatter(gt_traj[obs_len:][:,0], gt_traj[obs_len:][:,1], s=s, c=colors['GT'], label=labels_ckpt['GT'])
+                plt.plot(gt_traj[:obs_len][:,0], gt_traj[:obs_len][:,1], ms=ms, c=colors['OB'], label='observed')
+                plt.plot(gt_traj[obs_len:][:,0], gt_traj[obs_len:][:,1], ms=ms, c=colors['GT'], label=labels_ckpt['GT'])
                 j += 1
-            plt.scatter(pred_traj[:,0], pred_traj[:,1], s=s, c=colors[ckpt_name], label=labels_ckpt[ckpt_name])
+            plt.plot(pred_traj[:,0], pred_traj[:,1], ms=ms, c=colors[ckpt_name], label=labels_ckpt[ckpt_name])
         title = f'meta_id={meta_id}, scene_id={scene_id}'
         plt.title(title)
         plt.legend(loc='best')

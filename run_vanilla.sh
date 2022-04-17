@@ -1,8 +1,7 @@
 list_seed=(1) # Fine-tune the model on different seeds
 n_epoch=100
-batch_size=8
-# list_batch_size=(1)
-# list_n_train_batch=(1 2 3 4 5) # Fine-tune the model with a given number of batches
+batch_size=10
+list_n_train_batch=(1 2 4 20 40 200) # Fine-tune the model with a given number of batches
 
 dataset_name=sdd 
 out_csv_dir=csv 
@@ -23,22 +22,17 @@ declare -A F=( ["dataset_path"]="filter/agent_type/" ["filename"]="Biker.pkl" ["
     ["ckpt"]="ckpts/Seed_1_Train__Biker__Val__Biker__Val_Ratio_0.1_filter_agent_type__train_all_weights.pt")
 
 # ## pretrained_on: 
-dataset_path=${F["dataset_path"]}
-ckpt=${F["ckpt"]}
+dataset_path=${E["dataset_path"]}
+ckpt=${E["ckpt"]}
 # ## finetune_on
-train_files=${E["filename"]}
-val_files=${E["filename"]}
-n_leftouts=${E["n_test"]}
-
+train_files=${F["filename"]}
+val_files=${F["filename"]}
+n_leftouts=${F["n_test"]}
 
 for seed in ${list_seed[@]}; do
-#     for n_train_batch in ${list_n_train_batch[@]}
-#     do
-#     	for batch_size in ${list_batch_size[@]}
-#     	do
-    python train.py --fine_tune --seed $seed --batch_size $batch_size --n_epoch $n_epoch --dataset_name $dataset_name --dataset_path $dataset_path --out_csv_dir $out_csv_dir --train_files $train_files --val_files $val_files --val_ratio $val_ratio --n_leftouts $n_leftouts --train_net $train_net --ckpt $ckpt --lr 0.00005
-#         done
-#     done
+    for n_train_batch in ${list_n_train_batch[@]}; do
+        python train.py --fine_tune --seed $seed --batch_size $batch_size --n_epoch $n_epoch --dataset_name $dataset_name --dataset_path $dataset_path --out_csv_dir $out_csv_dir --train_files $train_files --val_files $val_files --val_ratio $val_ratio --n_leftouts $n_leftouts --train_net $train_net --ckpt $ckpt --lr 0.00005 --n_train_batch $n_train_batch
+    done
 done
 
 

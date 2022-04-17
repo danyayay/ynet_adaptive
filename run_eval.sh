@@ -1,5 +1,5 @@
-list_seed=(1)
-batch_size=8
+list_seed=(1 2 3)
+batch_size=10
 
 dataset_name=sdd
 out_csv_dir=csv 
@@ -21,17 +21,38 @@ declare -A F=( ["dataset_path"]="filter/agent_type/" ["filename"]="Biker.pkl" ["
     ["ckpt"]="ckpts/Seed_1_Train__Biker__Val__Biker__Val_Ratio_0.1_filter_agent_type__train_all_weights.pt")
 
 # ## pretrained_on: 
-dataset_path=${AB["dataset_path"]}
-ckpt=${AB["ckpt"]}
-# ## evaluate_on
-val_files=${B["filename"]}
-n_leftouts=${B["n_test"]}
+# dataset_path=${AB["dataset_path"]}
+# ckpt=${AB["ckpt"]}
+# # ## evaluate_on
+# val_files=${B["filename"]}
+# n_leftouts=${B["n_test"]}
 
 
-for seed in ${list_seed[@]}
-do
-    python test.py --seed $seed --batch_size $batch_size --dataset_name $dataset_name --dataset_path $dataset_path --val_files $val_files --out_csv_dir $out_csv_dir --val_ratio $val_ratio --ckpt $ckpt --n_leftouts $n_leftouts
+# for seed in ${list_seed[@]}
+# do
+#     python test.py --seed $seed --batch_size $batch_size --dataset_name $dataset_name --dataset_path $dataset_path --val_files $val_files --out_csv_dir $out_csv_dir --val_ratio $val_ratio --ckpt $ckpt --n_leftouts $n_leftouts
+# done
+
+
+dataset_path="filter/agent_type/"
+val_files="Biker.pkl"
+n_leftouts=500
+list_n_train=(10 20 40 200 400 2000)
+list_train_net=("all_FT" "encoder")
+list_ckpt=()
+for n_train in ${list_n_train[@]}; do
+    for train_net in ${list_train_net[@]}; do
+        list_ckpt+=("ckpts/Seed_1_Train__Biker__Val__Biker__Val_Ratio_0.1_filter_agent_type__train_${train_net}_${n_train}_weights.pt")
+    done
 done
+
+
+for seed in ${list_seed[@]}; do
+    for ckpt in ${list_ckpt[@]}; do
+        python test.py --seed $seed --batch_size $batch_size --dataset_name $dataset_name --dataset_path $dataset_path --val_files $val_files --out_csv_dir $out_csv_dir --val_ratio $val_ratio --ckpt $ckpt --n_leftouts $n_leftouts
+    done 
+done
+
 
 
 # ckpt=ckpts/Seed_1_Train__0.25_0.75__1.25_1.75__2.25_2.75__Val__0.25_0.75__1.25_1.75__2.25_2.75__Val_Ratio_0.3_dataset_ped_biker_gap_weights.pt # Pre-trained model

@@ -852,14 +852,15 @@ if __name__ == "__main__":
     parser.add_argument("--stride", default=20, type=int)
     parser.add_argument("--obs_len", default=8, type=int)
 
-    parser.add_argument("--varf", default='agent_type', 
+    parser.add_argument("--varf", default='avg_vel', 
                         help="variation factors from: 'avg_vel', 'max_vel', "+\
                             "'avg_acc', 'max_acc', 'abs+max_acc', 'abs+avg_acc', "+\
                             "'min_dist', 'avg_den50', 'avg_den100', 'agent_type'")
     parser.add_argument("--varf_ranges", help='range of varation factor to take',
+                        default=[(0.1, 0.3), (0.7, 1.3)])
                         # default=[(0.1, 0.3), (0.5, 1.5)])  # small gap 
                         # default=[(0.1, 0.2), (0.6, 1.4)])  # big gap 
-                        default=[(0, 1.3), (1.7, 4.3)])  # small gap, two groups
+                        # default=[(0, 1.3), (1.7, 4.3)])  # small gap, two groups
                         # default=[(0, 0.3), (0.7, 1.3), (1.7, 2.3), (2.7, 3.3), (3.7, 4.3)])  # small gap 
                         # default=[(0, 0.2), (0.8, 1.2), (1.8, 2.2), (2.8, 3.2), (3.8, 4.2)])  # big gap 
                         # default=[[(0.1, 0.3), (0.5, 1.5)], [(0, 0.3), (0.7, 1.3), (1.7, 2.3), (2.7, 3.3), (3.7, 4.3)]])

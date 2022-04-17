@@ -80,21 +80,27 @@ def evaluate(
         elif depth == 1:
             # depth = 1: viz each conv block
             encoder_name = [f'Encoder_B{i+1}' for i in range(len(model.encoder.stages))]
+            print('Encoder layer number:', len(encoder_name))
             n_block_decoder = 1 + len(model.goal_decoder.upsample_conv) + 1
             goal_dec_name = [f'GoalDecoder_B{i+1}' for i in range(n_block_decoder)]
-            # traj_dec_name = [f'TrajDecoder_B{i+1}' for i in range(n_block_decoder)]
-            features_name = encoder_name + goal_dec_name # + traj_dec_name
+            print('GoalDecoder layer number:', len(goal_dec_name)) 
+            traj_dec_name = [f'TrajDecoder_B{i+1}' for i in range(n_block_decoder)]
+            print('TrajDecoder layer number:', len(traj_dec_name)) 
+            features_name = encoder_name + goal_dec_name + traj_dec_name
         elif depth == 2:
             # depth = 2: viz each layer
             features_name = []
             for i, block in enumerate(model.encoder.stages):
                 for j in range(len(block)):
                     features_name.append(f'Encoder_B{i+1}_L{j+1}')
-            for dec_name in ['GoalDecoder']:
-                goal_dec_name = [f'{dec_name}_B1_L1']
-                goal_dec_name += [f'{dec_name}_B{i}_L{j}' for i in range(2,7) for j in range(1,3)]
-                goal_dec_name += [f'{dec_name}_B7_L1']
-                features_name += goal_dec_name                 
+            print('Encoder layer number:', len(features_name))
+            for dec in ['GoalDecoder', 'TrajDecoder']:
+                dec_name = [f'{dec}_B1_L{j}' for j in range(1,5)]
+                dec_name += [f'{dec}_B{i}_L{j}' for i in range(2,7) for j in range(1,6)]
+                dec_name += [f'{dec}_B7_L1']
+                features_name += dec_name
+            print('GoalDecoder layer number:', len(dec_name))   
+            print('TrajDecoder layer number:', len(dec_name))    
         else:
             raise ValueError(f'No support for depth={depth}')
         features_dict = dict()
@@ -142,7 +148,7 @@ def evaluate(
                     features = model.pred_features(feature_input)  # n_layer=6 list of (batch_size, n_channel, height, width)
                     if return_features:
                         features_dict[scene_id]['Encoder'].append(features[-1].cpu().detach().numpy())
-                elif depth == 1: 
+                elif depth == 1:
                     features = model.pred_features(feature_input, depth)
                     n_filled = len(features)
                     for i, f in enumerate(features, start=1):
@@ -220,8 +226,7 @@ def evaluate(
                     ratio = CWS_params['ratio']
                     rot = CWS_params['rot']
 
-                    goal_samples = goal_samples.repeat(
-                        n_traj, 1, 1, 1)  # repeat K_a times
+                    goal_samples = goal_samples.repeat(n_traj, 1, 1, 1)  # repeat K_a times
                     # [N, 2]
                     last_observed = trajectory[i:i+batch_size, obs_len-1].to(device)
                     # in the end this should be a list of [K, N, # waypoints, 2] waypoint coordinates
@@ -245,8 +250,7 @@ def evaluate(
                             gaussian_heatmaps = torch.stack(
                                 gaussian_heatmaps)  # [N, H, W]
 
-                            waypoint_map_before = pred_waypoint_map_sigmoid[:,
-                                                                            waypoint_num]
+                            waypoint_map_before = pred_waypoint_map_sigmoid[:, waypoint_num]
                             waypoint_map = waypoint_map_before * gaussian_heatmaps
                             # normalize waypoint map
                             waypoint_map = (waypoint_map.flatten(
@@ -285,6 +289,7 @@ def evaluate(
 
                 # Interpolate trajectories given goal and waypoints
                 future_samples = []
+                list_traj_pred = []
                 for waypoint in waypoint_samples:
                     waypoint_map = get_patch(
                         input_template, waypoint.reshape(-1, 2).cpu().numpy(), H, W)  # batch_size list of (height, width)
@@ -299,7 +304,17 @@ def evaluate(
                         features, waypoint_maps_downsampled)]  # n_layer list of (batch_size, n_channel+n_waypoint, height, width)
 
                     # predict trajectory
-                    pred_traj_map = model.pred_traj(traj_input)  # (batch_size, pred_len, height, width)
+                    if depth == 0:
+                        pred_traj_map = model.pred_traj(traj_input)  # (batch_size, pred_len, height, width)
+                        if return_features:
+                            dict_traj = {'TrajDecoder': pred_traj_map.cpu().detach().numpy()}
+                            list_traj_pred.append(dict_traj)
+                    elif (depth == 1) | (depth == 2):
+                        pred_traj_map, details = model.pred_traj(traj_input, depth)
+                        dict_traj = {}
+                        for i, fn in enumerate(features_name[n_filled:]):
+                            dict_traj[fn] = details[i].cpu().detach().numpy()
+                        list_traj_pred.append(dict_traj)
                     pred_traj = model.softargmax(pred_traj_map)  # (batch_size, pred_len, n_coord)
                     future_samples.append(pred_traj)
                 future_samples = torch.stack(future_samples)  # (n_goal, batch_size, pred_len, n_coord)
@@ -308,8 +323,7 @@ def evaluate(
 
                 # converts ETH/UCY pixel coordinates back into world-coordinates
                 if dataset_name == 'eth':
-                    waypoint_samples = image2world(
-                        waypoint_samples, scene_id, homo_mat, resize_factor)
+                    waypoint_samples = image2world(waypoint_samples, scene_id, homo_mat, resize_factor)
                     pred_traj = image2world(pred_traj, scene_id, homo_mat, resize_factor)
                     gt_future = image2world(gt_future, scene_id, homo_mat, resize_factor)
                 
@@ -320,9 +334,17 @@ def evaluate(
                     trajs_dict['groundtruth'].append(
                         trajectory.cpu().detach().numpy() / resize_factor)  # (batch_size, tot_len, n_coor)
                     # take the most accurate prediction only 
+                    best_idx = ade_batch.argmin(axis=0)
                     trajs_dict['prediction'].append((future_samples[
-                        ade_batch.argmin(axis=0), range(future_samples.shape[1]), ...] 
+                        best_idx, range(future_samples.shape[1]), ...] 
                         / resize_factor).cpu().detach().numpy())  # (n_goal, batch_size, n_coor)
+                    # store 
+                    if depth == 0:
+                        features_dict[scene_id]['TrajDecoder'].append(list_traj_pred[best_idx]['TrajDecoder'])
+                    elif (depth == 1) | (depth == 2):
+                        for i, fn in enumerate(features_name[n_filled:]):
+                            for idx in best_idx:
+                                features_dict[scene_id][fn].append(list_traj_pred[idx][fn])
                 
                 ade = ade_batch.min(dim=0)[0].cpu().detach().numpy()  # (batch_size, )
                 fde = fde_batch.min(dim=0)[0][:,0].cpu().detach().numpy()  # (batch_size, )
