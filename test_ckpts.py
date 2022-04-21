@@ -101,17 +101,20 @@ def main(args):
 
         # visualize
         if args.viz:
-            plot_feature_space_diff_evolution(dict_features, f'figures/feature_space_diff/{name}')
-            if args.limit_by is not None:
-                plot_decoder_overlay(IMAGE_PATH, dict_features_limit, f'figures/decoder/{name}')
-                plot_obs_pred_trajs(IMAGE_PATH, dict_trajs_limit, f'figures/prediction/{name}')
-                plot_feature_space(dict_features_limit, f'figures/feature_space/{name}', show_diff=False)
-                plot_feature_space(dict_features_limit, f'figures/feature_space/{name}', show_diff=True)
-            else:
-                plot_decoder_overlay(IMAGE_PATH, dict_features, f'figures/decoder/{name}')
-                plot_obs_pred_trajs(IMAGE_PATH, dict_trajs, f'figures/prediction/{name}')
-                plot_feature_space(dict_features, f'figures/feature_space/{name}', show_diff=False)
-                plot_feature_space(dict_features, f'figures/feature_space/{name}', show_diff=True)
+            for encoder_only in [True, False]:
+                for diff_type in ['absolute', 'relative']:
+                    plot_feature_space_diff_evolution(dict_features, f'figures/feature_space_diff/{name}', is_avg=True, encoder_only=encoder_only, diff_type=diff_type)
+            # plot_feature_space_diff_evolution(dict_features, f'figures/feature_space_diff/{name}', is_avg=True, encoder_only=False, diff_type='absolute')
+            # if args.limit_by is not None:
+                # plot_decoder_overlay(IMAGE_PATH, dict_features_limit, f'figures/decoder/{name}')
+                # plot_obs_pred_trajs(IMAGE_PATH, dict_trajs_limit, f'figures/prediction/{name}')
+                # plot_feature_space(dict_features_limit, f'figures/feature_space/{name}', show_diff=False)
+                # plot_feature_space(dict_features_limit, f'figures/feature_space/{name}', show_diff=True)
+            # else:
+                # plot_decoder_overlay(IMAGE_PATH, dict_features, f'figures/decoder/{name}')
+                # plot_obs_pred_trajs(IMAGE_PATH, dict_trajs, f'figures/prediction/{name}')
+                # plot_feature_space(dict_features, f'figures/feature_space/{name}', show_diff=False)
+                # plot_feature_space(dict_features, f'figures/feature_space/{name}', show_diff=True)
     else:
         raise ValueError('No checkpoint given!')
 

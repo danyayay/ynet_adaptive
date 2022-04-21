@@ -127,19 +127,19 @@ def evaluate(
                 if counter > 30 and mode == 'val':
                     break
 
-            for i in range(0, len(trajectory), batch_size):
+            for b in range(0, len(trajectory), batch_size):
                 # Create Heatmaps for past and ground-truth future trajectories
                 _, _, H, W = scene_image.shape
-                observed = trajectory[i:i+batch_size, :obs_len, :].reshape(-1, 2).cpu().numpy()  # (batch_size*obs_len, n_coord)
+                observed = trajectory[b:b+batch_size, :obs_len, :].reshape(-1, 2).cpu().numpy()  # (batch_size*obs_len, n_coord)
                 observed_map = get_patch(input_template, observed, H, W)  # batch_size*obs_len list of (height, width)
                 observed_map = torch.stack(observed_map).reshape([-1, obs_len, H, W])  # (batch_size, obs_len, height, width)
 
-                gt_future = trajectory[i:i+batch_size, obs_len:].to(device)  # (batch_size, pred_len)
+                gt_future = trajectory[b:b+batch_size, obs_len:].to(device)  # (batch_size, pred_len)
                 semantic_image = scene_image.expand(observed_map.shape[0], -1, -1, -1)  # (batch_size, n_class, height, width)
 
                 if viz_input:
                     plot_input_space(semantic_image.cpu().detach().numpy(), 
-                        observed_map.cpu().detach().numpy(), meta_ids[i:i+batch_size], 
+                        observed_map.cpu().detach().numpy(), meta_ids[b:b+batch_size], 
                         scene_id, 'figures/input_space')
 
                 # Forward pass
@@ -329,8 +329,9 @@ def evaluate(
                 fde_batch = ((((gt_goal - waypoint_samples[:, :, -1:]) / resize_factor) ** 2).sum(dim=3) ** 0.5)
                 
                 if return_features:
-                    trajs_dict['groundtruth'].append(
-                        trajectory.cpu().detach().numpy() / resize_factor)  # (batch_size, tot_len, n_coor)
+                    if b == 0:
+                        trajs_dict['groundtruth'].append(
+                            trajectory.cpu().detach().numpy() / resize_factor)  # (batch_size, tot_len, n_coor)
                     # take the most accurate prediction only 
                     best_indices = ade_batch.argmin(axis=0)
                     trajs_dict['prediction'].append((future_samples[

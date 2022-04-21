@@ -531,7 +531,6 @@ class YNetTrainer:
         else:
             homo_mat = None
             seg_mask = False
-        # TODO: check train/val/test dataset loader 
         # Load scene images 
         if (fine_tune & (mode == 'train')) | (mode == 'val') | (mode == 'test'):
             images_dict = create_images_dict(
@@ -547,14 +546,12 @@ class YNetTrainer:
         dataset = SceneDataset(df, resize=resize_factor, total_len=obs_len+pred_len)
         dataloader = DataLoader(dataset, batch_size=1, collate_fn=scene_collate, 
             shuffle=True if mode=='train' else False)
-        breakpoint()
 
         # Preprocess images, in particular resize, pad and normalize as semantic segmentation backbone requires
         resize(images_dict, factor=resize_factor, seg_mask=seg_mask)
         # make sure that image shape is divisible by 32, for UNet segmentation
         pad(images_dict, division_factor=self.division_factor)
         preprocess_image_for_segmentation(images_dict, seg_mask=seg_mask)
-        breakpoint()
 
         return images_dict, dataloader, homo_mat
 
