@@ -76,7 +76,7 @@ def evaluate(
     if return_features:
         if depth == 0:
             # depth = 0: viz output of each module
-            features_name = ['Encoder', 'GoalDecoder']
+            features_name = ['Encoder', 'GoalDecoder', 'TrajDecoder']
         elif depth == 1:
             # depth = 1: viz each conv block
             encoder_name = [f'Encoder_B{i+1}' for i in range(len(model.encoder.stages))]
@@ -338,9 +338,10 @@ def evaluate(
                         / resize_factor).cpu().detach().numpy())  # (n_goal, batch_size, n_coor)
                     # store 
                     if depth == 0:
-                        features_dict[scene_id]['TrajDecoder'].append(list_traj_pred[best_indices]['TrajDecoder'])
+                        for sample_idx, best_idx in enumerate(best_indices):
+                            features_dict[scene_id]['TrajDecoder'].append(list_traj_pred[best_idx]['TrajDecoder'][sample_idx])
                     elif (depth == 1) | (depth == 2):
-                        for i, fn in enumerate(features_name[n_filled:]):
+                        for fn in features_name[n_filled:]:
                             for sample_idx, best_idx in enumerate(best_indices):
                                 features_dict[scene_id][fn].append(list_traj_pred[best_idx][fn][sample_idx])
                 

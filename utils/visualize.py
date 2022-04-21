@@ -140,7 +140,7 @@ def plot_feature_space(dict_features, out_dir='figures/feature_space', show_diff
                             diff_i[ckpt_name] = dict_features['OODG'][scene_id][feature_name][i] - \
                                 dict_features[ckpt_name][scene_id][feature_name][i]
                     fig, axes = plt.subplots(len(diff_i), n_channel, 
-                        figsize=(n_channel*4+2, len(diff_i)*3+2))
+                        figsize=(n_channel*3, len(diff_i)*2))
                     for k, ckpt_name in enumerate(diff_i):
                         for c in range(n_channel):
                             axes[k, c].imshow(diff_i[ckpt_name][c])
@@ -180,6 +180,7 @@ def plot_feature_space(dict_features, out_dir='figures/feature_space', show_diff
 def plot_feature_space_diff_evolution(
     dict_features, out_dir='figures/feature_space_diff', is_avg=True, format='png'):
     diff = {}
+    df_dict = {}
     for ckpt_name in ['FT', 'ET']:
         if ('OODG' in dict_features.keys()) & (ckpt_name in dict_features.keys()):
             name = f'diff_OODG_{ckpt_name}'
@@ -202,9 +203,11 @@ def plot_feature_space_diff_evolution(
                             dict_features['FT'][scene_id][feature_name]).sum(axis=(1,2,3)))
             # average over samples
             df = pd.DataFrame()
+            n_data = len(diff[name][features_name[0]])
             for feature_name in features_name:
                 df.loc[feature_name, name] = np.mean(diff[name][feature_name])
                 df.loc[feature_name, name+'_std'] = np.std(diff[name][feature_name])
+            df_dict[name] = df
 
             # plot evolution
             if df.shape[0] == 3:
@@ -227,34 +230,63 @@ def plot_feature_space_diff_evolution(
             else: # (depth == 2) | (depth == unknown)
                 plt.xticks(rotation=90, ha='right')
             pathlib.Path(out_dir).mkdir(parents=True, exist_ok=True)
-            out_name = f'{name}_D{depth}_avg' if is_avg else f'{name}_D{depth}'
+            out_name = f'{name}_D{depth}_N{n_data}_avg' if is_avg else f'{name}_D{depth}_N{n_data}'
             out_path = os.path.join(out_dir, out_name + '.' + format)
             plt.savefig(out_path, bbox_inches='tight')
             plt.close(fig)
             print(f'Saved {out_path}')
+    
+    fig, ax = plt.subplots(figsize=(fig_size, 4))
+    for key in df_dict.keys():
+        df = df_dict[key]
+        plt.plot(df.index, df[key].values, label=key)
+        plt.fill_between(df.index, df[key].values-df[key+'_std'].values, 
+            df[key].values+df[key+'_std'].values, alpha=0.2)
+    plt.title(f'Feature space difference')
+    plt.ylabel('Difference')
+    plt.xlabel('Layers')
+    plt.legend(loc='best')
+    if (depth == 0) | (depth == 1):
+        plt.xticks(rotation=45, ha='right')
+    else: # (depth == 2) | (depth == unknown)
+        plt.xticks(rotation=90, ha='right')
+    pathlib.Path(out_dir).mkdir(parents=True, exist_ok=True)
+    out_name = f'diff_OODG_FT_ET_D{depth}_N{n_data}_avg' if is_avg else f'diff_OODG_FT_ET_D{depth}_N{n_data}'
+    out_path = os.path.join(out_dir, out_name + '.' + format)
+    plt.savefig(out_path, bbox_inches='tight')
+    plt.close(fig)
+    print(f'Saved {out_path}')
 
 
-def plot_all_trajectories(df_biker, df_ped, out_dir):
-    for scene_id in list(set(df_biker.sceneId.unique()).intersection(set(df_ped.sceneId.unique()))):
+def plot_trajectories_scenes_overlay(image_path, df_biker, df_ped, out_dir='figures/scene_with_trajs', format='png'):
+    unique_scene = list(set(df_biker.sceneId.unique()).intersection(set(df_ped.sceneId.unique())))
+    scene_images = create_images_dict(unique_scene, image_path, 'reference.jpg', True)
+    for scene_id in unique_scene:
+        print(f'Plotting {scene_id}')
         scene_biker = df_biker[df_biker.sceneId == scene_id]
         scene_ped = df_ped[df_ped.sceneId == scene_id]
 
-        fig = plt.figure(figsize=(10,10))
+        fig = plt.figure(figsize=(scene_images[scene_id].shape[0]/100, scene_images[scene_id].shape[1]/100))
+        plt.imshow(scene_images[scene_id])
+        ms = 2
         for _, traj in scene_biker.groupby('metaId'):
-            plt.plot(traj.x, traj.y, 'r.', alpha=0.4)
-            plt.plot(traj.x, traj.y, 'r-', alpha=0.2)
+            plt.scatter(traj.x, traj.y, s=ms, c='r', alpha=0.4)
+            plt.plot(traj.x, traj.y, 'r-', ms=ms, alpha=0.2)
         plt.plot(0,0,'r-', alpha=0.5, label='Biker')
 
         for _, traj in scene_ped.groupby('metaId'):
-            plt.plot(traj.x, traj.y, 'b.', alpha=0.4)
+            plt.scatter(traj.x, traj.y, s=ms, c='b', alpha=0.4)
             plt.plot(traj.x, traj.y, 'b-', alpha=0.2)
         plt.plot(0,0,'b-', alpha=0.5, label='Pedestrian')
 
         plt.plot(0,0,'w')
         plt.title(f'scene: {scene_id}')
         plt.legend(loc='best')
-        plt.savefig(f'{out_dir}/{scene_id}.png')
+        pathlib.Path(out_dir).mkdir(parents=True, exist_ok=True)
+        out_path = os.path.join(out_dir, scene_id + '.' + format)
+        plt.savefig(out_path, bbox_inches='tight')
         plt.close(fig)
+        print(f'Saved {out_path}')
 
 
 def plot_obs_pred_trajs(image_path, dict_trajs, out_dir='figures/prediction', format='png', obs_len=8):
@@ -272,9 +304,12 @@ def plot_obs_pred_trajs(image_path, dict_trajs, out_dir='figures/prediction', fo
             gt_traj = value['groundtruth'][i]
             pred_traj = value['prediction'][i]
             if j == 0:
+                plt.scatter(gt_traj[:obs_len][:,0], gt_traj[:obs_len][:,1], s=ms, c=colors['OB'])
+                plt.scatter(gt_traj[obs_len:][:,0], gt_traj[obs_len:][:,1], s=ms, c=colors['GT'])
                 plt.plot(gt_traj[:obs_len][:,0], gt_traj[:obs_len][:,1], ms=ms, c=colors['OB'], label='observed')
                 plt.plot(gt_traj[obs_len:][:,0], gt_traj[obs_len:][:,1], ms=ms, c=colors['GT'], label=labels_ckpt['GT'])
                 j += 1
+            plt.scatter(pred_traj[:,0], pred_traj[:,1], s=ms, c=colors[ckpt_name])
             plt.plot(pred_traj[:,0], pred_traj[:,1], ms=ms, c=colors[ckpt_name], label=labels_ckpt[ckpt_name])
         title = f'meta_id={meta_id}, scene_id={scene_id}'
         plt.title(title)
@@ -286,6 +321,51 @@ def plot_obs_pred_trajs(image_path, dict_trajs, out_dir='figures/prediction', fo
         plt.close(fig)
         print(f'Saved {out_path}')
 
+
+def plot_decoder_overlay(image_path, dict_features, out_dir='figures/decoder', format='png', resize_factor=0.25):
+    # take decoder name 
+    first_ckpt_dict = dict_features[list(dict_features)[0]]
+    if 'GoalDecoder' in first_ckpt_dict[list(first_ckpt_dict)[0]]:
+        goal_dec_name, traj_dec_name = 'GoalDecoder', 'TrajDecoder'
+    elif 'GoalDecoder_B7' in first_ckpt_dict[list(first_ckpt_dict)[0]]:
+        goal_dec_name, traj_dec_name = 'GoalDecoder_B7', 'TrajDecoder_B7'
+    else: # 'GoalDecoder_B7_L1' in first_ckpt_dict[list(first_ckpt_dict)[0]]
+        goal_dec_name, traj_dec_name = 'GoalDecoder_B7_L1', 'TrajDecoder_B7_L1'
+    # take unique scene images
+    scene_images = create_images_dict(
+        first_ckpt_dict.keys(), image_path, 'reference.jpg', True)
+    for scene_id, dict_scene in first_ckpt_dict.items():
+        for i, meta_id in enumerate(dict_scene['metaId']):
+            # for each sample, visualize overlayed feature space
+            for _, feature_name in enumerate([goal_dec_name, traj_dec_name]):
+                n_channel = dict_scene[feature_name].shape[1]
+                n_ckpt = len(dict_features)
+                fig, axes = plt.subplots(n_ckpt, n_channel, figsize=(n_channel*2, n_ckpt*3))
+                for k, (ckpt_name, dict_ckpt) in enumerate(dict_features.items()):
+                    # TODO: traj size and scene size  
+                    feature_i = dict_ckpt[scene_id][feature_name][i] / resize_factor  # (n_channel, height, width)
+                    for c in range(n_channel):
+                        axes[k, c].imshow(scene_images[scene_id])
+                        axes[k, c].imshow(feature_i[c], alpha=0.7, cmap='coolwarm')                     
+                        if c == 0: 
+                            axes[k, c].set_ylabel(labels_ckpt[ckpt_name])
+                        else:
+                            axes[k, c].set_yticklabels([])
+                        if k != (n_ckpt - 1): 
+                            axes[k, c].set_xticklabels([])
+                        else:
+                            axes[k, c].set_xlabel(f'channel_{c+1}')  
+                plt.subplots_adjust(wspace=0, hspace=0)
+                plt.tight_layout()
+                title = f'meta_id={meta_id}, scene_id={scene_id}, feature_name={feature_name}'
+                axes[0, n_channel//2].set_title(title)
+                pathlib.Path(out_dir).mkdir(parents=True, exist_ok=True)
+                out_name = f'{meta_id}__{scene_id}__{feature_name}__overlay'
+                out_path = os.path.join(out_dir, out_name + '.' + format)
+                plt.savefig(out_path, bbox_inches='tight')
+                plt.close(fig)
+                print(f'Saved {out_path}')
+    
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

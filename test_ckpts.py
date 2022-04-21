@@ -7,7 +7,8 @@ import pandas as pd
 
 from model import YNetTrainer
 from utils.dataset import set_random_seeds, dataset_split
-from utils.visualize import plot_feature_space, plot_feature_space_diff_evolution
+from utils.visualize import plot_feature_space, plot_obs_pred_trajs, \
+    plot_feature_space_diff_evolution, plot_decoder_overlay
 
 
 def main(args):
@@ -63,9 +64,10 @@ def main(args):
         if args.limit_by is not None:
             print('Limiting df_test')
             df_result.loc[:, 'ade_OODG_FT'] = np.absolute(df_result.ade_OODG.values - df_result.ade_FT.values)
+            df_result.loc[:, 'ade_OODG_ET'] = np.absolute(df_result.ade_OODG.values - df_result.ade_ET.values)
             df_result = df_result[df_result.sceneId != 'avg']
             if args.limit_by == 'n_viz':
-                meta_ids_focus = df_result.sort_values(by='ade_OODG_FT', ascending=False).head(args.n_viz).metaId.values
+                meta_ids_focus = df_result.sort_values(by='ade_OODG_ET', ascending=False).head(args.n_viz).metaId.values
             else: # args.limit_by == 'threshold'
                 meta_ids_focus = df_result[df_result.ade_OODG_FT >= args.threshold].metaId.values
                 while meta_ids_focus.shape[0] == 0:
@@ -73,7 +75,7 @@ def main(args):
                     meta_ids_focus = df_result[df_result.ade_OODG_FT >= args.threshold].metaId.values
             df_test_focus = df_test[df_test.metaId.isin(meta_ids_focus)]
             # repeat the above process 
-            dict_features, dict_trajs = dict(), dict()
+            dict_features_limit, dict_trajs_limit = dict(), dict()
             for i, (ckpt, ckpt_name) in enumerate(zip(args.ckpts, args.ckpts_name)):
                 set_random_seeds(args.seed)
                 model = YNetTrainer(params=params)
@@ -88,8 +90,8 @@ def main(args):
                     ignore_index=True, axis=0)
                 df_result = df_to_merge if i == 0 else df_result.merge(df_to_merge, on=['metaId', 'sceneId'])
                 # store features and trajectories, taking only the first round results for now 
-                dict_features[ckpt_name] = list_features[0]
-                dict_trajs[ckpt_name] = list_trajs[0]
+                dict_features_limit[ckpt_name] = list_features[0]
+                dict_trajs_limit[ckpt_name] = list_trajs[0]
             if args.limit_by == 'n_viz':
                 print(f'Visualize {meta_ids_focus.shape[0]} (n_viz={args.n_viz}) test samples')
             else:
@@ -99,9 +101,17 @@ def main(args):
 
         # visualize
         if args.viz:
-            # plot_obs_pred_trajs(IMAGE_PATH, dict_trajs, f'figures/prediction/{name}')
-            # plot_feature_space(dict_features, f'figures/feature_space/{name}', show_diff=True)
             plot_feature_space_diff_evolution(dict_features, f'figures/feature_space_diff/{name}')
+            if args.limit_by is not None:
+                plot_decoder_overlay(IMAGE_PATH, dict_features_limit, f'figures/decoder/{name}')
+                plot_obs_pred_trajs(IMAGE_PATH, dict_trajs_limit, f'figures/prediction/{name}')
+                plot_feature_space(dict_features_limit, f'figures/feature_space/{name}', show_diff=False)
+                plot_feature_space(dict_features_limit, f'figures/feature_space/{name}', show_diff=True)
+            else:
+                plot_decoder_overlay(IMAGE_PATH, dict_features, f'figures/decoder/{name}')
+                plot_obs_pred_trajs(IMAGE_PATH, dict_trajs, f'figures/prediction/{name}')
+                plot_feature_space(dict_features, f'figures/feature_space/{name}', show_diff=False)
+                plot_feature_space(dict_features, f'figures/feature_space/{name}', show_diff=True)
     else:
         raise ValueError('No checkpoint given!')
 

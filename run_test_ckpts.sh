@@ -15,13 +15,20 @@ declare -A D=( ["dataset_path"]="filter/avg_den100/Pedestrian/" ["filename"]="1.
 declare -A E=( ["dataset_path"]="filter/agent_type/" ["filename"]="Pedestrian.pkl" ["n_test"]=1500
     ["ckpts"]="ckpts/Seed_1_Train__Pedestrian__Val__Pedestrian__Val_Ratio_0.1_filter_agent_type__train_all_weights.pt ckpts/Seed_1_Train__Biker__Val__Biker__Val_Ratio_0.1_filter_agent_type__train_all_weights.pt ckpts/Seed_1_Train__Pedestrian__Val__Pedestrian__Val_Ratio_0.1_filter_agent_type__train_all_FT_weights.pt ckpts/Seed_1_Train__Pedestrian__Val__Pedestrian__Val_Ratio_0.1_filter_agent_type__train_encoder_weights.pt" 
     ["ckpts_name"]="INDG OODG FT ET")
+# declare -A F=( ["dataset_path"]="filter/agent_type/" ["filename"]="Biker.pkl" ["n_test"]=500
+#     ["ckpts"]="ckpts/Seed_1_Train__Biker__Val__Biker__Val_Ratio_0.1_filter_agent_type__train_all_weights.pt ckpts/Seed_1_Train__Pedestrian__Val__Pedestrian__Val_Ratio_0.1_filter_agent_type__train_all_weights.pt ckpts/Seed_1_Train__Biker__Val__Biker__Val_Ratio_0.1_filter_agent_type__train_all_FT_weights.pt ckpts/Seed_1_Train__Biker__Val__Biker__Val_Ratio_0.1_filter_agent_type__train_encoder_weights.pt" 
+#     ["ckpts_name"]="INDG OODG FT ET")
 declare -A F=( ["dataset_path"]="filter/agent_type/" ["filename"]="Biker.pkl" ["n_test"]=500
-    ["ckpts"]="ckpts/Seed_1_Train__Biker__Val__Biker__Val_Ratio_0.1_filter_agent_type__train_all_weights.pt ckpts/Seed_1_Train__Pedestrian__Val__Pedestrian__Val_Ratio_0.1_filter_agent_type__train_all_weights.pt ckpts/Seed_1_Train__Biker__Val__Biker__Val_Ratio_0.1_filter_agent_type__train_all_FT_weights.pt ckpts/Seed_1_Train__Biker__Val__Biker__Val_Ratio_0.1_filter_agent_type__train_encoder_weights.pt" 
-    ["ckpts_name"]="INDG OODG FT ET")
+    ["ckpts"]="ckpts/Seed_1_Train__Pedestrian__Val__Pedestrian__Val_Ratio_0.1_filter_agent_type__train_all_weights.pt ckpts/Seed_1_Train__Biker__Val__Biker__Val_Ratio_0.1_filter_agent_type__train_all_FT_weights.pt ckpts/Seed_1_Train__Biker__Val__Biker__Val_Ratio_0.1_filter_agent_type__train_encoder_weights.pt" 
+    ["ckpts_name"]="OODG FT ET")
 
 # python -m pdb test_ckpts.py --dataset_path filter/avg_vel/Pedestrian/ --ckpts ckpts/Seed_1_Train__0.5_1.5__Val__0.5_1.5__Val_Ratio_0.1_filter_avg_vel_Pedestrian__train_all_weights.pt ckpts/Seed_1_Train__0.1_0.3__Val__0.1_0.3__Val_Ratio_0.1_filter_avg_vel_Pedestrian__train_all_FT_weights.pt ckpts/Seed_1_Train__0.1_0.3__Val__0.1_0.3__Val_Ratio_0.1_filter_avg_vel_Pedestrian__train_encoder_weights.pt --ckpts_name OODG FT ET --val_files 0.1_0.3.pkl --n_leftouts 10 --viz --depth 2
 
-depth=2
+# python -m pdb test_ckpts.py --dataset_path filter/agent_type/ --ckpts ckpts/Seed_1_Train__Pedestrian__Val__Pedestrian__Val_Ratio_0.1_filter_agent_type__train_all_weights.pt ckpts/Seed_1_Train__Biker__Val__Biker__Val_Ratio_0.1_filter_agent_type__train_all_FT_weights.pt --ckpts_name OODG FT --val_files Biker.pkl --n_leftouts 500 --viz --depth 2
+
+# python -m pdb test_ckpts.py --dataset_path filter/agent_type/ --ckpts ckpts/Seed_1_Train__Pedestrian__Val__Pedestrian__Val_Ratio_0.1_filter_agent_type__train_all_weights.pt ckpts/Seed_1_Train__Biker__Val__Biker__Val_Ratio_0.1_filter_agent_type__train_all_FT_weights.pt ckpts/Seed_1_Train__Biker__Val__Biker__Val_Ratio_0.1_filter_agent_type__train_encoder_weights.pt --ckpts_name OODG FT ET --val_files Biker.pkl --n_leftouts 10 --viz --depth 1
+
+depth=1
 
 dataset_path=${F["dataset_path"]}
 ckpts=${F["ckpts"]}
@@ -30,5 +37,5 @@ val_files=${F["filename"]}
 n_leftouts=${F["n_test"]}
 
 for seed in ${list_seed[@]}; do
-    python -m test_ckpts --seed $seed --dataset_name $dataset_name --dataset_path $dataset_path --val_files $val_files --n_leftouts $n_leftouts --ckpts ${ckpts[@]:1:3} --ckpts_name ${ckpts_name[@]:1:3} --depth $depth --viz
+    python -m test_ckpts --seed $seed --dataset_name $dataset_name --dataset_path $dataset_path --val_files $val_files --n_leftouts $n_leftouts --ckpts $ckpts --ckpts_name $ckpts_name --depth $depth --viz --limit_by n_viz --n_viz 150
 done 
