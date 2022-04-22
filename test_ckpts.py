@@ -44,6 +44,10 @@ def main(args):
             set_random_seeds(args.seed)
             model = YNetTrainer(params=params)
             model.load(ckpt)
+            # if ckpt_name == 'OODG':
+            #     model_g = model
+            # elif ckpt_name == 'ET':
+            #     model_et = model
             val_ade, val_fde, list_metrics, list_features, list_trajs = \
                 model.test(df_test, IMAGE_PATH, False, True, False) # True if not args.limit_by else False
             # store ade/fde comparison
@@ -60,6 +64,9 @@ def main(args):
         out_path = f"csv/comparison/{name}__{'_'.join(args.ckpts_name)}.csv"
         df_result.to_csv(out_path, index=False)
 
+        # for (name, p_g), (_, p_et) in zip(model_g.model.named_parameters(), model_et.model.named_parameters()):
+        #     print(name, 'OODG==ET:', (p_g == p_et).all().item())
+        
         # reduce df_test size if needed
         if args.limit_by is not None:
             print('Limiting df_test')
@@ -101,13 +108,11 @@ def main(args):
 
         # visualize
         if args.viz:
-            for encoder_only in [True, False]:
-                for diff_type in ['absolute', 'relative']:
-                    plot_feature_space_diff_evolution(dict_features, f'figures/feature_space_diff/{name}', is_avg=True, encoder_only=encoder_only, diff_type=diff_type)
+            plot_feature_space_diff_evolution(dict_features, f'figures/feature_space_diff__/{name}', is_avg=True, encoder_only=False, diff_type='relative', by_scene=True)
             # plot_feature_space_diff_evolution(dict_features, f'figures/feature_space_diff/{name}', is_avg=True, encoder_only=False, diff_type='absolute')
             # if args.limit_by is not None:
                 # plot_decoder_overlay(IMAGE_PATH, dict_features_limit, f'figures/decoder/{name}')
-                # plot_obs_pred_trajs(IMAGE_PATH, dict_trajs_limit, f'figures/prediction/{name}')
+                # plot_obs_pred_trajs(IMAGE_PATH, dict_trajs_limit, f'figures/prediction/{name}/significant')
                 # plot_feature_space(dict_features_limit, f'figures/feature_space/{name}', show_diff=False)
                 # plot_feature_space(dict_features_limit, f'figures/feature_space/{name}', show_diff=True)
             # else:

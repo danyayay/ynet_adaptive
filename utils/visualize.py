@@ -197,10 +197,30 @@ def plot_feature_space(dict_features, out_dir='figures/feature_space', show_diff
 
 def plot_feature_space_diff_evolution(
     dict_features, out_dir='figures/feature_space_diff', 
-    is_avg=True, encoder_only=False, diff_type='absolute', format='png'):
-    diff_dict = {}
-    original_dict = {}
-    df_dict = {}
+    is_avg=True, encoder_only=False, diff_type='absolute', 
+    by_scene=True, format='png'):
+    """Plot the difference of OODG and FT/ET along with layers. 
+
+    Args:
+        dict_features (dict): 
+            Dict storing all features. 
+        out_dir (str, optional): 
+            Path for figures. Defaults to 'figures/feature_space_diff'.
+        is_avg (bool, optional): 
+            Whether average over channels and pixels. Defaults to True.
+        encoder_only (bool, optional): 
+            Visualize only encoder or the whole network. Defaults to False.
+        diff_type (str, optional): 
+            [absolute, relative]. Defaults to 'absolute'.
+        by_scene (str, optional): 
+            Defaults to True.
+        format (str, optional): 
+            format. Defaults to 'png'.
+
+    Raises:
+        ValueError: _description_
+    """
+    diff_dict, df_dict, original_dict, ckpt_scene_dict = {}, {}, {}, {}
     df_original = pd.DataFrame()
     colors = {'OODG': 'blue', 'FT': 'orange', 'ET': 'red', 
               'diff_OODG_FT': 'orange', 'diff_OODG_ET': 'red'}
@@ -210,6 +230,7 @@ def plot_feature_space_diff_evolution(
             diff_dict[name] = {}
             original_dict['OODG'] = {}
             original_dict[ckpt_name] = {}
+            ckpt_scene_dict[ckpt_name] = {}
             for s, (scene_id, dict_scene) in enumerate(dict_features[list(dict_features)[0]].items()):
                 features_name = list(dict_scene)
                 features_name.remove('metaId')
@@ -220,6 +241,8 @@ def plot_feature_space_diff_evolution(
                         diff_dict[name][feature_name] = []
                         original_dict['OODG'][feature_name] = []
                         original_dict[ckpt_name][feature_name] = []
+                index = dict_scene['metaId']
+                ckpt_scene_df = pd.DataFrame(index=index)
                 for feature_name in features_name:
                     # diff using all pixels and channels
                     diff = (dict_features['OODG'][scene_id][feature_name] - 
@@ -227,20 +250,24 @@ def plot_feature_space_diff_evolution(
                     n_tot = dict_features['OODG'][scene_id][feature_name][0].reshape(-1).shape[0]
                     original_oodg = dict_features['OODG'][scene_id][feature_name].sum(axis=(1,2,3))
                     original_ckpt = dict_features[ckpt_name][scene_id][feature_name].sum(axis=(1,2,3))
-
+                    
                     if is_avg and (diff_type == 'absolute'):
-                        diff_dict[name][feature_name].extend(diff/n_tot)
+                        add = diff / n_tot
                     elif is_avg and (diff_type == 'relative'):
-                        diff_dict[name][feature_name].extend(diff/n_tot/original_oodg)
+                        add = diff / original_oodg
                     elif (not is_avg) and (diff_type == 'absolute'):
-                        diff_dict[name][feature_name].extend(diff)
-                    elif (not is_avg) and (diff_type == 'relative'):
-                        diff_dict[name][feature_name].extend(diff/original_oodg)
+                        add = diff
                     else:
                         raise ValueError(f'No support for is_avg={is_avg}, diff_type={diff_type}')
                     
+                    diff_dict[name][feature_name].extend(add)
+                    ckpt_scene_df.loc[index, feature_name] = add
+
                     original_dict['OODG'][feature_name].extend(original_oodg/n_tot)
                     original_dict[ckpt_name][feature_name].extend(original_ckpt/n_tot)
+                
+                ckpt_scene_dict[ckpt_name][scene_id] = ckpt_scene_df
+
             # average over samples
             df = pd.DataFrame()
             n_data = len(diff_dict[name][features_name[0]])
@@ -253,7 +280,7 @@ def plot_feature_space_diff_evolution(
                 df_original.loc[feature_name, ckpt_name+'_std'] = np.std(original_dict[ckpt_name][feature_name])
             df_dict[name] = df
 
-            # plot evolution
+            # plot configuration
             if df.shape[0] == 3:
                 fig_size, depth = 4, 0
             elif df.shape[0] == 20: # 6+7+7
@@ -263,35 +290,39 @@ def plot_feature_space_diff_evolution(
             else: 
                 # when encoder_only=True, depth will be unknown
                 fig_size, depth = df.shape[0]*0.25 + 4, df.shape[0]
-            fig, ax = plt.subplots(figsize=(fig_size, 4))
-            for b, block in enumerate(['Encoder', 'GoalDecoder', 'TrajDecoder']):
-                df_block = df[df.index.str.contains(block)]
-                if df_block.shape[0]:
-                    if b == 0:
-                        plt.plot(df_block.index, df_block[name].values, '.-', c=colors[ckpt_name], label=name)
-                    else:
-                        plt.plot(df_block.index, df_block[name].values, '.-', c=colors[ckpt_name])
-                    plt.fill_between(df_block.index, df_block[name].values - df_block[name+'_std'].values, 
-                        df_block[name].values + df_block[name+'_std'].values, color=colors[ckpt_name], alpha=0.2)
-            plt.title('Feature space difference')
-            plt.ylabel(f'{diff_type} difference')
-            plt.xlabel('Layers')
-            plt.legend(loc='best')
-            if (depth == 0) | (depth == 1) | (encoder_only):
-                plt.xticks(rotation=45, ha='right')
-            else: # (depth == 2) | (depth == unknown)
-                plt.xticks(rotation=90, ha='right')
-            pathlib.Path(out_dir).mkdir(parents=True, exist_ok=True)
-            out_name = f'{name}__D{depth}__N{n_data}'
-            if encoder_only: out_name = f'{out_name}__encoder'
-            if is_avg: out_name = f'{out_name}__avg'
-            out_name = f'{out_name}__abs' if diff_type == 'absolute' else f'{out_name}__rel'
-            out_path = os.path.join(out_dir, out_name + '.' + format)
-            plt.savefig(out_path, bbox_inches='tight')
-            plt.close(fig)
-            print(f'Saved {out_path}')
+
+            # ## plot for each case 
+            # fig, ax = plt.subplots(figsize=(fig_size, 4))
+            # for b, block in enumerate(['Encoder', 'GoalDecoder', 'TrajDecoder']):
+            #     df_block = df[df.index.str.contains(block)]
+            #     if df_block.shape[0]:
+            #         if b == 0:
+            #             plt.plot(df_block.index, df_block[name].values, '.-', c=colors[ckpt_name], label=name)
+            #         else:
+            #             plt.plot(df_block.index, df_block[name].values, '.-', c=colors[ckpt_name])
+            #         plt.fill_between(df_block.index, df_block[name].values - df_block[name+'_std'].values, 
+            #             df_block[name].values + df_block[name+'_std'].values, color=colors[ckpt_name], alpha=0.2)
+            # plt.title('Feature space difference')
+            # plt.ylabel(f'{diff_type} difference')
+            # plt.xlabel('Layers')
+            # plt.legend(loc='best')
+            # if (depth == 0) | (depth == 1) | (encoder_only):
+            #     plt.xticks(rotation=45, ha='right')
+            # else: # (depth == 2) | (depth == unknown)
+            #     plt.xticks(rotation=90, ha='right')
+            # pathlib.Path(out_dir).mkdir(parents=True, exist_ok=True)
+            # out_name = f'{name}__D{depth}__N{n_data}'
+            # if encoder_only: out_name = f'{out_name}__encoder'
+            # if is_avg: out_name = f'{out_name}__avg'
+            # out_name = f'{out_name}__abs' if diff_type == 'absolute' else f'{out_name}__rel'
+            # out_path = os.path.join(out_dir, out_name + '.' + format)
+            # plt.savefig(out_path, bbox_inches='tight')
+            # plt.close(fig)
+            # print(f'Saved {out_path}')
     
+    # ## feature space difference plot along with layers 
     fig, ax = plt.subplots(figsize=(fig_size, 4))
+    plt.axhline(y=0, color='gray', linestyle='-', linewidth=0.5, alpha=0.3)
     for name in df_dict.keys():
         df = df_dict[name]
         for b, block in enumerate(['Encoder', 'GoalDecoder', 'TrajDecoder']):
@@ -312,7 +343,7 @@ def plot_feature_space_diff_evolution(
     else: # (depth == 2) | (depth == unknown)
         plt.xticks(rotation=90, ha='right')
     pathlib.Path(out_dir).mkdir(parents=True, exist_ok=True)
-    out_name = f'diff_OODG_FT_ET__D{depth}__N{n_data}'
+    out_name = f'{"_".join(df_dict.keys())}__D{depth}__N{n_data}'
     if encoder_only: out_name = f'{out_name}__encoder'
     if is_avg: out_name = f'{out_name}__avg'
     out_name = f'{out_name}__abs' if diff_type == 'absolute' else f'{out_name}__rel'
@@ -321,9 +352,9 @@ def plot_feature_space_diff_evolution(
     plt.close(fig)
     print(f'Saved {out_path}')
 
-    # plot absolute value 
+    # ## plot the original values in feature space 
     fig, ax = plt.subplots(figsize=(fig_size, 4))
-    for ckpt_name in ['OODG', 'FT', 'ET']:
+    for ckpt_name in original_dict.keys():
         for b, block in enumerate(['Encoder', 'GoalDecoder', 'TrajDecoder']):
             df_block = df_original[df_original.index.str.contains(block)]
             if df_block.shape[0]:
@@ -334,7 +365,7 @@ def plot_feature_space_diff_evolution(
                 plt.fill_between(df_block.index, df_block[ckpt_name].values - df_block[ckpt_name+'_std'].values, 
                     df_block[ckpt_name].values + df_block[ckpt_name+'_std'].values, color=colors[ckpt_name], alpha=0.2)
     plt.title('Feature space')
-    plt.ylabel('absolute value')
+    plt.ylabel('Value')
     plt.xlabel('Layers')
     plt.legend(loc='best')
     if (depth == 0) | (depth == 1) | (encoder_only):
@@ -342,13 +373,51 @@ def plot_feature_space_diff_evolution(
     else: # (depth == 2) | (depth == unknown)
         plt.xticks(rotation=90, ha='right')
     pathlib.Path(out_dir).mkdir(parents=True, exist_ok=True)
-    out_name = f'OODG__D{depth}__N{n_data}'
+    out_name = f'{"_".join(original_dict.keys())}__D{depth}__N{n_data}'
     if encoder_only: out_name = f'{out_name}__encoder'
     out_name = f'{out_name}__avg__abs'
     out_path = os.path.join(out_dir, out_name + '.' + format)
     plt.savefig(out_path, bbox_inches='tight')
     plt.close(fig)
     print(f'Saved {out_path}')
+
+    # ## plot by_scene
+    if by_scene:
+        for ckpt_name, scene_dict in ckpt_scene_dict.items():
+            for scene_id in scene_dict.keys():
+                fig, ax = plt.subplots(figsize=(fig_size, 4))
+                plt.axhline(y=0, color='gray', linestyle='-', linewidth=0.5, alpha=0.3)
+                df = scene_dict[scene_id]
+                for i, meta_id in enumerate(df.index):
+                    for b, block in enumerate(['Encoder', 'GoalDecoder', 'TrajDecoder']):
+                        # plot each example
+                        cols = df.columns[df.columns.str.contains(block)]
+                        example = df.loc[meta_id, cols].to_numpy()
+                        if example.shape[0]:
+                            plt.plot(cols, example, c=colors[name], linewidth=0.5, alpha=0.3)
+                        # plot average
+                        mean = df.loc[:, cols].mean(axis=0).to_numpy()
+                        if (i == 0) & (b == 0):
+                            plt.plot(cols, mean, '.-', c=colors[name], label=name)
+                        else:
+                            plt.plot(cols, mean, '.-', c=colors[name])
+                plt.title(f'Feature space difference ({scene_id})')
+                plt.ylabel(f'{diff_type} difference')
+                plt.xlabel('Layers')
+                plt.legend(loc='best')
+                if (depth == 0) | (depth == 1) | (encoder_only):
+                    plt.xticks(rotation=45, ha='right')
+                else: # (depth == 2) | (depth == unknown)
+                    plt.xticks(rotation=90, ha='right')
+                pathlib.Path(out_dir).mkdir(parents=True, exist_ok=True)
+                out_name = f'diff_OODG_{ckpt_name}__{scene_id}__D{depth}__N{n_data}'
+                if encoder_only: out_name = f'{out_name}__encoder'
+                if is_avg: out_name = f'{out_name}__avg'
+                out_name = f'{out_name}__abs' if diff_type == 'absolute' else f'{out_name}__rel'
+                out_path = os.path.join(out_dir, out_name + '.' + format)
+                plt.savefig(out_path, bbox_inches='tight')
+                plt.close(fig)
+                print(f'Saved {out_path}') 
 
 
 def plot_trajectories_scenes_overlay(image_path, df_biker, df_ped, out_dir='figures/scene_with_trajs', format='png'):
@@ -463,6 +532,11 @@ def plot_decoder_overlay(image_path, dict_features, out_dir='figures/decoder', f
                 plt.close(fig)
                 print(f'Saved {out_path}')
     
+
+def plot_weights(models, models_name, out_dir='figures/weights', format='png'):
+    for model, model_name in zip(models, models_name):
+        pass 
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
