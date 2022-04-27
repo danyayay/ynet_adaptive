@@ -6,9 +6,9 @@ import numpy as np
 import pandas as pd
 
 from model import YNetTrainer
-from utils.dataset import set_random_seeds, dataset_split
+from utils.dataset import set_random_seeds, dataset_split, dataset_given_scenes
 from utils.visualize import plot_feature_space, plot_obs_pred_trajs, \
-    plot_feature_space_diff_evolution, plot_decoder_overlay
+    plot_feature_space_diff_evolution, plot_decoder_overlay, plot_filters_diff_evolution
 
 
 def main(args):
@@ -31,12 +31,15 @@ def main(args):
     # data 
     if args.n_leftouts:
         _, _, df_test = dataset_split(DATA_PATH, args.val_files, 0, args.n_leftouts)
+    elif args.scenes:
+        df_test = dataset_given_scenes(DATA_PATH, args.val_files, args.scenes)
     else:
         _, df_test, _ = dataset_split(DATA_PATH, args.val_files, 0)
     print(f"df_test: {df_test.shape}; #={df_test.shape[0]/(params['obs_len']+params['pred_len'])}")
 
     # ## model 
     print('############ Load models ##############')
+    model_dict = {}
     if args.ckpts:
         dict_features, dict_trajs = dict(), dict()
         for i, (ckpt, ckpt_name) in enumerate(zip(args.ckpts, args.ckpts_name)):
@@ -44,10 +47,7 @@ def main(args):
             set_random_seeds(args.seed)
             model = YNetTrainer(params=params)
             model.load(ckpt)
-            # if ckpt_name == 'OODG':
-            #     model_g = model
-            # elif ckpt_name == 'ET':
-            #     model_et = model
+            model_dict[ckpt_name] = model
             val_ade, val_fde, list_metrics, list_features, list_trajs = \
                 model.test(df_test, IMAGE_PATH, False, True, False) # True if not args.limit_by else False
             # store ade/fde comparison
@@ -63,9 +63,6 @@ def main(args):
         name = str(args.seed) + '__' + args.ckpts[0].split('_filter_')[1].split('__')[0] + '__' + '_'.join(args.val_files).rstrip('.pkl')
         out_path = f"csv/comparison/{name}__{'_'.join(args.ckpts_name)}.csv"
         df_result.to_csv(out_path, index=False)
-
-        # for (name, p_g), (_, p_et) in zip(model_g.model.named_parameters(), model_et.model.named_parameters()):
-        #     print(name, 'OODG==ET:', (p_g == p_et).all().item())
         
         # reduce df_test size if needed
         if args.limit_by is not None:
@@ -108,18 +105,18 @@ def main(args):
 
         # visualize
         if args.viz:
-            plot_feature_space_diff_evolution(dict_features, f'figures/feature_space_diff__/{name}', is_avg=True, encoder_only=False, diff_type='relative', by_scene=True)
-            # plot_feature_space_diff_evolution(dict_features, f'figures/feature_space_diff/{name}', is_avg=True, encoder_only=False, diff_type='absolute')
-            # if args.limit_by is not None:
+            # plot_filters_diff_evolution(model_dict, f'figures/filters_diff/{name}/scenes')
+            # plot_feature_space_diff_evolution(dict_features, f'figures/feature_space_diff/{name}/scenes', is_avg=True, encoder_only=False, diff_type='relative', by_scene=True)
+            if args.limit_by is not None:
                 # plot_decoder_overlay(IMAGE_PATH, dict_features_limit, f'figures/decoder/{name}')
-                # plot_obs_pred_trajs(IMAGE_PATH, dict_trajs_limit, f'figures/prediction/{name}/significant')
-                # plot_feature_space(dict_features_limit, f'figures/feature_space/{name}', show_diff=False)
-                # plot_feature_space(dict_features_limit, f'figures/feature_space/{name}', show_diff=True)
-            # else:
+                plot_obs_pred_trajs(IMAGE_PATH, dict_trajs_limit, f'figures/prediction/{name}/significant')
+                plot_feature_space(dict_features_limit, f'figures/feature_space/{name}/scenes', show_diff=False)
+                plot_feature_space(dict_features_limit, f'figures/feature_space/{name}/scenes', show_diff=True)
+            else:
                 # plot_decoder_overlay(IMAGE_PATH, dict_features, f'figures/decoder/{name}')
-                # plot_obs_pred_trajs(IMAGE_PATH, dict_trajs, f'figures/prediction/{name}')
-                # plot_feature_space(dict_features, f'figures/feature_space/{name}', show_diff=False)
-                # plot_feature_space(dict_features, f'figures/feature_space/{name}', show_diff=True)
+                # plot_obs_pred_trajs(IMAGE_PATH, dict_trajs, f'figures/prediction/{name}/scenes')
+                plot_feature_space(dict_features, f'figures/feature_space/{name}/scenes', show_diff=False)
+                plot_feature_space(dict_features, f'figures/feature_space/{name}/scenes', show_diff=True)
     else:
         raise ValueError('No checkpoint given!')
 
@@ -138,6 +135,7 @@ if __name__ == '__main__':
     parser.add_argument('--dataset_path', default=None, type=str)
     parser.add_argument('--val_files', default=None, type=str, nargs='+')
     parser.add_argument('--n_leftouts', default=None, type=int, nargs='+')
+    parser.add_argument('--scenes', default=None, type=str, nargs='+')
     # visualization
     parser.add_argument('--viz', action='store_true')
     parser.add_argument('--depth', default=0, type=int)

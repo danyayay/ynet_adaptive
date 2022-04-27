@@ -1,6 +1,6 @@
-from base64 import encode
 import os
 import cv2
+import glob
 import pathlib
 import argparse
 import numpy as np
@@ -24,6 +24,11 @@ labels_ckpt = {
     'FT': 'full finetuning',
     'ET': 'encoder finetuning'
 }
+
+
+colors = {
+    'OODG': 'tab:blue', 'FT': 'tab:orange', 'ET': 'tab:red', 
+    'diff_OODG_FT': 'tab:orange', 'diff_OODG_ET': 'tab:red'}
 
 
 def create_few_shot_plot(results_dir, out_dir, fontsize=16):
@@ -141,8 +146,12 @@ def plot_feature_space(dict_features, out_dir='figures/feature_space', show_diff
                         if ('OODG' in dict_features.keys()) & (ckpt_name in dict_features.keys()):
                             diff_i[ckpt_name] = dict_features['OODG'][scene_id][feature_name][i] - \
                                 dict_features[ckpt_name][scene_id][feature_name][i]
+                    height, width = diff_i[ckpt_name][0].shape
+                    while height >= 6:
+                        height /= 2
+                        width /= 2
                     fig, axes = plt.subplots(
-                        len(diff_i), n_channel, figsize=(n_channel*3, len(diff_i)*2))
+                        len(diff_i), n_channel, figsize=(n_channel*width, len(diff_i)*height))
                     for k, ckpt_name in enumerate(diff_i):
                         for c in range(n_channel):
                             if len(axes.shape) == 1:
@@ -169,8 +178,12 @@ def plot_feature_space(dict_features, out_dir='figures/feature_space', show_diff
                 for _, feature_name in enumerate(features_name):
                     n_channel = dict_scene[feature_name].shape[1]
                     n_ckpt = len(dict_features)
+                    height, width = dict_ckpt[scene_id][feature_name][i].shape
+                    while height >= 6:
+                        height /= 2
+                        width /= 2
                     fig, axes = plt.subplots(n_ckpt, n_channel, 
-                        figsize=(n_channel*4, n_ckpt*3))
+                        figsize=(n_channel*width, n_ckpt*height))
                     for k, (ckpt_name, dict_ckpt) in enumerate(dict_features.items()):
                         feature_i = dict_ckpt[scene_id][feature_name][i]  # (n_channel, height, width)
                         for c in range(n_channel):
@@ -222,8 +235,6 @@ def plot_feature_space_diff_evolution(
     """
     diff_dict, df_dict, original_dict, ckpt_scene_dict = {}, {}, {}, {}
     df_original = pd.DataFrame()
-    colors = {'OODG': 'blue', 'FT': 'orange', 'ET': 'red', 
-              'diff_OODG_FT': 'orange', 'diff_OODG_ET': 'red'}
     for ckpt_name in ['FT', 'ET']:
         if ('OODG' in dict_features.keys()) & (ckpt_name in dict_features.keys()):
             name = f'diff_OODG_{ckpt_name}'
@@ -251,6 +262,7 @@ def plot_feature_space_diff_evolution(
                     original_oodg = dict_features['OODG'][scene_id][feature_name].sum(axis=(1,2,3))
                     original_ckpt = dict_features[ckpt_name][scene_id][feature_name].sum(axis=(1,2,3))
                     
+                    # TODO: what kind of difference, overall_relative / pixel_relative...
                     if is_avg and (diff_type == 'absolute'):
                         add = diff / n_tot
                     elif is_avg and (diff_type == 'relative'):
@@ -290,35 +302,6 @@ def plot_feature_space_diff_evolution(
             else: 
                 # when encoder_only=True, depth will be unknown
                 fig_size, depth = df.shape[0]*0.25 + 4, df.shape[0]
-
-            # ## plot for each case 
-            # fig, ax = plt.subplots(figsize=(fig_size, 4))
-            # for b, block in enumerate(['Encoder', 'GoalDecoder', 'TrajDecoder']):
-            #     df_block = df[df.index.str.contains(block)]
-            #     if df_block.shape[0]:
-            #         if b == 0:
-            #             plt.plot(df_block.index, df_block[name].values, '.-', c=colors[ckpt_name], label=name)
-            #         else:
-            #             plt.plot(df_block.index, df_block[name].values, '.-', c=colors[ckpt_name])
-            #         plt.fill_between(df_block.index, df_block[name].values - df_block[name+'_std'].values, 
-            #             df_block[name].values + df_block[name+'_std'].values, color=colors[ckpt_name], alpha=0.2)
-            # plt.title('Feature space difference')
-            # plt.ylabel(f'{diff_type} difference')
-            # plt.xlabel('Layers')
-            # plt.legend(loc='best')
-            # if (depth == 0) | (depth == 1) | (encoder_only):
-            #     plt.xticks(rotation=45, ha='right')
-            # else: # (depth == 2) | (depth == unknown)
-            #     plt.xticks(rotation=90, ha='right')
-            # pathlib.Path(out_dir).mkdir(parents=True, exist_ok=True)
-            # out_name = f'{name}__D{depth}__N{n_data}'
-            # if encoder_only: out_name = f'{out_name}__encoder'
-            # if is_avg: out_name = f'{out_name}__avg'
-            # out_name = f'{out_name}__abs' if diff_type == 'absolute' else f'{out_name}__rel'
-            # out_path = os.path.join(out_dir, out_name + '.' + format)
-            # plt.savefig(out_path, bbox_inches='tight')
-            # plt.close(fig)
-            # print(f'Saved {out_path}')
     
     # ## feature space difference plot along with layers 
     fig, ax = plt.subplots(figsize=(fig_size, 4))
@@ -394,13 +377,13 @@ def plot_feature_space_diff_evolution(
                         cols = df.columns[df.columns.str.contains(block)]
                         example = df.loc[meta_id, cols].to_numpy()
                         if example.shape[0]:
-                            plt.plot(cols, example, c=colors[name], linewidth=0.5, alpha=0.3)
+                            plt.plot(cols, example, c=colors[ckpt_name], linewidth=0.5, alpha=0.3)
                         # plot average
                         mean = df.loc[:, cols].mean(axis=0).to_numpy()
                         if (i == 0) & (b == 0):
-                            plt.plot(cols, mean, '.-', c=colors[name], label=name)
+                            plt.plot(cols, mean, '.-', c=colors[ckpt_name], label=f'diff_OODG_{ckpt_name}')
                         else:
-                            plt.plot(cols, mean, '.-', c=colors[name])
+                            plt.plot(cols, mean, '.-', c=colors[ckpt_name])
                 plt.title(f'Feature space difference ({scene_id})')
                 plt.ylabel(f'{diff_type} difference')
                 plt.xlabel('Layers')
@@ -533,9 +516,390 @@ def plot_decoder_overlay(image_path, dict_features, out_dir='figures/decoder', f
                 print(f'Saved {out_path}')
     
 
-def plot_weights(models, models_name, out_dir='figures/weights', format='png'):
-    for model, model_name in zip(models, models_name):
-        pass 
+def plot_filters(model_dict, out_dir='figures/filters', format='png'):
+    for model_name, model in model_dict.items():
+        for param_name, param in model.model.named_parameters():
+            if param_name.startswith(('encoder', 'goal_decoder', 'traj_decoder')):
+                if param_name.endswith('weight'):
+                    c_out, c_in, height, width = param.shape
+                    vmin, vmax = param.min().item(), param.max().item()
+                    fig, axes = plt.subplots(c_in, c_out, figsize=(c_out*width, c_in*height))
+                    for o in range(c_out):
+                        for i in range(c_in):
+                            im = axes[i, o].imshow(param[o, i].cpu().detach().numpy(), vmin=vmin, vmax=vmax)
+                            axes[i, o].set_xticklabels([])
+                            axes[i, o].set_yticklabels([])
+                    divider = make_axes_locatable(axes[0, c_out-1])
+                    cax = divider.append_axes('right', size='5%', pad=0.05)
+                    fig.colorbar(im, cax=cax, orientation='vertical')
+                    plt.subplots_adjust(wspace=0, hspace=0)
+                    plt.tight_layout()
+                    axes[0, c_out//2-1].set_title('Out channels')#
+                    axes[c_in//2-1, 0].set_ylabel('In channels')
+                    pathlib.Path(out_dir).mkdir(parents=True, exist_ok=True)
+                    out_name = f'{model_name}__{param_name}'
+                    out_path = os.path.join(out_dir, out_name + '.' + format)
+                    plt.savefig(out_path, bbox_inches='tight')
+                    plt.close(fig)
+                    print(f'Saved {out_path}')                        
+
+
+def plot_filters_diff_evolution(
+    model_dict, out_dir='figures/filters_diff', format='png'):
+    if 'OODG' in model_dict.keys():
+        df_filters = pd.DataFrame()
+        for model_name, model in model_dict.items():
+            if model_name == 'OODG':
+                for param_name, param in model.model.named_parameters():
+                    if not param_name.startswith('semantic_segmentation'):
+                        df_filters.loc[param_name, model_name+'__sum'] = param.sum().item()
+                        df_filters.loc[param_name, model_name+'__avg'] = param.mean().item()
+            else:
+                name = f'diff_OODG_{model_name}'
+                for (_, param_oodg), (param_name, param) in zip(
+                    model_dict['OODG'].model.named_parameters(), model.model.named_parameters()):
+                    if not param_name.startswith('semantic_segmentation'):
+                        # df_filters.loc[param_name, model_name] = param.sum().item()
+                        # d1 = (param_oodg - param).sum().item() / param_oodg.sum().item()
+                        # d2 = ((param_oodg - param) / param_oodg).mean().item()
+                        # d3 = (param_oodg - param).sum().item()
+                        # print(model_name, param_name, d1, d2, d3)
+                        df_filters.loc[param_name, model_name+'__sum'] = param.sum().item()
+                        df_filters.loc[param_name, model_name+'__avg'] = param.mean().item()
+                        # overall relative: can be distorted by outliers 
+                        df_filters.loc[param_name, name+'__overall_relative'] = \
+                            (param_oodg - param).sum().item() / param_oodg.sum().item()
+                        # pixel_relative: can be smoothed by the mostly low values in filters; std is possible..(big)
+                        df_filters.loc[param_name, name+'__pixel_relative'] = \
+                            ((param_oodg - param) / param_oodg).mean().item()
+                        # absolute
+                        df_filters.loc[param_name, name+'__absolute'] = \
+                            (param_oodg - param).sum().item()
+
+        # TODO: order of filters 
+        colors.update({
+            'OODG_weight': 'tab:blue', 'FT_weight': 'tab:orange', 'ET_weight': 'tab:red',
+            'OODG_bias': 'lightsteelblue', 'FT_bias': 'navajowhite', 'ET_bias': 'pink',
+            'diff_OODG_FT_weight': 'tab:orange', 'diff_OODG_FT_bias': 'navajowhite',
+            'diff_OODG_ET_weight': 'tab:red', 'diff_OODG_ET_bias': 'pink'})
+        fig_width = df_filters.shape[0]*0.25+3
+        mask_w = df_filters.index.str.contains('weight')
+        mask_b = df_filters.index.str.contains('bias')
+        index = [n.rstrip('.weight') for n in df_filters.index[mask_w]]
+        pathlib.Path(out_dir).mkdir(parents=True, exist_ok=True)
+
+        # absolute values: plot
+        for op in ['sum', 'avg']:
+            fig, ax = plt.subplots(figsize=(fig_width, 4))
+            for model_name in model_dict.keys():
+                plt.plot(index, df_filters.loc[mask_w, f'{model_name}__{op}'], 
+                    '-', c=colors[model_name], label=model_name+'_weight')
+                plt.plot(index, df_filters.loc[mask_b, f'{model_name}__{op}'], 
+                    '--', c=colors[model_name], label=model_name+'_bias')
+            plt.axhline(y=0, color='gray', linestyle='-', linewidth=0.5, alpha=0.3)
+            plt.title('Filters')
+            plt.ylabel('Value')
+            plt.xlabel('Layers')
+            plt.legend(loc='best')
+            plt.xticks(rotation=45, ha='right')
+            out_name = f'filters_{"_".join(model_dict.keys())}__{op}__plot.{format}'
+            out_path = os.path.join(out_dir, out_name)
+            plt.savefig(out_path, bbox_inches='tight')
+            plt.close(fig)
+            print(f'Saved {out_path}') 
+
+        # absolute values: bar plot
+        df_dict = {}
+        for op in ['sum', 'avg']:
+            df = pd.DataFrame(index=index)
+            for model_name in model_dict.keys():
+                df.loc[index, model_name+'_weight'] = df_filters.loc[mask_w, f'{model_name}__{op}'].values
+                df.loc[index, model_name+'_bias'] = df_filters.loc[mask_b, f'{model_name}__{op}'].values
+            df_dict[op] = df
+            df.plot(kind='bar', color=[colors.get(x) for x in df.columns],
+                figsize=(fig_width, 4), title='Filters',
+                xlabel='Layers', ylabel='Value', rot=45, legend=True)
+            plt.axhline(y=0, color='gray', linestyle='-', linewidth=0.5, alpha=0.3)
+            plt.xticks(rotation=45, ha='right')
+            out_name = f'filters_{"_".join(model_dict.keys())}__{op}__bar.{format}'
+            out_path = os.path.join(out_dir, out_name)
+            plt.savefig(out_path, bbox_inches='tight')
+            plt.close()
+            print(f'Saved {out_path}') 
+
+        # barplot separately 
+        for op in ['sum', 'avg']:
+            df = df_dict[op]
+            for name in ['weight', 'bias']:
+                cols = [c for c in df.columns if c.endswith(name)]
+                df[cols].plot(kind='bar', color=[colors.get(x) for x in cols],
+                    figsize=(fig_width/1.7, 4), title='Filters',
+                    xlabel='Layers', ylabel='Value', rot=45, legend=True)
+                plt.axhline(y=0, color='gray', linestyle='-', linewidth=0.5, alpha=0.3)
+                plt.xticks(rotation=45, ha='right')
+                out_name = f'filters_{"_".join(model_dict.keys())}__{op}__bar__{name}.{format}'
+                out_path = os.path.join(out_dir, out_name)
+                plt.savefig(out_path, bbox_inches='tight')
+                plt.close()
+                print(f'Saved {out_path}') 
+
+        # plot filters' difference 
+        for diff_type in ['overall_relative', 'pixel_relative', 'absolute']:
+            # plot 
+            fig, ax = plt.subplots(figsize=(fig_width, 4))
+            columns = df_filters.columns[
+                df_filters.columns.str.startswith('diff') & df_filters.columns.str.endswith(diff_type)]
+            for column in columns:
+                name, _ = column.split('__')
+                plt.plot(index, df_filters.loc[mask_w, column], '-', c=colors[name], label=name+'_weight')
+                plt.plot(index, df_filters.loc[mask_b, column], '--', c=colors[name], label=name+'_bias')
+            plt.axhline(y=0, color='gray', linestyle='-', linewidth=0.5, alpha=0.3)
+            plt.title('Filters')
+            plt.xlabel('Layers')
+            plt.legend(loc='best')
+            plt.xticks(rotation=45, ha='right')
+            out_name = f'filters_diff_{"_".join(model_dict.keys())}__{diff_type}__plot.{format}'
+            out_path = os.path.join(out_dir, out_name)
+            plt.savefig(out_path, bbox_inches='tight')
+            plt.close(fig)
+            print(f'Saved {out_path}') 
+            
+            # barplot 
+            df = pd.DataFrame(index=index)
+            for column in columns:
+                name, _ = column.split('__')
+                df.loc[index, name+'_weight'] = df_filters.loc[mask_w, column].values
+                df.loc[index, name+'_bias'] = df_filters.loc[mask_b, column].values
+            df.plot(kind='bar', color=[colors.get(x) for x in df.columns],
+                figsize=(fig_width, 4), title='Filters',
+                xlabel='Layers', ylabel='Value', legend=True)
+            plt.axhline(y=0, color='gray', linestyle='-', linewidth=0.5, alpha=0.3)
+            plt.xticks(rotation=45, ha='right')
+            out_name = f'filters_diff_{"_".join(model_dict.keys())}__{diff_type}__bar.{format}'
+            out_path = os.path.join(out_dir, out_name)
+            plt.savefig(out_path, bbox_inches='tight')
+            plt.close()
+            print(f'Saved {out_path}') 
+
+            # barplot separately 
+            for name in ['weight', 'bias']:
+                cols = [c for c in df.columns if c.endswith(name)]
+                df[cols].plot(kind='bar', color=[colors.get(x) for x in cols],
+                    figsize=(fig_width/1.7, 4), title='Filters',
+                    xlabel='Layers', ylabel='Value', rot=45, legend=True)
+                plt.axhline(y=0, color='gray', linestyle='-', linewidth=0.5, alpha=0.3)
+                plt.xticks(rotation=45, ha='right')
+                out_name = f'filters_diff_{"_".join(model_dict.keys())}__{diff_type}__bar__{name}.{format}'
+                out_path = os.path.join(out_dir, out_name)
+                plt.savefig(out_path, bbox_inches='tight')
+                plt.close()
+                print(f'Saved {out_path}')             
+    else:
+        raise ValueError('No generalization model found')
+
+
+# def plot_importance_analysis(in_dir, out_dir='figures/importance_analysis', format='png', n_test=500):
+#     # ## plot the average importance analysis
+
+#     # pretrained models
+#     df_oodg = pd.read_csv(f'{in_dir}/OODG__N{n_test}.csv')
+#     ade_oodg, fde_oodg = df_oodg.ade.mean(), df_oodg.fde.mean()
+#     print('OODG:')
+#     print('ADE mean:', round(ade_oodg, 2), 'FDE mean:', round(fde_oodg, 2))
+#     print('ADE std:', round(df_oodg.ade.std(), 2), 'FDE std:', round(df_oodg.fde.std(), 2))
+    
+#     # tuned models
+#     for tuned_name in ['FT', 'ET']:
+#         # results 
+#         df_tuned = pd.read_csv(f'{in_dir}/{tuned_name}__N{n_test}.csv')
+#         ade_tuned, fde_tuned = df_tuned.ade.mean(), df_tuned.fde.mean()
+#         tuned_diff = {'ade_diff': ade_oodg - ade_tuned, 'fde_diff': fde_oodg - fde_tuned}
+#         print(tuned_name, ':')
+#         print('ADE mean:', round(ade_tuned, 2), 'FDE mean:', round(fde_tuned, 2))
+#         print('ADE std:', round(df_tuned.ade.std(), 2), 'FDE std:', round(df_tuned.fde.std(), 2))
+
+#         # results after replacing one layer
+#         df = pd.DataFrame(columns=['layer', 'ade_diff', 'fde_diff'])
+#         pattern = f'{in_dir}/{tuned_name}__N{n_test}__*.csv'
+#         file_names = glob.glob(pattern)
+#         if file_names:
+#             # collect files 
+#             for file_name in file_names: 
+#                 layer_name = file_name.split('__')[-1].replace('.csv', '')
+#                 df_file = pd.read_csv(file_name) 
+#                 df = pd.concat([df, pd.DataFrame({'layer': layer_name, 
+#                     'ade_diff': ade_oodg - df_file.ade.mean(), 
+#                     'ade_diff_std': (df_oodg.ade - df_file.ade).std(),
+#                     'fde_diff': fde_oodg - df_file.fde.mean(), 
+#                     'fde_diff_std': (df_oodg.fde - df_file.fde).std()}, 
+#                     index=[0])], ignore_index=True, axis=0)
+#             df.sort_values(by='layer', ascending=True, inplace=True)
+#             df.set_index('layer', drop=True, inplace=True)
+#             # bar plot 
+#             for metric in ['ade_diff', 'fde_diff']:
+#                 fig_width = df.shape[0] * 0.25 + 3
+#                 # plot bias and weight with two colors
+#                 colors = {'weight': 'tab:blue', 'bias': 'lightsteelblue'}
+#                 mask_w = df.index.str.contains('weight')
+#                 mask_b = df.index.str.contains('bias')
+#                 index = [n.rstrip('.weight') for n in df.index[mask_w]]
+#                 df_data = pd.DataFrame(index=index)
+#                 df_err = pd.DataFrame(index=index)
+#                 df_data.loc[index, 'weight'] = df.loc[mask_w, metric].values
+#                 df_data.loc[index, 'bias'] = df.loc[mask_b, metric].values
+#                 df_err.loc[index, 'weight'] = df.loc[mask_w, metric+'_std'].values
+#                 df_err.loc[index, 'bias'] = df.loc[mask_b, metric+'_std'].values 
+#                 df_data.plot(kind='bar', color=[colors.get(c) for c in df_data.columns], 
+#                     yerr=df_err, figsize=(fig_width/1.7, 4), title='Importance analysis',
+#                     xlabel='Layers', ylabel=metric)
+#                 plt.axhline(y=tuned_diff[metric], color='tab:red', 
+#                     linestyle='--', linewidth=1, alpha=0.5, label=f'diff_OODG_{tuned_name}')
+#                 plt.xticks(rotation=45, ha='right')
+#                 plt.legend(loc='best')
+#                 out_name = f'{tuned_name}_{metric}__N{n_test}.{format}'
+#                 out_path = os.path.join(out_dir, out_name)
+#                 plt.savefig(out_path, bbox_inches='tight')
+#                 plt.close()
+#                 print(f'Saved {out_path}') 
+#         else:
+#             raise ValueError(f'No desired files in {in_dir}')
+    
+
+def plot_per_importance_analysis(
+    tuned_name, df, n_test, scene_id, 
+    ade_oodg_mean, fde_oodg_mean, ade_oodg_std, fde_oodg_std, 
+    ade_tuned_mean, fde_tuned_mean, ade_tuned_std, fde_tuned_std, 
+    out_dir='figures/importance_analysis', format='png', plot_err_bar=False
+):
+    print('OODG:')
+    print(f'ADE mean={round(ade_oodg_mean, 2)}, FDE mean={round(fde_oodg_mean, 2)}')
+    print(f'ADE std={round(ade_oodg_std, 2)}, FDE std={round(fde_oodg_std, 2)}')
+
+    print(tuned_name, ':')
+    print(f'ADE mean={round(ade_tuned_mean, 2)}, FDE mean={round(fde_tuned_mean, 2)}')
+    print(f'ADE std={round(ade_tuned_std, 2)}, FDE std={round(fde_tuned_std, 2)}')
+    
+    tuned_diff = {
+        'ade_diff': ade_oodg_mean - ade_tuned_mean, 
+        'fde_diff': fde_oodg_mean - fde_tuned_mean
+    }
+
+    # bar plot 
+    for metric in ['ade_diff', 'fde_diff']:
+        fig_width = df.shape[0] * 0.25 + 3
+        # plot bias and weight with two colors
+        colors = {'weight': 'tab:blue', 'bias': 'lightsteelblue'}
+        mask_w = df.index.str.contains('weight')
+        mask_b = df.index.str.contains('bias')
+        index = [n.rstrip('.weight') for n in df.index[mask_w]]
+        df_data = pd.DataFrame(index=index)
+        df_data.loc[index, 'weight'] = df.loc[mask_w, metric].values
+        df_data.loc[index, 'bias'] = df.loc[mask_b, metric].values
+        if plot_err_bar:
+            df_err = pd.DataFrame(index=index)
+            df_err.loc[index, 'weight'] = df.loc[mask_w, metric+'_std'].values
+            df_err.loc[index, 'bias'] = df.loc[mask_b, metric+'_std'].values 
+            df_data.plot(kind='bar', color=[colors.get(c) for c in df_data.columns], 
+                figsize=(fig_width/1.7, 4), yerr=df_err, xlabel='Layers', ylabel=metric, 
+                title='Importance analysis' if not scene_id else f'Importance analysis ({scene_id})')
+        else:
+            df_data.plot(kind='bar', color=[colors.get(c) for c in df_data.columns], 
+                figsize=(fig_width/1.7, 4), xlabel='Layers', ylabel=metric, 
+                title='Importance analysis' if not scene_id else f'Importance analysis ({scene_id})')
+        plt.axhline(y=tuned_diff[metric], color='tab:red', 
+            linestyle='--', linewidth=1, alpha=0.5, label=f'diff_OODG_{tuned_name}')
+        plt.xticks(rotation=45, ha='right')
+        plt.legend(loc="upper right")
+        if not scene_id:
+            out_name = f'{tuned_name}_{metric}__N{n_test}' 
+        else:
+            out_name = f'{tuned_name}_{metric}__N{n_test}__{scene_id}'
+        if plot_err_bar: out_name += f'__err.{format}' 
+        out_path = os.path.join(out_dir, out_name)
+        plt.savefig(out_path, bbox_inches='tight')
+        plt.close()
+        print(f'Saved {out_path}') 
+
+
+def plot_importance_analysis(
+    in_dir, out_dir='figures/importance_analysis', format='png', 
+    n_test=500, plot_err_bar=False):
+
+    # pretrained models
+    df_oodg = pd.read_csv(f'{in_dir}/OODG__N{n_test}.csv')
+    ade_oodg_mean, fde_oodg_mean = df_oodg.ade.mean(), df_oodg.fde.mean()
+    ade_oodg_std, fde_oodg_std = df_oodg.ade.std(), df_oodg.fde.std()
+
+    # tuned models
+    for tuned_name in ['FT', 'ET']:
+        # results 
+        df_tuned = pd.read_csv(f'{in_dir}/{tuned_name}__N{n_test}.csv')
+        ade_tuned_mean, fde_tuned_mean = df_tuned.ade.mean(), df_tuned.fde.mean()
+        ade_tuned_std, fde_tuned_std = df_tuned.ade.std(), df_tuned.fde.std()
+
+        # results after replacing one layer
+        df_avg, df_sample = pd.DataFrame(), pd.DataFrame()
+        
+        # collect files 
+        pattern = f'{in_dir}/{tuned_name}__N{n_test}__*.csv'
+        file_names = glob.glob(pattern)
+        if file_names:
+            for file_name in file_names: 
+                layer_name = file_name.split('__')[-1].replace('.csv', '')
+                df_file = pd.read_csv(file_name) 
+                df_file['layer'] = layer_name
+                df_file.loc[:, 'ade_diff'] = df_oodg.ade - df_file.ade
+                df_file.loc[:, 'fde_diff'] = df_oodg.fde - df_file.fde
+                df_avg = pd.concat([df_avg, pd.DataFrame({
+                    'layer': layer_name, 
+                    'ade_diff': df_file.ade_diff.mean(),
+                    'fde_diff': df_file.fde_diff.mean(),
+                    'ade_diff_std': df_file.ade_diff.std(),
+                    'fde_diff_std': df_file.fde_diff.std()}, 
+                    index=[0])], ignore_index=True, axis=0)
+                df_sample = pd.concat([df_sample, df_file], ignore_index=True, axis=0)
+            df_avg.sort_values(by='layer', ascending=True, inplace=True)
+            df_avg.set_index('layer', drop=True, inplace=True)
+        else:
+            raise ValueError(f'No desired files in {in_dir}')
+        # plot averaged case      
+        plot_per_importance_analysis(
+            tuned_name, df_avg, n_test, None, 
+            ade_oodg_mean, fde_oodg_mean, ade_oodg_std, fde_oodg_std, 
+            ade_tuned_mean, fde_tuned_mean, ade_tuned_std, fde_tuned_std, 
+            out_dir, plot_err_bar=False
+        )
+        plot_per_importance_analysis(
+            tuned_name, df_avg, n_test, None, 
+            ade_oodg_mean, fde_oodg_mean, ade_oodg_std, fde_oodg_std, 
+            ade_tuned_mean, fde_tuned_mean, ade_tuned_std, fde_tuned_std, 
+            out_dir, plot_err_bar=True
+        )
+        # plot by scene 
+        df_gb = df_sample.groupby(by=['sceneId', 'layer']).agg(['mean', 'std']).reset_index()
+        df_selected = df_gb[['sceneId', 'layer']].copy()
+        df_selected.loc[:, 'ade_diff'] = df_gb['ade_diff']['mean']
+        df_selected.loc[:, 'fde_diff'] = df_gb['fde_diff']['mean']
+        df_selected.loc[:, 'ade_diff_std'] = df_gb['ade_diff']['std']
+        df_selected.loc[:, 'fde_diff_std'] = df_gb['fde_diff']['std']
+        for scene_id in df_selected.sceneId.unique():
+            df_scene = df_selected[df_selected.sceneId == scene_id]
+            df_scene.sort_values(by='layer', ascending=True, inplace=True)
+            df_scene.set_index('layer', drop=True, inplace=True)
+            plot_per_importance_analysis(
+                tuned_name, df_scene[['ade_diff', 'fde_diff']], n_test, scene_id,
+                ade_oodg_mean, fde_oodg_mean, ade_oodg_std, fde_oodg_std, 
+                ade_tuned_mean, fde_tuned_mean, ade_tuned_std, fde_tuned_std, 
+                out_dir, plot_err_bar=False
+            )
+            plot_per_importance_analysis(
+                tuned_name, 
+                df_scene[['ade_diff', 'fde_diff', 'ade_diff_std', 'fde_diff_std']], 
+                n_test, scene_id,
+                ade_oodg_mean, fde_oodg_mean, ade_oodg_std, fde_oodg_std, 
+                ade_tuned_mean, fde_tuned_mean, ade_tuned_std, fde_tuned_std, 
+                out_dir, plot_err_bar=True
+            )
 
 
 if __name__ == "__main__":

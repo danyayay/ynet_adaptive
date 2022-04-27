@@ -818,6 +818,13 @@ def reduce_df_meta_ids(df, meta_ids):
     return df[(df["metaId"].values == meta_ids[:, None]).sum(axis=0).astype(bool)]
 
 
+def dataset_given_scenes(data_path, files, scenes):
+    print(f"Split {files} given scenes={scenes}")
+    df = pd.concat([pd.read_pickle(os.path.join(data_path, file)) for file in files])
+    df_selected = df[df.sceneId.isin(scenes)]
+    return df_selected
+
+
 def set_random_seeds(random_seed=0):
     torch.manual_seed(random_seed)
     np.random.seed(random_seed)
