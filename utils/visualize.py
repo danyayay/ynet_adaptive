@@ -210,7 +210,7 @@ def plot_feature_space(dict_features, out_dir='figures/feature_space', show_diff
 
 def plot_feature_space_diff_evolution(
     dict_features, out_dir='figures/feature_space_diff', 
-    is_avg=True, encoder_only=False, diff_type='absolute', 
+    encoder_only=False, diff_type='absolute', 
     by_scene=True, format='png'):
     """Plot the difference of OODG and FT/ET along with layers. 
 
@@ -219,8 +219,6 @@ def plot_feature_space_diff_evolution(
             Dict storing all features. 
         out_dir (str, optional): 
             Path for figures. Defaults to 'figures/feature_space_diff'.
-        is_avg (bool, optional): 
-            Whether average over channels and pixels. Defaults to True.
         encoder_only (bool, optional): 
             Visualize only encoder or the whole network. Defaults to False.
         diff_type (str, optional): 
@@ -256,30 +254,29 @@ def plot_feature_space_diff_evolution(
                 ckpt_scene_df = pd.DataFrame(index=index)
                 for feature_name in features_name:
                     # diff using all pixels and channels
-                    diff = (dict_features['OODG'][scene_id][feature_name] - 
-                        dict_features[ckpt_name][scene_id][feature_name]).sum(axis=(1,2,3))
                     n_tot = dict_features['OODG'][scene_id][feature_name][0].reshape(-1).shape[0]
-                    original_oodg = dict_features['OODG'][scene_id][feature_name].sum(axis=(1,2,3))
-                    original_ckpt = dict_features[ckpt_name][scene_id][feature_name].sum(axis=(1,2,3))
-                    
-                    # TODO: what kind of difference, overall_relative / pixel_relative...
-                    if is_avg and (diff_type == 'absolute'):
-                        add = diff / n_tot
-                    elif is_avg and (diff_type == 'relative'):
-                        add = diff / original_oodg
-                    elif (not is_avg) and (diff_type == 'absolute'):
-                        add = diff
+                    original_oodg = dict_features['OODG'][scene_id][feature_name]
+                    original_ckpt = dict_features[ckpt_name][scene_id][feature_name]
+                    diff = original_oodg - original_ckpt
+
+                    if diff_type == 'overall_relative':
+                        add = diff.mean(axis=(1,2,3)) / original_oodg.mean(axis=(1,2,3))
+                    elif diff_type == 'pixel_relative':
+                        add = np.empty(diff.shape)
+                        add.fill(np.nan)
+                        np.divide(diff, original_oodg, out=add, where=original_oodg!=0)
+                        add = np.nanmean(add, axis=(1,2,3))
                     else:
-                        raise ValueError(f'No support for is_avg={is_avg}, diff_type={diff_type}')
+                        raise ValueError(f'No support for diff_type={diff_type}')
                     
                     diff_dict[name][feature_name].extend(add)
                     ckpt_scene_df.loc[index, feature_name] = add
 
-                    original_dict['OODG'][feature_name].extend(original_oodg/n_tot)
-                    original_dict[ckpt_name][feature_name].extend(original_ckpt/n_tot)
+                    original_dict['OODG'][feature_name].extend(original_oodg.sum(axis=(1,2,3))/n_tot)
+                    original_dict[ckpt_name][feature_name].extend(original_ckpt.sum(axis=(1,2,3))/n_tot)
                 
                 ckpt_scene_dict[ckpt_name][scene_id] = ckpt_scene_df
-
+            
             # average over samples
             df = pd.DataFrame()
             n_data = len(diff_dict[name][features_name[0]])
@@ -326,11 +323,9 @@ def plot_feature_space_diff_evolution(
     else: # (depth == 2) | (depth == unknown)
         plt.xticks(rotation=90, ha='right')
     pathlib.Path(out_dir).mkdir(parents=True, exist_ok=True)
-    out_name = f'{"_".join(df_dict.keys())}__D{depth}__N{n_data}'
-    if encoder_only: out_name = f'{out_name}__encoder'
-    if is_avg: out_name = f'{out_name}__avg'
-    out_name = f'{out_name}__abs' if diff_type == 'absolute' else f'{out_name}__rel'
-    out_path = os.path.join(out_dir, out_name + '.' + format)
+    out_name = f'{"_".join(df_dict.keys())}__D{depth}__N{n_data}__{diff_type}'
+    if encoder_only: out_name += '__encoder'
+    out_path = os.path.join(out_dir, f'{out_name}.{format}')
     plt.savefig(out_path, bbox_inches='tight')
     plt.close(fig)
     print(f'Saved {out_path}')
@@ -358,8 +353,7 @@ def plot_feature_space_diff_evolution(
     pathlib.Path(out_dir).mkdir(parents=True, exist_ok=True)
     out_name = f'{"_".join(original_dict.keys())}__D{depth}__N{n_data}'
     if encoder_only: out_name = f'{out_name}__encoder'
-    out_name = f'{out_name}__avg__abs'
-    out_path = os.path.join(out_dir, out_name + '.' + format)
+    out_path = os.path.join(out_dir, f'{out_name}.{format}')
     plt.savefig(out_path, bbox_inches='tight')
     plt.close(fig)
     print(f'Saved {out_path}')
@@ -393,11 +387,9 @@ def plot_feature_space_diff_evolution(
                 else: # (depth == 2) | (depth == unknown)
                     plt.xticks(rotation=90, ha='right')
                 pathlib.Path(out_dir).mkdir(parents=True, exist_ok=True)
-                out_name = f'diff_OODG_{ckpt_name}__{scene_id}__D{depth}__N{n_data}'
+                out_name = f'diff_OODG_{ckpt_name}__{scene_id}__D{depth}__N{n_data}__{diff_type}'
                 if encoder_only: out_name = f'{out_name}__encoder'
-                if is_avg: out_name = f'{out_name}__avg'
-                out_name = f'{out_name}__abs' if diff_type == 'absolute' else f'{out_name}__rel'
-                out_path = os.path.join(out_dir, out_name + '.' + format)
+                out_path = os.path.join(out_dir, f'{out_name}.{format}')
                 plt.savefig(out_path, bbox_inches='tight')
                 plt.close(fig)
                 print(f'Saved {out_path}') 
@@ -576,7 +568,6 @@ def plot_filters_diff_evolution(
                         df_filters.loc[param_name, name+'__absolute'] = \
                             (param_oodg - param).sum().item()
 
-        # TODO: order of filters 
         colors.update({
             'OODG_weight': 'tab:blue', 'FT_weight': 'tab:orange', 'ET_weight': 'tab:red',
             'OODG_bias': 'lightsteelblue', 'FT_bias': 'navajowhite', 'ET_bias': 'pink',
@@ -696,77 +687,10 @@ def plot_filters_diff_evolution(
                 print(f'Saved {out_path}')             
     else:
         raise ValueError('No generalization model found')
-
-
-# def plot_importance_analysis(in_dir, out_dir='figures/importance_analysis', format='png', n_test=500):
-#     # ## plot the average importance analysis
-
-#     # pretrained models
-#     df_oodg = pd.read_csv(f'{in_dir}/OODG__N{n_test}.csv')
-#     ade_oodg, fde_oodg = df_oodg.ade.mean(), df_oodg.fde.mean()
-#     print('OODG:')
-#     print('ADE mean:', round(ade_oodg, 2), 'FDE mean:', round(fde_oodg, 2))
-#     print('ADE std:', round(df_oodg.ade.std(), 2), 'FDE std:', round(df_oodg.fde.std(), 2))
-    
-#     # tuned models
-#     for tuned_name in ['FT', 'ET']:
-#         # results 
-#         df_tuned = pd.read_csv(f'{in_dir}/{tuned_name}__N{n_test}.csv')
-#         ade_tuned, fde_tuned = df_tuned.ade.mean(), df_tuned.fde.mean()
-#         tuned_diff = {'ade_diff': ade_oodg - ade_tuned, 'fde_diff': fde_oodg - fde_tuned}
-#         print(tuned_name, ':')
-#         print('ADE mean:', round(ade_tuned, 2), 'FDE mean:', round(fde_tuned, 2))
-#         print('ADE std:', round(df_tuned.ade.std(), 2), 'FDE std:', round(df_tuned.fde.std(), 2))
-
-#         # results after replacing one layer
-#         df = pd.DataFrame(columns=['layer', 'ade_diff', 'fde_diff'])
-#         pattern = f'{in_dir}/{tuned_name}__N{n_test}__*.csv'
-#         file_names = glob.glob(pattern)
-#         if file_names:
-#             # collect files 
-#             for file_name in file_names: 
-#                 layer_name = file_name.split('__')[-1].replace('.csv', '')
-#                 df_file = pd.read_csv(file_name) 
-#                 df = pd.concat([df, pd.DataFrame({'layer': layer_name, 
-#                     'ade_diff': ade_oodg - df_file.ade.mean(), 
-#                     'ade_diff_std': (df_oodg.ade - df_file.ade).std(),
-#                     'fde_diff': fde_oodg - df_file.fde.mean(), 
-#                     'fde_diff_std': (df_oodg.fde - df_file.fde).std()}, 
-#                     index=[0])], ignore_index=True, axis=0)
-#             df.sort_values(by='layer', ascending=True, inplace=True)
-#             df.set_index('layer', drop=True, inplace=True)
-#             # bar plot 
-#             for metric in ['ade_diff', 'fde_diff']:
-#                 fig_width = df.shape[0] * 0.25 + 3
-#                 # plot bias and weight with two colors
-#                 colors = {'weight': 'tab:blue', 'bias': 'lightsteelblue'}
-#                 mask_w = df.index.str.contains('weight')
-#                 mask_b = df.index.str.contains('bias')
-#                 index = [n.rstrip('.weight') for n in df.index[mask_w]]
-#                 df_data = pd.DataFrame(index=index)
-#                 df_err = pd.DataFrame(index=index)
-#                 df_data.loc[index, 'weight'] = df.loc[mask_w, metric].values
-#                 df_data.loc[index, 'bias'] = df.loc[mask_b, metric].values
-#                 df_err.loc[index, 'weight'] = df.loc[mask_w, metric+'_std'].values
-#                 df_err.loc[index, 'bias'] = df.loc[mask_b, metric+'_std'].values 
-#                 df_data.plot(kind='bar', color=[colors.get(c) for c in df_data.columns], 
-#                     yerr=df_err, figsize=(fig_width/1.7, 4), title='Importance analysis',
-#                     xlabel='Layers', ylabel=metric)
-#                 plt.axhline(y=tuned_diff[metric], color='tab:red', 
-#                     linestyle='--', linewidth=1, alpha=0.5, label=f'diff_OODG_{tuned_name}')
-#                 plt.xticks(rotation=45, ha='right')
-#                 plt.legend(loc='best')
-#                 out_name = f'{tuned_name}_{metric}__N{n_test}.{format}'
-#                 out_path = os.path.join(out_dir, out_name)
-#                 plt.savefig(out_path, bbox_inches='tight')
-#                 plt.close()
-#                 print(f'Saved {out_path}') 
-#         else:
-#             raise ValueError(f'No desired files in {in_dir}')
     
 
 def plot_per_importance_analysis(
-    tuned_name, df, n_test, scene_id, 
+    tuned_name, df, n_test, scene_id, depth,
     ade_oodg_mean, fde_oodg_mean, ade_oodg_std, fde_oodg_std, 
     ade_tuned_mean, fde_tuned_mean, ade_tuned_std, fde_tuned_std, 
     out_dir='figures/importance_analysis', format='png', plot_err_bar=False
@@ -787,25 +711,43 @@ def plot_per_importance_analysis(
     # bar plot 
     for metric in ['ade_diff', 'fde_diff']:
         fig_width = df.shape[0] * 0.25 + 3
-        # plot bias and weight with two colors
-        colors = {'weight': 'tab:blue', 'bias': 'lightsteelblue'}
-        mask_w = df.index.str.contains('weight')
-        mask_b = df.index.str.contains('bias')
-        index = [n.rstrip('.weight') for n in df.index[mask_w]]
-        df_data = pd.DataFrame(index=index)
-        df_data.loc[index, 'weight'] = df.loc[mask_w, metric].values
-        df_data.loc[index, 'bias'] = df.loc[mask_b, metric].values
-        if plot_err_bar:
-            df_err = pd.DataFrame(index=index)
-            df_err.loc[index, 'weight'] = df.loc[mask_w, metric+'_std'].values
-            df_err.loc[index, 'bias'] = df.loc[mask_b, metric+'_std'].values 
-            df_data.plot(kind='bar', color=[colors.get(c) for c in df_data.columns], 
-                figsize=(fig_width/1.7, 4), yerr=df_err, xlabel='Layers', ylabel=metric, 
-                title='Importance analysis' if not scene_id else f'Importance analysis ({scene_id})')
+        if depth == -1:
+            # plot bias and weight with two colors
+            colors = {'weight': 'tab:blue', 'bias': 'lightsteelblue'}
+            mask_w = df.index.str.contains('weight')
+            mask_b = df.index.str.contains('bias')
+            index = [n.rstrip('.weight') for n in df.index[mask_w]]
+            df_data = pd.DataFrame(index=index)
+            df_data.loc[index, 'weight'] = df.loc[mask_w, metric].values
+            df_data.loc[index, 'bias'] = df.loc[mask_b, metric].values
+            if plot_err_bar:
+                df_err = pd.DataFrame(index=index)
+                df_err.loc[index, 'weight'] = df.loc[mask_w, metric+'_std'].values
+                df_err.loc[index, 'bias'] = df.loc[mask_b, metric+'_std'].values 
+                df_data.plot(kind='bar', color=[colors.get(c) for c in df_data.columns], 
+                    figsize=(fig_width/1.7, 4), yerr=df_err, xlabel='Layers', ylabel=metric, 
+                    title='Importance analysis' if not scene_id else f'Importance analysis ({scene_id})')
+            else:
+                df_data.plot(kind='bar', color=[colors.get(c) for c in df_data.columns], 
+                    figsize=(fig_width/1.7, 4), xlabel='Layers', ylabel=metric, 
+                    title='Importance analysis' if not scene_id else f'Importance analysis ({scene_id})')
+        elif (depth == 1) or (depth == 2):
+            # organize index
+            df.index = df.reset_index()['layer'].apply(
+                lambda x: x.split(',')[-1] if len(x.split(','))==1 else x.split(',')[-1].lstrip(" '").rstrip("']"))
+            df = df.sort_values(by='layer')
+            # plot
+            if plot_err_bar:
+                df[[metric]].plot(kind='bar', 
+                    yerr=df[[metric+'_std']].rename(columns={metric+'_std': metric}), 
+                    figsize=(fig_width/1.3, 4), xlabel='Layers', ylabel=metric, 
+                    title='Importance analysis' if not scene_id else f'Importance analysis ({scene_id})')
+            else:
+                df[[metric]].plot(kind='bar',
+                    figsize=(fig_width/1.3, 4), xlabel='Layers', ylabel=metric, 
+                    title='Importance analysis' if not scene_id else f'Importance analysis ({scene_id})')
         else:
-            df_data.plot(kind='bar', color=[colors.get(c) for c in df_data.columns], 
-                figsize=(fig_width/1.7, 4), xlabel='Layers', ylabel=metric, 
-                title='Importance analysis' if not scene_id else f'Importance analysis ({scene_id})')
+            raise ValueError('No support for depth={depth}')
         plt.axhline(y=tuned_diff[metric], color='tab:red', 
             linestyle='--', linewidth=1, alpha=0.5, label=f'diff_OODG_{tuned_name}')
         plt.xticks(rotation=45, ha='right')
@@ -816,6 +758,7 @@ def plot_per_importance_analysis(
             out_name = f'{tuned_name}_{metric}__N{n_test}__{scene_id}'
         if plot_err_bar: out_name += f'__err.{format}' 
         out_path = os.path.join(out_dir, out_name)
+        pathlib.Path(out_dir).mkdir(parents=True, exist_ok=True)
         plt.savefig(out_path, bbox_inches='tight')
         plt.close()
         print(f'Saved {out_path}') 
@@ -823,7 +766,7 @@ def plot_per_importance_analysis(
 
 def plot_importance_analysis(
     in_dir, out_dir='figures/importance_analysis', format='png', 
-    n_test=500, plot_err_bar=False):
+    n_test=500, depth=-1, plot_err_bar=False):
 
     # pretrained models
     df_oodg = pd.read_csv(f'{in_dir}/OODG__N{n_test}.csv')
@@ -833,7 +776,11 @@ def plot_importance_analysis(
     # tuned models
     for tuned_name in ['FT', 'ET']:
         # results 
+        if not os.path.exists(f'{in_dir}/{tuned_name}__N{n_test}.csv'):
+            continue
+
         df_tuned = pd.read_csv(f'{in_dir}/{tuned_name}__N{n_test}.csv')
+    
         ade_tuned_mean, fde_tuned_mean = df_tuned.ade.mean(), df_tuned.fde.mean()
         ade_tuned_std, fde_tuned_std = df_tuned.ade.std(), df_tuned.fde.std()
 
@@ -843,7 +790,8 @@ def plot_importance_analysis(
         # collect files 
         pattern = f'{in_dir}/{tuned_name}__N{n_test}__*.csv'
         file_names = glob.glob(pattern)
-        if file_names:
+        
+        if file_names: 
             for file_name in file_names: 
                 layer_name = file_name.split('__')[-1].replace('.csv', '')
                 df_file = pd.read_csv(file_name) 
@@ -858,48 +806,49 @@ def plot_importance_analysis(
                     'fde_diff_std': df_file.fde_diff.std()}, 
                     index=[0])], ignore_index=True, axis=0)
                 df_sample = pd.concat([df_sample, df_file], ignore_index=True, axis=0)
-            df_avg.sort_values(by='layer', ascending=True, inplace=True)
+            df_avg = df_avg.sort_values(by='layer', ascending=True)
             df_avg.set_index('layer', drop=True, inplace=True)
-        else:
-            raise ValueError(f'No desired files in {in_dir}')
-        # plot averaged case      
-        plot_per_importance_analysis(
-            tuned_name, df_avg, n_test, None, 
-            ade_oodg_mean, fde_oodg_mean, ade_oodg_std, fde_oodg_std, 
-            ade_tuned_mean, fde_tuned_mean, ade_tuned_std, fde_tuned_std, 
-            out_dir, plot_err_bar=False
-        )
-        plot_per_importance_analysis(
-            tuned_name, df_avg, n_test, None, 
-            ade_oodg_mean, fde_oodg_mean, ade_oodg_std, fde_oodg_std, 
-            ade_tuned_mean, fde_tuned_mean, ade_tuned_std, fde_tuned_std, 
-            out_dir, plot_err_bar=True
-        )
-        # plot by scene 
-        df_gb = df_sample.groupby(by=['sceneId', 'layer']).agg(['mean', 'std']).reset_index()
-        df_selected = df_gb[['sceneId', 'layer']].copy()
-        df_selected.loc[:, 'ade_diff'] = df_gb['ade_diff']['mean']
-        df_selected.loc[:, 'fde_diff'] = df_gb['fde_diff']['mean']
-        df_selected.loc[:, 'ade_diff_std'] = df_gb['ade_diff']['std']
-        df_selected.loc[:, 'fde_diff_std'] = df_gb['fde_diff']['std']
-        for scene_id in df_selected.sceneId.unique():
-            df_scene = df_selected[df_selected.sceneId == scene_id]
-            df_scene.sort_values(by='layer', ascending=True, inplace=True)
-            df_scene.set_index('layer', drop=True, inplace=True)
+
+            # plot averaged case      
             plot_per_importance_analysis(
-                tuned_name, df_scene[['ade_diff', 'fde_diff']], n_test, scene_id,
+                tuned_name, df_avg, n_test, None, depth, 
                 ade_oodg_mean, fde_oodg_mean, ade_oodg_std, fde_oodg_std, 
                 ade_tuned_mean, fde_tuned_mean, ade_tuned_std, fde_tuned_std, 
                 out_dir, plot_err_bar=False
             )
             plot_per_importance_analysis(
-                tuned_name, 
-                df_scene[['ade_diff', 'fde_diff', 'ade_diff_std', 'fde_diff_std']], 
-                n_test, scene_id,
+                tuned_name, df_avg, n_test, None, depth, 
                 ade_oodg_mean, fde_oodg_mean, ade_oodg_std, fde_oodg_std, 
                 ade_tuned_mean, fde_tuned_mean, ade_tuned_std, fde_tuned_std, 
                 out_dir, plot_err_bar=True
             )
+
+            # plot by scene 
+            df_gb = df_sample.groupby(by=['sceneId', 'layer']).agg(['mean', 'std']).reset_index()
+            df_selected = df_gb[['sceneId', 'layer']].copy()
+            df_selected.loc[:, 'ade_diff'] = df_gb['ade_diff']['mean']
+            df_selected.loc[:, 'fde_diff'] = df_gb['fde_diff']['mean']
+            df_selected.loc[:, 'ade_diff_std'] = df_gb['ade_diff']['std']
+            df_selected.loc[:, 'fde_diff_std'] = df_gb['fde_diff']['std']
+            for scene_id in df_selected.sceneId.unique():
+                df_scene = df_selected[df_selected.sceneId == scene_id]
+                df_scene = df_scene.sort_values(by='layer', ascending=True)
+                df_scene.set_index('layer', drop=True, inplace=True)
+                # TODO: legend format is incorrect 
+                plot_per_importance_analysis(
+                    tuned_name, df_scene[['ade_diff', 'fde_diff']], n_test, scene_id, depth, 
+                    ade_oodg_mean, fde_oodg_mean, ade_oodg_std, fde_oodg_std, 
+                    ade_tuned_mean, fde_tuned_mean, ade_tuned_std, fde_tuned_std, 
+                    out_dir+'/scenes', plot_err_bar=False
+                )
+                plot_per_importance_analysis(
+                    tuned_name, 
+                    df_scene[['ade_diff', 'fde_diff', 'ade_diff_std', 'fde_diff_std']], 
+                    n_test, scene_id, depth, 
+                    ade_oodg_mean, fde_oodg_mean, ade_oodg_std, fde_oodg_std, 
+                    ade_tuned_mean, fde_tuned_mean, ade_tuned_std, fde_tuned_std, 
+                    out_dir+'/scenes', plot_err_bar=True
+                )
 
 
 if __name__ == "__main__":
