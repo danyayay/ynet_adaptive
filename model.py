@@ -346,7 +346,7 @@ class YNetTrainer:
         for param in model.semantic_segmentation.parameters():
             param.requires_grad = False
 
-        if train_net in ["encoder", "modulator"]:
+        if train_net != 'all':
             for param in model.parameters():
                 param.requires_grad = False
             if train_net == "encoder":
@@ -355,6 +355,21 @@ class YNetTrainer:
             elif train_net == "modulator":
                 for param in model.style_modulators.parameters():
                     param.requires_grad = True
+            elif len(train_net.split('_')[-1].split('-')) == 1:
+                layer_num = int(train_net.split('_')[-1])
+                for param_name, param in model.encoder.named_parameters():
+                    param_layer = int(param_name.split('.')[1])
+                    if param_layer == layer_num:
+                        param.requires_grad = True
+            elif len(train_net.split('_')[-1].split('-')) == 2:
+                layer_lower, layer_upper = train_net.split('_')[-1].split('-')
+                layer_lower, layer_upper = int(layer_lower), int(layer_upper)
+                for param_name, param in model.encoder.named_parameters():
+                    param_layer = int(param_name.split('.')[1])
+                    if (param_layer >= layer_lower) and (param_layer <= layer_upper):
+                        param.requires_grad = True
+            else:
+                raise ValueError(f'No support for train_net={train_net}')
 
         optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
@@ -410,10 +425,11 @@ class YNetTrainer:
         model.load_state_dict(best_state_dict, strict=True)
 
         # # Save best model
-        if fine_tune & (train_net == 'all'):
-            torch.save(best_state_dict, f'ckpts/{experiment_name}_FT_{str(int((df_train.shape[0])/20))}_weights.pt')
-        elif fine_tune & (train_net == 'encoder'):
-            torch.save(best_state_dict, f'ckpts/{experiment_name}_{str(int((df_train.shape[0])/20))}_weights.pt')
+        if fine_tune:
+            if train_net == 'all':
+                torch.save(best_state_dict, f'ckpts/{experiment_name}_FT__TN_{str(int((df_train.shape[0])/20))}_weights.pt')
+            else:
+                torch.save(best_state_dict, f'ckpts/{experiment_name}__TN_{str(int((df_train.shape[0])/20))}_weights.pt')
         else:
             torch.save(best_state_dict, f'ckpts/{experiment_name}_weights.pt')
 

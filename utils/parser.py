@@ -15,7 +15,8 @@ def get_general_parser():
     parser.add_argument("--val_ratio", default=0.3, type=float)
     parser.add_argument("--out_csv_dir", default="csv", type=str, help="If not None, will write a csv with results in this dir")
     # model
-    parser.add_argument("--train_net", default="all", choices=["all", "encoder", "modulator"], type=str, help="train all parameters or only encoder or with modulator")
+    parser.add_argument("--train_net", default="all", type=str, 
+        help="train all parameters or only encoder or with modulator")
     parser.add_argument("--ckpt", default=None, type=str, help='path to checkpoint')
     parser.add_argument("--n_round", default=1, type=int, help='number of rounds in stochastics eval process')  
     parser.add_argument("--n_leftouts", default=None, type=int, nargs='+', help='The number of data left for testing')
