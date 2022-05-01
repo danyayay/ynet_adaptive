@@ -49,7 +49,7 @@ class YNetEncoder(nn.Module):
         self.stages.append(
             nn.Sequential(
                 nn.Conv2d(in_channels, channels[0], kernel_size=(3, 3), stride=(1, 1), padding=(1, 1)),
-                nn.ReLU(inplace=True),
+                nn.ReLU(inplace=False),
             )
         )
 
@@ -59,9 +59,9 @@ class YNetEncoder(nn.Module):
                 nn.Sequential(
                     nn.MaxPool2d(kernel_size=2, stride=2, padding=0, dilation=1, ceil_mode=False),
                     nn.Conv2d(channels[i], channels[i+1], kernel_size=(3, 3), stride=(1, 1), padding=(1, 1)),
-                    nn.ReLU(inplace=True),
+                    nn.ReLU(inplace=False),
                     nn.Conv2d(channels[i+1], channels[i+1], kernel_size=(3, 3), stride=(1, 1), padding=(1, 1)),
-                    nn.ReLU(inplace=True)
+                    nn.ReLU(inplace=False)
                 )
             )
 
@@ -506,6 +506,99 @@ class YNetTrainer:
         else:
             return avg_ade, avg_fde, list_metrics
     
+    def forward_test(self, df_test, image_path, require_input_grad, noisy_std_frac):
+        return self._forward_test(df_test, image_path, require_input_grad, noisy_std_frac, **self.params)
+
+    def _forward_test(
+        self, df_test, image_path, require_input_grad, noisy_std_frac,
+        dataset_name, obs_len, pred_len, resize_factor, 
+        use_raw_data, waypoints, kernlen, nsig, loss_scale, **kwargs):
+
+        # get data 
+        test_images, test_loader, self.homo_mat = self.prepare_data(
+            df_test, image_path, dataset_name, 'test', 
+            obs_len, pred_len, resize_factor, use_raw_data)
+
+        # create template
+        input_template = torch.Tensor(create_dist_mat(size=self.template_size)).to(self.device)
+        gt_template = torch.Tensor(create_gaussian_heatmap_template(
+            size=self.template_size, kernlen=kernlen, nsig=nsig, normalize=False)).to(self.device)
+        criterion = nn.BCEWithLogitsLoss()
+
+        # test 
+        if len(test_loader) == 1:
+            for traj, _, scene_id in test_loader:
+                scene_raw_img = test_images[scene_id].to(self.device).unsqueeze(0)
+                if noisy_std_frac is not None: 
+                    # noisy input
+                    std = noisy_std_frac * (scene_raw_img.max() - scene_raw_img.min())
+                    noisy_scene_img = scene_raw_img + scene_raw_img.new(scene_raw_img.size()).normal_(0, std)
+                    noisy_scene_img.requires_grad = True
+                    # forward 
+                    goal_loss, traj_loss = self._forward_batch(
+                        noisy_scene_img, traj, input_template, gt_template, criterion, 
+                        obs_len, pred_len, waypoints, loss_scale, self.device)
+                else:
+                    # require grad for input or not
+                    scene_raw_img.requires_grad = False 
+                    if require_input_grad: scene_raw_img.requires_grad = True
+                    # forward 
+                    goal_loss, traj_loss = self._forward_batch(
+                        scene_raw_img, traj, input_template, gt_template, criterion, 
+                        obs_len, pred_len, waypoints, loss_scale, self.device)
+        else:
+            raise ValueError(f'Received more than 1 batch ({len(test_loader)})')
+        
+        if noisy_std_frac is not None:
+            return goal_loss, traj_loss, scene_raw_img, noisy_scene_img
+        else:
+            return goal_loss, traj_loss, scene_raw_img 
+
+    def _forward_batch(
+        self, scene_raw_img, traj, input_template, gt_template, criterion, 
+        obs_len, pred_len, waypoints, loss_scale, device):
+        
+        # model 
+        model = self.model.to(self.device)
+
+        _, _, H, W = scene_raw_img.shape
+
+        # create heatmap for observed trajectories 
+        observed = traj[:, :obs_len, :].reshape(-1, 2).cpu().numpy() 
+        observed_map = get_patch(input_template, observed, H, W)  
+        observed_map = torch.stack(observed_map).reshape([-1, obs_len, H, W]) 
+
+        # create heatmap for groundtruth future trajectories 
+        gt_future = traj[:, obs_len:].to(device)  
+        gt_future_map = get_patch(gt_template, gt_future.reshape(-1, 2).cpu().numpy(), H, W)
+        gt_future_map = torch.stack(gt_future_map).reshape([-1, pred_len, H, W])
+        
+        # create semantic segmentation map for all bacthes 
+        scene_image = model.segmentation(scene_raw_img)
+        semantic_image = scene_image.expand(observed_map.shape[0], -1, -1, -1)  
+
+        # forward 
+        feature_input = torch.cat([semantic_image, observed_map], dim=1) 
+        features = model.pred_features(feature_input)
+        pred_goal_map = model.pred_goal(features)
+
+        # goal loss 
+        goal_loss = criterion(pred_goal_map, gt_future_map) * loss_scale  
+        pred_waypoint_map = pred_goal_map[:, waypoints] 
+        
+        # way points 
+        gt_waypoints_maps_downsampled = [nn.AvgPool2d(
+            kernel_size=2**i, stride=2**i)(pred_waypoint_map) for i in range(1, len(features))]
+        gt_waypoints_maps_downsampled = [pred_waypoint_map] + gt_waypoints_maps_downsampled
+        
+        # traj loss
+        traj_input = [torch.cat([feature, goal], dim=1) for feature, goal in zip(
+            features, gt_waypoints_maps_downsampled)]
+        pred_traj_map = model.pred_traj(traj_input)
+        traj_loss = criterion(pred_traj_map, gt_future_map) * loss_scale  
+        
+        return goal_loss, traj_loss
+
     def prepare_data(
         self, df, image_path, dataset_name, mode, obs_len, pred_len, 
         resize_factor, use_raw_data, fine_tune=False):

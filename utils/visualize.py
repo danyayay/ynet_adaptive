@@ -1,6 +1,7 @@
 import os
 import cv2
 import glob
+import torch 
 import pathlib
 import argparse
 import numpy as np
@@ -849,6 +850,59 @@ def plot_importance_analysis(
                     ade_tuned_mean, fde_tuned_mean, ade_tuned_std, fde_tuned_std, 
                     out_dir+'/scenes', plot_err_bar=True
                 )
+
+
+def plot_saliency_maps(
+    input, grad_input, saliency_name, filename,
+    out_dir='figures/saliency_maps', format='png'):
+    # TODO: add observations and predictions...
+    # ## plot for one sample
+    scene_id, meta_id = filename.split('__')[1], filename.split('__')[2]
+    _, _, height, width = input.shape
+    fig, axes = plt.subplots(1, 2, figsize=(width/100*2+1, height/100))
+
+    # format
+    if torch.is_tensor(input):
+        input = input.cpu().detach().numpy()
+    if torch.is_tensor(grad_input):
+        grad_input = grad_input.cpu().detach().numpy()
+    
+    # switch channels
+    blue, green, red = input[0][0], input[0][1], input[0][2]
+    raw_img = np.empty((height, width, 3))
+    raw_img[:, :, 0] = red
+    raw_img[:, :, 1] = green 
+    raw_img[:, :, 2] = blue 
+    raw_img = (raw_img - input[0].min()) / (input[0].max() - input[0].min())
+
+    # plot raw image
+    axes[0].imshow(raw_img)
+    axes[0].set_title(f'{scene_id}: {meta_id}')
+    
+    # plot grad 
+    grad_img = grad_input.sum(axis=(0, 1))
+    grad_img[grad_img < 0] = 0  
+    # grad_img = (grad_img - grad_img.min()) / (grad_img.max() - grad_img.min())
+    im = axes[1].imshow(grad_img, cmap='gray_r')
+    axes[1].set_title(saliency_name)
+    plt.colorbar(im, ax=axes.ravel().tolist(), shrink=0.9)
+
+    out_path = os.path.join(out_dir, f'{filename}.{format}')
+    pathlib.Path(out_dir).mkdir(parents=True, exist_ok=True)
+    plt.savefig(out_path, bbox_inches='tight')
+    plt.close(fig)
+    print(f'Saved {out_path}') 
+
+    # plot overlay 
+    fig, ax = plt.subplots(1, 1, figsize=(width/100, height/100))
+    ax.imshow(raw_img)
+    ax.imshow(grad_img, cmap='copper', alpha=0.5)
+    ax.set_title(f'{scene_id}: {saliency_name}')
+
+    out_path = os.path.join(out_dir, f'{filename}__overlay.{format}')
+    plt.savefig(out_path, bbox_inches='tight')
+    plt.close(fig)
+    print(f'Saved {out_path}') 
 
 
 if __name__ == "__main__":
