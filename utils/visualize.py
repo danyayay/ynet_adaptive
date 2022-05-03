@@ -404,7 +404,7 @@ def plot_trajectories_scenes_overlay(image_path, df_biker, df_ped, out_dir='figu
         scene_biker = df_biker[df_biker.sceneId == scene_id]
         scene_ped = df_ped[df_ped.sceneId == scene_id]
         height, width = scene_images[scene_id].shape[0], scene_images[scene_id].shape[1]
-        fig = plt.figure(figsize=(height/100, width/100))
+        fig = plt.figure(figsize=(height/50, width/50))
         plt.imshow(scene_images[scene_id])
         ms = 2
         for _, traj in scene_biker.groupby('metaId'):
@@ -855,7 +855,6 @@ def plot_importance_analysis(
 def plot_saliency_maps(
     input, grad_input, saliency_name, filename,
     out_dir='figures/saliency_maps', format='png'):
-    # TODO: add observations and predictions...
     # ## plot for one sample
     scene_id, meta_id = filename.split('__')[1], filename.split('__')[2]
     _, _, height, width = input.shape
@@ -903,6 +902,11 @@ def plot_saliency_maps(
     plt.savefig(out_path, bbox_inches='tight')
     plt.close(fig)
     print(f'Saved {out_path}') 
+
+
+def plot_saliency_maps_side_by_side():
+    pass 
+
 
 
 if __name__ == "__main__":
