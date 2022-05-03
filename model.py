@@ -116,9 +116,9 @@ class YNetDecoder(nn.Module):
         # The center layer (the layer with the smallest feature map size)
         self.center = nn.Sequential(
             nn.Conv2d(center_channels, center_channels*2, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1)),
-            nn.ReLU(inplace=True),
+            nn.ReLU(inplace=False),
             nn.Conv2d(center_channels*2, center_channels*2, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1)),
-            nn.ReLU(inplace=True)
+            nn.ReLU(inplace=False)
         )
 
         # Determine the upsample channel dimensions
@@ -138,9 +138,9 @@ class YNetDecoder(nn.Module):
         self.decoder = nn.ModuleList([
             nn.Sequential(
                 nn.Conv2d(in_channels_, out_channels_, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1)),
-                nn.ReLU(inplace=True),
+                nn.ReLU(inplace=False),
                 nn.Conv2d(out_channels_, out_channels_, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1)),
-                nn.ReLU(inplace=True))
+                nn.ReLU(inplace=False))
             for in_channels_, out_channels_ in zip(in_channels, out_channels)]
         )
 
@@ -510,7 +510,8 @@ class YNetTrainer:
         return self._forward_test(df_test, image_path, require_input_grad, noisy_std_frac, **self.params)
 
     def _forward_test(
-        self, df_test, image_path, require_input_grad, noisy_std_frac,
+        self, df_test, image_path, 
+        require_input_grad, noisy_std_frac, decision,
         dataset_name, obs_len, pred_len, resize_factor, 
         use_raw_data, waypoints, kernlen, nsig, loss_scale, **kwargs):
 
@@ -535,28 +536,48 @@ class YNetTrainer:
                     noisy_scene_img = scene_raw_img + scene_raw_img.new(scene_raw_img.size()).normal_(0, std)
                     noisy_scene_img.requires_grad = True
                     # forward 
-                    goal_loss, traj_loss = self._forward_batch(
-                        noisy_scene_img, traj, input_template, gt_template, criterion, 
-                        obs_len, pred_len, waypoints, loss_scale, self.device)
+                    if decision == 'loss':
+                        goal_loss, traj_loss = self._forward_batch(
+                            noisy_scene_img, traj, input_template, gt_template, criterion, 
+                            obs_len, pred_len, waypoints, loss_scale, self.device, False)
+                    elif decision == 'map':
+                        pred_goal_map, pred_traj_map = self._forward_batch(
+                            noisy_scene_img, traj, input_template, gt_template, criterion, 
+                            obs_len, pred_len, waypoints, loss_scale, self.device, True)
+                    else:
+                        raise ValueError(f'No support for decision={decision}')
                 else:
                     # require grad for input or not
                     scene_raw_img.requires_grad = False 
                     if require_input_grad: scene_raw_img.requires_grad = True
                     # forward 
-                    goal_loss, traj_loss = self._forward_batch(
-                        scene_raw_img, traj, input_template, gt_template, criterion, 
-                        obs_len, pred_len, waypoints, loss_scale, self.device)
+                    if decision == 'loss':
+                        goal_loss, traj_loss = self._forward_batch(
+                            scene_raw_img, traj, input_template, gt_template, criterion, 
+                            obs_len, pred_len, waypoints, loss_scale, self.device, False)
+                    elif decision == 'map':
+                        pred_goal_map, pred_traj_map = self._forward_batch(
+                            scene_raw_img, traj, input_template, gt_template, criterion, 
+                            obs_len, pred_len, waypoints, loss_scale, self.device, True)
+                    else:
+                        raise ValueError(f'No support for decision={decision}')
         else:
             raise ValueError(f'Received more than 1 batch ({len(test_loader)})')
         
-        if noisy_std_frac is not None:
-            return goal_loss, traj_loss, scene_raw_img, noisy_scene_img
-        else:
-            return goal_loss, traj_loss, scene_raw_img 
+        if decision == 'loss':
+            if noisy_std_frac is not None:
+                return goal_loss, traj_loss, scene_raw_img, noisy_scene_img
+            else:
+                return goal_loss, traj_loss, scene_raw_img 
+        elif decision == 'map':
+            if noisy_std_frac is not None:
+                return pred_goal_map, pred_traj_map, scene_raw_img, noisy_scene_img
+            else:
+                return pred_goal_map, pred_traj_map, scene_raw_img
 
     def _forward_batch(
         self, scene_raw_img, traj, input_template, gt_template, criterion, 
-        obs_len, pred_len, waypoints, loss_scale, device):
+        obs_len, pred_len, waypoints, loss_scale, device, return_pred_map):
         
         # model 
         model = self.model.to(self.device)
@@ -597,6 +618,8 @@ class YNetTrainer:
         pred_traj_map = model.pred_traj(traj_input)
         traj_loss = criterion(pred_traj_map, gt_future_map) * loss_scale  
         
+        if return_pred_map:
+            return pred_goal_map, pred_traj_map
         return goal_loss, traj_loss
 
     def prepare_data(

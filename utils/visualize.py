@@ -854,7 +854,8 @@ def plot_importance_analysis(
 
 def plot_saliency_maps(
     input, grad_input, saliency_name, filename,
-    out_dir='figures/saliency_maps', format='png'):
+    out_dir='figures/saliency_maps', format='png', 
+    side_by_side=True, best_points=None):
     # ## plot for one sample
     scene_id, meta_id = filename.split('__')[1], filename.split('__')[2]
     _, _, height, width = input.shape
@@ -866,7 +867,7 @@ def plot_saliency_maps(
     if torch.is_tensor(grad_input):
         grad_input = grad_input.cpu().detach().numpy()
     
-    # switch channels
+    # prepare input and switch channels
     blue, green, red = input[0][0], input[0][1], input[0][2]
     raw_img = np.empty((height, width, 3))
     raw_img[:, :, 0] = red
@@ -874,30 +875,36 @@ def plot_saliency_maps(
     raw_img[:, :, 2] = blue 
     raw_img = (raw_img - input[0].min()) / (input[0].max() - input[0].min())
 
-    # plot raw image
-    axes[0].imshow(raw_img)
-    axes[0].set_title(f'{scene_id}: {meta_id}')
-    
-    # plot grad 
+    # prepare grad 
     grad_img = grad_input.sum(axis=(0, 1))
     grad_img[grad_img < 0] = 0  
     # grad_img = (grad_img - grad_img.min()) / (grad_img.max() - grad_img.min())
-    im = axes[1].imshow(grad_img, cmap='gray_r')
-    axes[1].set_title(saliency_name)
-    plt.colorbar(im, ax=axes.ravel().tolist(), shrink=0.9)
-
-    out_path = os.path.join(out_dir, f'{filename}.{format}')
     pathlib.Path(out_dir).mkdir(parents=True, exist_ok=True)
-    plt.savefig(out_path, bbox_inches='tight')
-    plt.close(fig)
-    print(f'Saved {out_path}') 
+
+    if side_by_side:
+        # plot raw image
+        axes[0].imshow(raw_img)
+        axes[0].set_title(f'{scene_id}: {meta_id}')
+        # plot grad
+        if best_points is not None:
+            plt.scatter(best_points[0], best_points[1], c='r', marker='*')
+        im = axes[1].imshow(grad_img, cmap='gray_r')
+        axes[1].set_title(saliency_name)
+        plt.colorbar(im, ax=axes.ravel().tolist(), shrink=0.9)
+        # save 
+        out_path = os.path.join(out_dir, f'{filename}.{format}')
+        plt.savefig(out_path, bbox_inches='tight')
+        plt.close(fig)
+        print(f'Saved {out_path}') 
 
     # plot overlay 
     fig, ax = plt.subplots(1, 1, figsize=(width/100, height/100))
     ax.imshow(raw_img)
     ax.imshow(grad_img, cmap='copper', alpha=0.5)
-    ax.set_title(f'{scene_id}: {saliency_name}')
-
+    if best_points is not None:
+        plt.scatter(best_points[0], best_points[1], c='r', marker='*')
+    ax.set_title(f'{meta_id}({scene_id}): {saliency_name}')
+    # save 
     out_path = os.path.join(out_dir, f'{filename}__overlay.{format}')
     plt.savefig(out_path, bbox_inches='tight')
     plt.close(fig)
