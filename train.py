@@ -23,6 +23,7 @@ with open(os.path.join('config', 'sdd_raw_train.yaml')) as file:
     params = yaml.load(file, Loader=yaml.FullLoader)
 
 params['segmentation_model_fp'] = os.path.join(args.data_dir, args.dataset_name, 'segmentation_model.pth')
+params['share_val_test'] = True
 params.update(vars(args))
 # set lr depending on the model
 # if args.train_net == 'modulator': params['lr'] = 0.01
@@ -37,7 +38,8 @@ DATA_PATH = os.path.join(args.data_dir, args.dataset_name, args.dataset_path)
 if args.train_files == args.val_files:
     # train_files and val_files are fully overlapped 
     df_train, df_val, df_test = dataset_split(
-        DATA_PATH, args.train_files, args.val_ratio, args.n_leftouts)
+        DATA_PATH, args.train_files, args.val_ratio, args.n_leftouts, 
+        share_val_test=params['share_val_test'])
 else:
     # train_files and val_files are fully non-overlapped
     df_train, _, df_test = dataset_split(
@@ -45,7 +47,7 @@ else:
     df_val = pd.concat([pd.read_pickle(os.path.join(DATA_PATH, val_file)) for val_file in args.val_files])
 df_train = limit_samples(df_train, args.n_train_batch, args.batch_size)
 print(f"df_train: {df_train.shape}; #={df_train.shape[0]/(params['obs_len']+params['pred_len'])}")
-print(f"df_val: {df_val.shape}; #={df_val.shape[0]/(params['obs_len']+params['pred_len'])}")
+if df_val is not None: print(f"df_val: {df_val.shape}; #={df_val.shape[0]/(params['obs_len']+params['pred_len'])}")
 if df_test is not None: print(f"df_test: {df_test.shape}; #={df_test.shape[0]/(params['obs_len']+params['pred_len'])}")
 
 # ## model
@@ -69,11 +71,8 @@ EXPERIMENT_NAME += f"_train_{args.train_net}"
 print(f"Experiment {EXPERIMENT_NAME} has started")
 
 # ## training
-# TODO: why df_val is exposed to training while final evaluation uses df_val during finetuning
 print('############ Train model ##############')
 val_ade, val_fde = model.train(df_train, df_val, IMAGE_PATH, IMAGE_PATH, EXPERIMENT_NAME)
-print(f'val_ade: {val_ade}, val_fde: {val_fde}')
-print(f'val_ade: {np.min(np.array(val_ade))}, val_fde: {np.min(np.array(val_fde))}')
 
 # test for leftout data 
 if args.out_csv_dir and args.n_leftouts:

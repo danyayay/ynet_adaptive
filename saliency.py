@@ -171,6 +171,7 @@ def main(args):
                 model = YNetTrainer(params=params)
                 model.load(ckpt)
                 model.model.eval()
+                # TODO: for FT, traj-related plots mostly have errors when placing the most likely position 
 
                 # select data
                 for meta_id in meta_ids_focus:
@@ -197,11 +198,13 @@ def main(args):
                             side_by_side=False, best_points=max_traj_indice)
 
                     if args.SmoothGrad:
+                        # different std may lead to different most likely point 
                         for std_frac in [0.1, 0.15, 0.2, 0.25]:
                             for i in range(args.n_smooth):
                                 pred_goal_map, pred_traj_map, input, noisy_input = model.forward_test(
                                     df_meta, IMAGE_PATH, require_input_grad=True, noisy_std_frac=std_frac)
                                 # find the most likely position 
+                                # TODO: the most likely points are changing for n_smooth
                                 max_goal_point, max_goal_indice = get_most_likely_point(pred_goal_map)
                                 max_traj_point, max_traj_indice = get_most_likely_point(pred_traj_map)
                                 # get gradient 
@@ -254,16 +257,16 @@ def main(args):
                             if 'traj_decoder' not in layer_name: 
                                 max_goal_point.backward(retain_graph=True)
                                 L_goal = torch.relu((layer.dydA * layer.A).sum(1, keepdim = True))
-                                L_goal = F.interpolate(L_goal, size = (input.size(2), input.size(3)), 
-                                    mode = 'bilinear', align_corners = False)
+                                L_goal = F.interpolate(L_goal, size=(input.size(2), input.size(3)), 
+                                    mode = 'bilinear', align_corners=False)
                                 plot_saliency_maps(input, L_goal, 'grad_cam', 
                                     f'{ckpt_name}__{scene_id}__{meta_id}__grad_cam__{layer_name}__goal', 
                                     f'figures/saliency_maps/{folder_name}/{args.decision}/{meta_id}', 
                                     side_by_side=False, best_points=max_goal_indice)
                             max_traj_point.backward()
                             L_traj = torch.relu((layer.dydA * layer.A).sum(1, keepdim = True))
-                            L_traj = F.interpolate(L_traj, size = (input.size(2), input.size(3)), 
-                                mode = 'bilinear', align_corners = False)
+                            L_traj = F.interpolate(L_traj, size=(input.size(2), input.size(3)), 
+                                mode = 'bilinear', align_corners=False)
                             plot_saliency_maps(input, L_traj, 'grad_cam', 
                                 f'{ckpt_name}__{scene_id}__{meta_id}__grad_cam__{layer_name}__traj', 
                                 f'figures/saliency_maps/{folder_name}/{args.decision}/{meta_id}', 
@@ -316,4 +319,5 @@ if __name__ == '__main__':
 
 
 # python -m pdb saliency.py --dataset_path filter/agent_type/ --ckpts ckpts/Seed_1_Train__Pedestrian__Val__Pedestrian__Val_Ratio_0.1_filter_agent_type__train_all_weights.pt --ckpts_name OODG --files Biker.pkl --n_leftouts 10 --meta_id 22796 --decision map --VanillaGrad
+
 # python -m pdb saliency.py --dataset_path filter/agent_type/ --ckpts ckpts/Seed_1_Train__Pedestrian__Val__Pedestrian__Val_Ratio_0.1_filter_agent_type__train_all_weights.pt ckpts/Seed_1_Train__Biker__Val__Biker__Val_Ratio_0.1_filter_agent_type__train_all_FT_weights.pt ckpts/Seed_1_Train__Biker__Val__Biker__Val_Ratio_0.1_filter_agent_type__train_encoder_weights.pt --ckpts_name OODG FT ET --files Biker.pkl --n_leftouts 10 --meta_id 22796 --VanillaGrad --SmoothGrad --GradCAM

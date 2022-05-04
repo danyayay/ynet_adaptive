@@ -780,12 +780,16 @@ def filter_long_tail_df(df_varfs, varf_list, n=3):
     return df_varfs_filter, p_filter
 
 
-def dataset_split(data_path, train_files, val_ratio, n_leftouts):
+def dataset_split(data_path, train_files, val_ratio, n_leftouts, by_order='True', share_val_test=False):
     print(f"Split {train_files} given val_ratio={val_ratio}, n_leftout={n_leftouts}")
     df_train, df_val, df_test = pd.DataFrame([]), pd.DataFrame([]), pd.DataFrame([])
     for train_file, n_leftout in zip(train_files, n_leftouts):
         df_train_ = pd.read_pickle(os.path.join(data_path, train_file))
-        df_train_, df_val_, df_test_ = split_df(df_train_, val_ratio, n_leftout)
+        if by_order:
+            df_train_, df_val_, df_test_ = split_df_by_order(
+                df_train_, val_ratio, n_leftout, share_val_test)
+        else:
+            df_train_, df_val_, df_test_ = split_df(df_train_, val_ratio, n_leftout)
         df_train = pd.concat([df_train, df_train_])
         df_val = pd.concat([df_val, df_val_])
         if df_test_ is not None:
@@ -811,6 +815,41 @@ def split_df(df, val_ratio, n_test=None, shuffle=False):
         df_test = None
     df_train = reduce_df_meta_ids(df, train_meta_ids)
     df_val = reduce_df_meta_ids(df, val_meta_ids)
+    return df_train, df_val, df_test
+
+
+def split_df_by_order(df, val_ratio, n_test=None, share_val_test=False, shuffle=False):
+    # idx
+    unique_meta_ids = np.unique(df["metaId"])
+    if shuffle:
+        print('Shuffling raw data')
+        np.random.shuffle(unique_meta_ids)
+    n_metaId = unique_meta_ids.shape[0]
+    n_val = int(val_ratio * n_metaId)
+    # split
+    if n_test:
+        if share_val_test:
+            n_train = n_metaId - n_test 
+            train_meta_ids, test_meta_ids = np.split(unique_meta_ids, [n_train])
+            if n_val != 0:
+                interval = n_test // n_val if n_test // n_val > 1 else 3
+                val_meta_ids = test_meta_ids[::interval]
+                df_val = reduce_df_meta_ids(df, val_meta_ids)
+            else:
+                df_val = None
+            df_test = reduce_df_meta_ids(df, test_meta_ids)
+        else:
+            n_train = n_metaId - n_val - n_test 
+            train_meta_ids, val_meta_ids, test_meta_ids = np.split(unique_meta_ids, [n_train, n_train + n_val])
+            df_test = reduce_df_meta_ids(df, test_meta_ids)
+            df_val = reduce_df_meta_ids(df, val_meta_ids)
+    else:
+        n_train = n_metaId - n_val
+        val_meta_ids, train_meta_ids = np.split(
+            unique_meta_ids, [n_train])
+        df_test = None
+        df_val = reduce_df_meta_ids(df, val_meta_ids)
+    df_train = reduce_df_meta_ids(df, train_meta_ids)
     return df_train, df_val, df_test
 
 

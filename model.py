@@ -427,11 +427,13 @@ class YNetTrainer:
         # # Save best model
         if fine_tune:
             if train_net == 'all':
-                torch.save(best_state_dict, f'ckpts/{experiment_name}_FT__TN_{str(int((df_train.shape[0])/20))}_weights.pt')
+                pt_name = f'ckpts/{experiment_name}_FT__TN_{str(int((df_train.shape[0])/20))}_weights.pt'
             else:
-                torch.save(best_state_dict, f'ckpts/{experiment_name}__TN_{str(int((df_train.shape[0])/20))}_weights.pt')
+                pt_name = f'ckpts/{experiment_name}__TN_{str(int((df_train.shape[0])/20))}_weights.pt'
+                
         else:
-            torch.save(best_state_dict, f'ckpts/{experiment_name}_weights.pt')
+            pt_name = f'ckpts/{experiment_name}_weights.pt'
+        torch.save(best_state_dict, pt_name)
 
         return self.val_ADE, self.val_FDE
 
