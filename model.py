@@ -690,9 +690,9 @@ class YNetTrainer:
         return images_dict, dataloader, homo_mat
 
     def load(self, path):
-        if self.device == 'cuda':
+        if self.device == torch.device('cuda'):
             print(self.model.load_state_dict(torch.load(path), strict=False))
-        else:  # self.device == 'cpu'
+        else:  # self.device == torch.device('cpu')
             print(self.model.load_state_dict(torch.load(path, map_location='cpu'), strict=False))
 
     def save(self, path):

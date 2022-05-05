@@ -1,3 +1,4 @@
+n_early_stop: 10
 resize_factor: 0.25  # resize factor
 viz_epoch: 10
 

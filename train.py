@@ -69,6 +69,7 @@ EXPERIMENT_NAME += f"_Val_Ratio_{args.val_ratio}"
 EXPERIMENT_NAME += f"_{(args.dataset_path).replace('/', '_')}"
 EXPERIMENT_NAME += f"_train_{args.train_net}"
 print(f"Experiment {EXPERIMENT_NAME} has started")
+# TODO: modify experiment name 
 
 # ## training
 print('############ Train model ##############')
