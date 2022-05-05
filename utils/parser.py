@@ -30,4 +30,21 @@ def get_parser(train):
         parser.add_argument("--n_train_batch", default=None, type=int, help="Limited number of batches for each training agent (fine-tuning), None means no limit (training)")
         parser.add_argument("--fine_tune", action="store_true")
         parser.add_argument("--lr", default=0.0001, type=float)
+        parser.add_argument("--steps", default=[20], type=int, nargs='+')
+        parser.add_argument("--lr_decay_ratio", default=0.1)
+        parser.add_argument("--epsilon", default=1e-3)
     return parser.parse_args()
+
+
+def get_parser_(train):
+    parser = get_general_parser()
+    if train:
+        parser.add_argument("--n_epoch", default=1, type=int)
+        parser.add_argument("--train_files", default=["0.25_0.75.pkl", "1.25_1.75.pkl", "2.25_2.75.pkl"], type=str, nargs="+")
+        parser.add_argument("--n_train_batch", default=None, type=int, help="Limited number of batches for each training agent (fine-tuning), None means no limit (training)")
+        parser.add_argument("--fine_tune", action="store_true")
+        parser.add_argument("--lr", default=0.0001, type=float)
+        parser.add_argument("--steps", default=[20], type=int, nargs='+')
+        parser.add_argument("--lr_decay_ratio", default=0.1)
+        parser.add_argument("--epsilon", default=1e-3)
+    return parser
