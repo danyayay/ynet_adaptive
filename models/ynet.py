@@ -108,11 +108,18 @@ class YNetEncoder(nn.Module):
                     x = self.adapters[j](x)
                     j += 1
             elif self.adapter_type == 'parallel':
-                y = stage(x)
-                if i in self.adapter_position:
-                    y = y + self.adapters[j](x)
-                    j += 1
-                x = y 
+                if isinstance(stage[0], nn.MaxPool2d):
+                    y = stage[0](x)
+                    x = stage(x)
+                    if i in self.adapter_position:
+                        x = x + self.adapters[j](y)
+                        j += 1
+                else:
+                    y = stage(x)
+                    if i in self.adapter_position:
+                        y = y + self.adapters[j](x)
+                        j += 1
+                    x = y
             else:
                 x = stage(x)
             features.append(x)
@@ -200,7 +207,7 @@ class YNet(nn.Module):
         self, obs_len, pred_len, segmentation_model_fp, 
         use_features_only=False, n_semantic_classes=6,
         encoder_channels=[], decoder_channels=[], n_waypoints=1, 
-        adapter_type=None, adapter_position=None):
+        adapter_type=None, adapter_position=None, adapter_initialization='zero'):
         """
         Complete Y-net Architecture including semantic segmentation backbone, heatmap embedding and ConvPredictor
         :param obs_len: int, observed timesteps
@@ -233,7 +240,9 @@ class YNet(nn.Module):
             adapter_type=adapter_type, adapter_position=adapter_position)
 
         # initialize as 0
-        torch.nn.init.zeros_(self.encoder.adapters[0].adapter_layer.weight)
+        if adapter_initialization == 'zero':
+            for n, p in self.encoder.adapters.named_parameters():
+                torch.nn.init.zeros_(p)
 
         self.goal_decoder = YNetDecoder(encoder_channels, decoder_channels, output_len=pred_len)
         self.traj_decoder = YNetDecoder(encoder_channels, decoder_channels, output_len=pred_len, traj=n_waypoints)

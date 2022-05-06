@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from utils.image_utils import get_patch, image2world
+from utils.image_utils import get_patch
 
 
 def train_epoch(
