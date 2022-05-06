@@ -1,3 +1,4 @@
+from collections import OrderedDict
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
@@ -5,14 +6,13 @@ from tqdm import tqdm
 import numpy as np
 from copy import deepcopy
 
+from models.ynet import YNet
 from utils.train import train_epoch
 from utils.dataset import augment_data, create_images_dict
 from utils.image_utils import create_gaussian_heatmap_template, create_dist_mat, get_patch, \
     preprocess_image_for_segmentation, pad, resize
 from utils.dataloader import SceneDataset, scene_collate
 from utils.evaluate import evaluate
-
-from models.ynet import YNet
 
 
 class YNetTrainer:
@@ -42,7 +42,8 @@ class YNetTrainer:
             decoder_channels=params['decoder_channels'],
             n_waypoints=len(params['waypoints']),
             adapter_type=params['adapter_type'], 
-            adapter_position=params['adapter_position']
+            adapter_position=params['adapter_position'],
+            adapter_initialization=params['adapter_initialization']
         )
     
     def train(self, df_train, df_val, train_image_path, val_image_path, experiment_name):
@@ -158,7 +159,7 @@ class YNetTrainer:
                 best_state_dict = deepcopy(model.state_dict())
 
             if e % save_every_n == 0 and not fine_tune:
-                torch.save(model.state_dict(), f'ckpts/{experiment_name}_weights_epoch_{e}.pt')
+                self.save_params(f'ckpts/{experiment_name}_epoch_{e}.pt', train_net)
 
             # early stop in case of clear overfitting
             if best_val_ADE < min(self.val_ADE[-n_early_stop:]):
@@ -169,9 +170,8 @@ class YNetTrainer:
         model.load_state_dict(best_state_dict, strict=True)
 
         # Save the best model
-        pt_name = f'ckpts/{experiment_name}_weights.pt'
-        torch.save(best_state_dict, pt_name)
-        # TODO: for train_net == adapter, save only the adapters... 
+        pt_path = f'ckpts/{experiment_name}.pt'
+        self.save_params(pt_path, train_net)
 
         return self.val_ADE, self.val_FDE
 
@@ -427,13 +427,21 @@ class YNetTrainer:
 
         return images_dict, dataloader, homo_mat
 
-    def load(self, path):
+    def load_params(self, path):
         if self.device == torch.device('cuda'):
-            print(self.model.load_state_dict(torch.load(path), strict=False))
+            self.model.load_state_dict(torch.load(path), strict=False)
             print('Loaded ynet model to GPU')
         else:  # self.device == torch.device('cpu')
-            print(self.model.load_state_dict(torch.load(path, map_location='cpu'), strict=False))
+            self.model.load_state_dict(torch.load(path, map_location='cpu'), strict=False)
             print('Loaded ynet model to CPU')
 
-    def save(self, path):
-        torch.save(self.model.state_dict(), path)
+    def save_params(self, path, train_net):
+        if train_net == 'all':
+            state_dict = self.model.state_dict()
+        else:
+            # save parameters with requires_grad = True
+            state_dict = OrderedDict()
+            for param_name, param in self.model.named_parameters():
+                if param.requires_grad:
+                    state_dict[param_name] = param 
+        torch.save(state_dict, path)
