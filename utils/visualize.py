@@ -460,6 +460,38 @@ def plot_obs_pred_trajs(image_path, dict_trajs, out_dir='figures/prediction', fo
         print(f'Saved {out_path}')
 
 
+def plot_prediction(image_path, ckpt_trajs_dict, out_dir='figures/prediction', format='png', obs_len=8):
+    first_dict = ckpt_trajs_dict[list(ckpt_trajs_dict)[0]]
+    scene_images = create_images_dict(first_dict['sceneId'], image_path, 'reference.jpg', True)
+    for i, meta_id in enumerate(first_dict['metaId']):
+        scene_id = first_dict['sceneId'][i]
+        scene_image = scene_images[scene_id]
+        fig = plt.figure(figsize=(scene_image.shape[0]/100, scene_image.shape[1]/100))
+        plt.imshow(scene_image)
+        ms = 4
+        breakpoint()
+        for j, (ckpt_name, trajs_dict) in enumerate(ckpt_trajs_dict.items()):
+            gt_traj = trajs_dict['groundtruth'][i]
+            pred_traj = trajs_dict['prediction'][i]
+            if j == 0:
+                plt.plot(gt_traj[:obs_len,0], gt_traj[:obs_len,1], 
+                    '.-', ms=ms, c='black')
+                plt.plot(gt_traj[(obs_len-1):,0], gt_traj[(obs_len-1):,1], 
+                    '.-', ms=ms, c='black', label='groundtruth')
+            pred_x = np.insert(pred_traj[:,0], 0, gt_traj[obs_len-1,0])
+            pred_y = np.insert(pred_traj[:,1], 0, gt_traj[obs_len-1,1])
+            plt.plot(pred_x, pred_y, '.-', ms=ms, label=ckpt_name)
+        title = f'meta_id={meta_id}, scene_id={scene_id}'
+        plt.title(title)
+        plt.legend(loc='best')
+        pathlib.Path(out_dir).mkdir(parents=True, exist_ok=True)
+        out_name = f'{meta_id}__{scene_id}'
+        out_path = os.path.join(out_dir, out_name + '.'+ format)
+        plt.savefig(out_path, bbox_inches='tight')
+        plt.close(fig)
+        print(f'Saved {out_path}')
+
+
 def plot_decoder_overlay(image_path, dict_features, out_dir='figures/decoder', format='png', resize_factor=0.25):
     # take decoder name 
     first_ckpt_dict = dict_features[list(dict_features)[0]]
@@ -855,7 +887,7 @@ def plot_importance_analysis(
 def plot_saliency_maps(
     input, grad_input, saliency_name, filename,
     out_dir='figures/saliency_maps', format='png', 
-    side_by_side=True, best_points=None):
+    side_by_side=True, best_point=None):
     # ## plot for one sample
     scene_id, meta_id = filename.split('__')[1], filename.split('__')[2]
     _, _, height, width = input.shape
@@ -886,8 +918,8 @@ def plot_saliency_maps(
         axes[0].imshow(raw_img)
         axes[0].set_title(f'{scene_id}: {meta_id}')
         # plot grad
-        if best_points is not None:
-            plt.scatter(best_points[0], best_points[1], c='r', marker='*')
+        if best_point is not None:
+            plt.scatter(best_point[0], best_point[1], c='r', marker='*')
         im = axes[1].imshow(grad_img, cmap='gray_r')
         axes[1].set_title(saliency_name)
         plt.colorbar(im, ax=axes.ravel().tolist(), shrink=0.9)
@@ -897,12 +929,12 @@ def plot_saliency_maps(
         plt.close(fig)
         print(f'Saved {out_path}') 
 
-    # plot overlay 
+    # plot overlay
     fig, ax = plt.subplots(1, 1, figsize=(width/100, height/100))
-    ax.imshow(raw_img)
+    ax.imshow(raw_img) # num of y, num of x
     ax.imshow(grad_img, cmap='copper', alpha=0.5)
-    if best_points is not None:
-        plt.scatter(best_points[0], best_points[1], c='r', marker='*')
+    if best_point is not None:
+        plt.scatter(best_point[0], best_point[1], c='r', marker='*') 
     ax.set_title(f'{meta_id}({scene_id}): {saliency_name}')
     # save 
     out_path = os.path.join(out_dir, f'{filename}__overlay.{format}')
