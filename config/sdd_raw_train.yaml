@@ -1,6 +1,6 @@
 # train 
 save_every_n: 10
-n_early_stop: 10
+n_early_stop: 30
 resize_factor: 0.25  # resize factor
 viz_epoch: 10
 

@@ -112,7 +112,6 @@ class YNetTrainer:
                         param.requires_grad = True
             else:
                 raise ValueError(f'No support for train_net={train_net}')
-
         optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
         lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=steps, gamma=lr_decay_ratio)
@@ -210,19 +209,18 @@ class YNetTrainer:
 
         self.eval_ADE = []
         self.eval_FDE = []
-        list_metrics, list_features, list_trajs = [], [], []
+        list_metrics, list_trajs = [], []
 
         print("TTST setting:", use_TTST)
         print('Start testing')
         for e in tqdm(range(n_round), desc='Round'):
             if return_features:
-                test_ADE, test_FDE, df_metrics, features_dict, trajs_dict = evaluate(
+                test_ADE, test_FDE, df_metrics, trajs_dict = evaluate(
                     model, test_loader, test_images, self.device, 
                     dataset_name, self.homo_mat, input_template, waypoints, 'test',
                     n_goal, n_traj, obs_len, batch_size, resize_factor, with_style,
                     temperature, use_TTST, use_CWS, rel_threshold, CWS_params,
                     True, viz_input)
-                list_features.append(features_dict)
                 list_trajs.append(trajs_dict)
             else:
                 test_ADE, test_FDE, df_metrics = evaluate(
@@ -242,7 +240,7 @@ class YNetTrainer:
             f'\nAverage performance (by {n_round}): \nTest ADE: {avg_ade} \nTest FDE: {avg_fde}')
 
         if return_features:
-            return avg_ade, avg_fde, list_metrics, list_features, list_trajs
+            return avg_ade, avg_fde, list_metrics, list_trajs
         else:
             return avg_ade, avg_fde, list_metrics
     
@@ -445,3 +443,14 @@ class YNetTrainer:
                 if param.requires_grad:
                     state_dict[param_name] = param 
         torch.save(state_dict, path)
+
+    def load_separated_params(self, pretrained_path, tuned_path):
+        if self.device == torch.device('cuda'):
+            self.model.load_state_dict(torch.load(pretrained_path), strict=False)
+            self.model.load_state_dict(torch.load(tuned_path), strict=False)
+            print('Loaded ynet model to GPU')
+        else:  # self.device == torch.device('cpu')
+            self.model.load_state_dict(torch.load(pretrained_path, map_location='cpu'), strict=False)
+            self.model.load_state_dict(torch.load(tuned_path, map_location='cpu'), strict=False)
+            print('Loaded ynet model to CPU')
+        

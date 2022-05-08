@@ -58,7 +58,7 @@ def main(args):
     else:
         print("Training from scratch")
 
-    # experiment name 
+    # ## experiment name 
     EXPERIMENT_NAME = ""
     EXPERIMENT_NAME += f"Seed_{args.seed}_"
     EXPERIMENT_NAME += f"_Tr{'_'.join(['_'+f.split('.pkl')[0] for f in args.train_files])}_"
@@ -76,18 +76,18 @@ def main(args):
     print(f"Experiment {EXPERIMENT_NAME} has started")
 
     # ## training
-    # print('############ Train model ##############')
-    # val_ade, val_fde = model.train(df_train, df_val, IMAGE_PATH, IMAGE_PATH, EXPERIMENT_NAME)
+    print('############ Train model ##############')
+    val_ade, val_fde = model.train(df_train, df_val, IMAGE_PATH, IMAGE_PATH, EXPERIMENT_NAME)
 
-    # # test for leftout data 
-    # if params['out_csv_dir'] and args.n_leftouts:
-    #     print('############ Test leftout data ##############')
-    #     set_random_seeds(args.seed)
-    #     # test
-    #     test_ade, test_fde, _ = model.test(df_test, IMAGE_PATH, args.train_net == "modulator")
-    #     # save csv results
-    #     out_dir = get_out_dir(params['out_csv_dir'], args.dataset_path, args.seed, args.train_net, args.val_files, args.train_files)
-    #     write_csv(out_dir, 'fine_tune.csv', val_ade, val_fde, test_ade, test_fde)
+    # test for leftout data 
+    if params['out_csv_dir'] and args.n_leftouts:
+        print('############ Test leftout data ##############')
+        set_random_seeds(args.seed)
+        # test
+        test_ade, test_fde, _ = model.test(df_test, IMAGE_PATH, args.train_net == "modulator")
+        # save csv results
+        out_dir = get_out_dir(params['out_csv_dir'], args.dataset_path, args.seed, args.train_net, args.val_files, args.train_files)
+        write_csv(out_dir, 'fine_tune.csv', val_ade, val_fde, test_ade, test_fde)
 
     toc = time.time()
     print(time.strftime("%Hh%Mm%Ss", time.gmtime(toc - tic)))
@@ -99,6 +99,6 @@ if __name__ == '__main__':
 
     main(args)
 
-# python -m pdb train_adapter.py --fine_tune --seed 1 --batch_size 8 --n_epoch 10 --dataset_path filter/agent_type/deathCircle_0/ --train_files Biker.pkl --val_files Biker.pkl --val_ratio 0.1 --n_leftouts 100 --pretrained_ckpt ckpts/Seed_1_Train__Pedestrian__Val__Pedestrian__Val_Ratio_0.1_filter_agent_type__train_all_weights.pt --lr 0.00005 --n_train_batch 1 --train_net adapter --adapter_type parallel --adapter_position 0
+# python -m pdb train.py --fine_tune --seed 1 --batch_size 8 --n_epoch 10 --dataset_path filter/agent_type/deathCircle_0/ --train_files Biker.pkl --val_files Biker.pkl --val_ratio 0.1 --n_leftouts 100 --pretrained_ckpt ckpts/Seed_1_Train__Pedestrian__Val__Pedestrian__Val_Ratio_0.1_filter_agent_type__train_all_weights.pt --lr 0.00005 --n_train_batch 1 --train_net adapter --adapter_type parallel --adapter_position 0
 
-# python -m pdb train_adapter.py --fine_tune --seed 1 --batch_size 10 --n_epoch 10 --dataset_path filter/agent_type/deathCircle_0/ --train_files Biker.pkl --val_files Biker.pkl --val_ratio 0.1 --n_leftouts 500 --n_train_batch 16 --ckpt ckpts/Seed_1_Train__Pedestrian__Val__Pedestrian__Val_Ratio_0.1_filter_agent_type__train_all_weights.pt --lr 0.00005 --train_net adapter --adapter_type serial --adapter_position 0 1 2 3 4
+# python -m pdb train.py --fine_tune --seed 1 --batch_size 10 --n_epoch 10 --dataset_path filter/agent_type/deathCircle_0/ --train_files Biker.pkl --val_files Biker.pkl --val_ratio 0.1 --n_leftouts 500 --n_train_batch 16 --ckpt ckpts/Seed_1_Train__Pedestrian__Val__Pedestrian__Val_Ratio_0.1_filter_agent_type__train_all_weights.pt --lr 0.00005 --train_net adapter --adapter_type serial --adapter_position 0 1 2 3 4

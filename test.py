@@ -35,19 +35,22 @@ def main(args):
     # ## model
     print('############ Load model ##############')
     if 'adapter' in args.tuned_ckpt:
-        _, train_net, adapter_type = args.tuned_ckpt.split('__')[5].split('_')
-        adapter_position = args.tuned_ckpt.split('__')[6]
-        params.update({'train_net': train_net, 'adapter_type': adapter_type, 'adapter_position': [int(i) for i in adapter_position.split('_')]})
+        train_net, adapter_type = args.tuned_ckpt.split('__')[5].split('_')
+        adapter_position = [int(i) for i in args.tuned_ckpt.split('__')[6].split('_')]
+        params.update({
+            'train_net': train_net, 
+            'adapter_type': adapter_type, 
+            'adapter_position': adapter_position})
     model = YNetTrainer(params=params)
 
-    if args.pretrained_ckpt is not None:
+    if args.pretrained_ckpt is not None and args.tuned_ckpt is not None:
+        model.load_separated_params(args.pretrained_ckpt, args.tuned_ckpt)
+        print(f"Loaded checkpoint {args.pretrained_ckpt} and {args.tuned_ckpt}")
+    elif args.pretrained_ckpt is not None:
         if args.train_net == "modulator":
             model.model.initialize_style()
         model.load_params(args.pretrained_ckpt)
         print(f"Loaded checkpoint {args.pretrained_ckpt}")
-        if args.tuned_ckpt is not None: 
-            model.load_params(args.tuned_ckpt)
-            print(f'Loaded checkpoint {args.tuned_ckpt}')
     else:
         raise ValueError("No checkpoint given!")
     
@@ -70,4 +73,4 @@ if __name__ == '__main__':
     main(args)
 
 
-# python -m pdb test_adapter.py --seed 1 --batch_size 10 --dataset_path filter/agent_type/deathCircle_0/ --val_files Biker.pkl --val_ratio 0.1 --n_leftouts 10 --pretrained_ckpt ckpts/Seed_1_Train__Pedestrian__Val__Pedestrian__Val_Ratio_0.1_filter_agent_type__train_all_weights.pt --tuned_ckpt ckpts/Seed_1_Train__Biker__Val__Biker__Val_Ratio_0.1_filter_agent_type_deathCircle_0__train_adapter_parallel__0__TrN_8.pt
+# python -m pdb test.py --seed 1 --batch_size 10 --dataset_path filter/agent_type/deathCircle_0/ --val_files Biker.pkl --val_ratio 0.1 --n_leftouts 10 --pretrained_ckpt ckpts/Seed_1_Train__Pedestrian__Val__Pedestrian__Val_Ratio_0.1_filter_agent_type__train_all_weights.pt --tuned_ckpt ckpts/Seed_1_Train__Biker__Val__Biker__Val_Ratio_0.1_filter_agent_type_deathCircle_0__train_adapter_parallel__0__TrN_8.pt
