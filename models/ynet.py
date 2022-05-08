@@ -240,9 +240,15 @@ class YNet(nn.Module):
             adapter_type=adapter_type, adapter_position=adapter_position)
 
         # initialize as 0
-        if adapter_initialization == 'zero':
-            for n, p in self.encoder.adapters.named_parameters():
-                torch.nn.init.zeros_(p)
+        if adapter_type == 'serial':
+            if adapter_initialization == 'zero':
+                for n, p in self.encoder.adapters.named_parameters():
+                    if n.endswith('1.weight'):
+                        torch.nn.init.zeros_(p)
+        elif adapter_type == 'parallel':
+            if adapter_initialization == 'zero':
+                for n, p in self.encoder.adapters.named_parameters():
+                    torch.nn.init.zeros_(p)
 
         self.goal_decoder = YNetDecoder(encoder_channels, decoder_channels, output_len=pred_len)
         self.traj_decoder = YNetDecoder(encoder_channels, decoder_channels, output_len=pred_len, traj=n_waypoints)
