@@ -2,7 +2,7 @@ import os
 import yaml
 import pathlib
 import argparse
-from model import YNetTrainer
+from models.trainer import YNetTrainer
 from utils.dataset import set_random_seeds, dataset_split, dataset_given_scenes
 from utils.visualize import plot_importance_analysis
 
@@ -12,17 +12,17 @@ def main(args):
     with open(os.path.join('config', 'sdd_raw_eval.yaml')) as file:
         params = yaml.load(file, Loader=yaml.FullLoader)
 
-    params['segmentation_model_fp'] = os.path.join(args.data_dir, args.dataset_name, 'segmentation_model.pth')
+    params['segmentation_model_fp'] = os.path.join(params['data_dir'], params['dataset_name'], 'segmentation_model.pth')
     params.update(vars(args))
     print(params)
 
     # ## set up data 
     print('############ Prepare dataset ##############')
     # image path 
-    IMAGE_PATH = os.path.join(args.data_dir, args.dataset_name, 'raw', 'annotations')
+    IMAGE_PATH = os.path.join(params['data_dir'], params['dataset_name'], 'raw', 'annotations')
     assert os.path.isdir(IMAGE_PATH), 'raw data dir error'
     # data path 
-    DATA_PATH = os.path.join(args.data_dir, args.dataset_name, args.dataset_path)
+    DATA_PATH = os.path.join(params['data_dir'], params['dataset_name'], args.dataset_path)
 
     # data 
     if args.n_leftouts:

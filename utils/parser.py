@@ -34,4 +34,8 @@ def get_parser(train):
         parser.add_argument("--lr", default=0.0001, type=float)
         parser.add_argument("--steps", default=[20], type=int, nargs='+')
         parser.add_argument("--lr_decay_ratio", default=0.1)
+        parser.add_argument("--share_val_test", default=True, type=bool)
+        parser.add_argument("--config_filename", default='sdd_raw_train.yaml', type=str)
+    else:
+        parser.add_argument("--config_filename", default='sdd_raw_eval.yaml', type=str)
     return parser

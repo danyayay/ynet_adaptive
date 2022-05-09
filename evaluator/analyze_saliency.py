@@ -1,42 +1,33 @@
-import os
-import yaml
 import torch
 import numpy as np
-
 import torch.nn.functional as F
 
 from models.trainer import YNetTrainer
 from utils.parser import get_parser
-from utils.dataset import reduce_df_meta_ids, set_random_seeds, dataset_split, dataset_given_scenes
-from utils.visualize import plot_saliency_maps, plot_prediction
+from utils.dataset import reduce_df_meta_ids, set_random_seeds, dataset_split, dataset_given_scenes, limit_samples
+from utils.visualize import plot_saliency_maps, plot_prediction, plot_given_trajectories_scenes_overlay
+from utils.util import get_ckpt_name, get_image_and_data_path, get_params, restore_model
 
 
 def main(args):
-    # ## configuration
-    with open(os.path.join('config', 'sdd_raw_eval.yaml')) as file:
-        params = yaml.load(file, Loader=yaml.FullLoader)
-
-    params['segmentation_model_fp'] = os.path.join(
-        params['data_dir'], params['dataset_name'], 'segmentation_model.pth')
-    params.update(vars(args))
-    print(params)
-
+    # configuration
+    set_random_seeds(args.seed)
+    params = get_params(args)
+    IMAGE_PATH, DATA_PATH = get_image_and_data_path(params)
     resize_factor = params['resize_factor']
-
-    # ## set up data 
-    print('############ Prepare dataset ##############')
-    IMAGE_PATH = os.path.join(params['data_dir'], params['dataset_name'], 'raw', 'annotations')
-    assert os.path.isdir(IMAGE_PATH), 'raw data dir error'
-    DATA_PATH = os.path.join(params['data_dir'], params['dataset_name'], args.dataset_path)
 
     # data 
     if args.n_leftouts:
-        _, _, df_test = dataset_split(DATA_PATH, args.val_files, 0, args.n_leftouts)
+        df_train, _, df_test = dataset_split(DATA_PATH, args.val_files, 0, args.n_leftouts)
     elif args.scenes:
         df_test = dataset_given_scenes(DATA_PATH, args.val_files, args.scenes)
     else:
         _, df_test, _ = dataset_split(DATA_PATH, args.val_files, 0)
-    
+    df_train = limit_samples(df_train, 2, 10)
+    folder_name = f"{args.seed}__{'_'.join(args.dataset_path.split('/'))}__{'_'.join(args.val_files).rstrip('.pkl')}" 
+    plot_given_trajectories_scenes_overlay(
+        IMAGE_PATH, df_train, f'figures/scene_with_trajs_given/{folder_name}')
+
     # select the most significant trajs
     if args.meta_ids is not None:
         meta_ids_focus = args.meta_ids
@@ -46,13 +37,11 @@ def main(args):
     print(f"df_test: {df_test.shape}; #={df_test.shape[0]/(params['obs_len']+params['pred_len'])}")
 
     # ckpts
-    load_separated_files = False 
     if args.ckpts is not None:
         ckpts, ckpts_name = args.ckpts, args.ckpts_name
     elif args.pretrained_ckpt is not None:
         ckpts = [args.pretrained_ckpt] + args.tuned_ckpts
         ckpts_name = ['OODG'] + [get_ckpt_name(ckpt) for ckpt in args.tuned_ckpts]
-        load_separated_files = True
     else:
         raise ValueError('No checkpoints provided')
 
@@ -173,20 +162,13 @@ def main(args):
     elif args.decision == 'map':
         for i, (ckpt, ckpt_name) in enumerate(zip(ckpts, ckpts_name)):
             print(f'====== Testing for {ckpt_name} ======')
-            set_random_seeds(args.seed)
+        
             # load parameters 
-            if load_separated_files and ckpt_name != 'OODG':
-                updated_params = get_adapter_info(ckpt, params)
-                model = YNetTrainer(params=updated_params)
-                model.load_separated_params(ckpts[0], ckpt)
-            else:
-                model = YNetTrainer(params=params)
-                model.load_params(ckpt)
+            model = restore_model(params, ckpt_name, args.pretrained_ckpt, ckpt)
             model.model.eval()
-            time_step = -1
-            breakpoint()
 
             # test 
+            set_random_seeds(args.seed)
             _, _, _, list_trajs = model.test(df_test, IMAGE_PATH, False, True, False)
             trajs_dict = list_trajs[0]
             ckpt_trajs_dict[ckpt_name] = trajs_dict
@@ -198,17 +180,17 @@ def main(args):
                 
                 # select trajs 
                 indice_gt, indice_pred = get_gt_pred_indice(
-                    trajs_dict, meta_id, time_step, resize_factor)
+                    trajs_dict, meta_id, args.time_step, resize_factor)
 
                 if args.VanillaGrad:
                     method_name = 'vanilla_grad'
                     pred_goal_map, pred_traj_map, input = model.forward_test(
                         df_meta, IMAGE_PATH, require_input_grad=True, noisy_std_frac=None)
                     # find the decision of interest
-                    point_goal_prob, indice_goal_prob = get_most_likely_point_and_indice(pred_goal_map, time_step)
-                    point_traj_prob, indice_traj_prob = get_most_likely_point_and_indice(pred_traj_map, time_step)
-                    point_goal_gt, point_goal_pred = get_gt_pred_point(pred_goal_map, indice_gt, indice_pred, time_step)
-                    point_traj_gt, point_traj_pred = get_gt_pred_point(pred_traj_map, indice_gt, indice_pred, time_step)
+                    point_goal_prob, indice_goal_prob = get_most_likely_point_and_indice(pred_goal_map, args.time_step)
+                    point_traj_prob, indice_traj_prob = get_most_likely_point_and_indice(pred_traj_map, args.time_step)
+                    point_goal_gt, point_goal_pred = get_gt_pred_point(pred_goal_map, indice_gt, indice_pred, args.time_step)
+                    point_traj_gt, point_traj_pred = get_gt_pred_point(pred_traj_map, indice_gt, indice_pred, args.time_step)
                     # get gradient 
                     grad_goal_prob, = torch.autograd.grad(point_goal_prob, input, retain_graph=True)
                     grad_traj_prob, = torch.autograd.grad(point_traj_prob, input, retain_graph=True)
@@ -239,9 +221,9 @@ def main(args):
                                 df_meta, IMAGE_PATH, require_input_grad=True, noisy_std_frac=std_frac)
                             # find the decision of interest
                             point_goal_gt, point_goal_pred = get_gt_pred_point(
-                                pred_goal_map, indice_gt, indice_pred, time_step)
+                                pred_goal_map, indice_gt, indice_pred, args.time_step)
                             point_traj_gt, point_traj_pred = get_gt_pred_point(
-                                pred_traj_map, indice_gt, indice_pred, time_step)
+                                pred_traj_map, indice_gt, indice_pred, args.time_step)
                             # get gradient 
                             grad_goal_gt, = torch.autograd.grad(point_goal_gt, noisy_input, retain_graph=True)
                             grad_goal_pred, = torch.autograd.grad(point_goal_pred, noisy_input, retain_graph=True)
@@ -289,10 +271,10 @@ def main(args):
                         pred_goal_map, pred_traj_map, input = model.forward_test(
                             df_meta, IMAGE_PATH, require_input_grad=False, noisy_std_frac=None) 
                         # find the decision of interest
-                        point_goal_prob, indice_goal_prob = get_most_likely_point_and_indice(pred_goal_map, time_step)
-                        point_traj_prob, indice_traj_prob = get_most_likely_point_and_indice(pred_traj_map, time_step)
-                        point_goal_gt, point_goal_pred = get_gt_pred_point(pred_goal_map, indice_gt, indice_pred, time_step)
-                        point_traj_gt, point_traj_pred = get_gt_pred_point(pred_traj_map, indice_gt, indice_pred, time_step)
+                        point_goal_prob, indice_goal_prob = get_most_likely_point_and_indice(pred_goal_map, args.time_step)
+                        point_traj_prob, indice_traj_prob = get_most_likely_point_and_indice(pred_traj_map, args.time_step)
+                        point_goal_gt, point_goal_pred = get_gt_pred_point(pred_goal_map, indice_gt, indice_pred, args.time_step)
+                        point_traj_gt, point_traj_pred = get_gt_pred_point(pred_traj_map, indice_gt, indice_pred, args.time_step)
                         # get gradient 
                         if 'traj_decoder' not in layer_name: 
                             point_goal_prob.backward(retain_graph=True)
@@ -363,38 +345,12 @@ def compute_grad_cam(layer, input):
     return L
 
 
-def get_ckpt_name(ckpt_path):
-    if 'adapter' in ckpt_path:
-        train_net = ckpt_path.split('__')[5]
-        adapter_position = ckpt_path.split('__')[6]
-        n_train = ckpt_path.split('__')[7].split('_')[1].split('.')[0]
-        ckpt_name = f'{train_net}[{adapter_position}]({n_train})'
-    else:
-        train_net = ckpt_path.split('__')[5]
-        n_train = ckpt_path.split('__')[6].split('_')[1]
-        ckpt_name = f'{train_net}({n_train})'
-    return ckpt_name 
-
-
-def get_adapter_info(ckpt_path, params):
-    if 'adapter' in ckpt_path:
-        train_net, adapter_type = ckpt_path.split('__')[5].split('_')
-        adapter_position = [int(i) for i in ckpt_path.split('__')[6].split('_')]
-        updated_params = params.copy()
-        updated_params.update({
-            'train_net': train_net, 
-            'adapter_type': adapter_type, 
-            'adapter_position': adapter_position})
-        return updated_params
-    else:
-        raise ValueError(f"{ckpt_path} is not an adapter's model")
-
-
 if __name__ == '__main__':
     
     parser = get_parser(False)
     # files 
     # TODO: think about which layer to plot (i.e., w.r.t.) (input scene, input trajs..., intermediate layers...)
+    # TODO: for all cases, input as the concatenated segmentation and previous trajs / segmentation / previous trajs / raw scene (now)... to avg
     parser.add_argument('--ckpts', default=None, type=str, nargs='+')
     parser.add_argument('--ckpts_name', default=None, type=str, nargs='+')
     parser.add_argument('--tuned_ckpts', default=None, type=str, nargs='+')
@@ -403,6 +359,7 @@ if __name__ == '__main__':
     parser.add_argument('--n_limited', default=10, type=int)
     # saliency map arguments 
     parser.add_argument('--decision', default=None, type=str, choices=['loss', 'map'])
+    parser.add_argument('--time_step', default=-1, type=int)
     parser.add_argument('--VanillaGrad', action='store_true')
     parser.add_argument('--SmoothGrad', action='store_true')
     parser.add_argument('--n_smooth', default=4, type=int)
@@ -413,8 +370,10 @@ if __name__ == '__main__':
     main(args)
 
 
-# python -m pdb saliency.py --dataset_path filter/agent_type/ --ckpts ckpts/Seed_1_Train__Pedestrian__Val__Pedestrian__Val_Ratio_0.1_filter_agent_type__train_all_weights.pt ckpts/Seed_1_Train__Biker__Val__Biker__Val_Ratio_0.1_filter_agent_type__train_all_FT_weights.pt --ckpts_name OODG FT --val_files Biker.pkl --n_leftouts 10 --meta_id 22796 --decision map --VanillaGrad
+# python -m pdb analyze_saliency.py --dataset_path filter/agent_type/deathCircle_0 --ckpts ckpts/Seed_1_Train__Pedestrian__Val__Pedestrian__Val_Ratio_0.1_filter_agent_type__train_all_weights.pt ckpts/Seed_1_Train__Biker__Val__Biker__Val_Ratio_0.1_filter_agent_type__train_all_FT_weights.pt --ckpts_name OODG FT --val_files Biker.pkl --n_leftouts 10 --meta_id 22796 --decision map --VanillaGrad
 
 # python -m pdb saliency.py --dataset_path filter/agent_type/ --ckpts ckpts/Seed_1_Train__Pedestrian__Val__Pedestrian__Val_Ratio_0.1_filter_agent_type__train_all_weights.pt ckpts/Seed_1_Train__Biker__Val__Biker__Val_Ratio_0.1_filter_agent_type__train_all_FT_weights.pt ckpts/Seed_1_Train__Biker__Val__Biker__Val_Ratio_0.1_filter_agent_type__train_encoder_weights.pt --ckpts_name OODG FT ET --val_files Biker.pkl --n_leftouts 10 --meta_id 22796 --VanillaGrad --SmoothGrad --GradCAM
 
 # python -m pdb saliency.py --dataset_path filter/agent_type/deathCircle_0 --pretrained_ckpt ckpts/Seed_1_Train__Pedestrian__Val__Pedestrian__Val_Ratio_0.1_filter_agent_type__train_all_weights.pt --tuned_ckpts ckpts/Seed_1__Tr_Biker__Val_Biker__ValRatio_0.1__filter_agent_type_deathCircle_0__adapter_serial__0__TrN_10.pt ckpts/Seed_1__Tr_Biker__Val_Biker__ValRatio_0.1__filter_agent_type_deathCircle_0__adapter_serial__0__TrN_20.pt --val_files Biker.pkl --n_leftouts 10 --meta_id 22796 --decision map --VanillaGrad
+
+# python -m pdb evaluator/analyze_saliency.py --dataset_path filter/agent_type/deathCircle_0 --pretrained_ckpt ckpts/Seed_1_Train__Pedestrian__Val__Pedestrian__Val_Ratio_0.1_filter_agent_type__train_all_weights.pt --tuned_ckpts ckpts/Seed_1__Tr_Biker__Val_Biker__ValRatio_0.1__filter_agent_type_deathCircle_0__encoder_0__TrN_20.pt --val_files Biker.pkl --n_leftouts 500 --val_ratio 0.1 --meta_ids 6269 6098 6252 5775 5711 5885 5466 5890 5445 5635 5726 5767 5607 5972 5982 --decision map --VanillaGrad --SmoothGrad --GradCAM
