@@ -1,36 +1,24 @@
 import os
-import yaml
 import time
-import torch
-import numpy as np
 import pandas as pd
 
 from models.trainer import YNetTrainer
 from utils.parser import get_parser
+from utils.util import get_experiment_name, get_params, get_image_and_data_path
 from utils.write_files import write_csv, get_out_dir
 from utils.dataset import set_random_seeds, limit_samples, dataset_split
+from utils.visualize import plot_given_trajectories_scenes_overlay
 
 
 def main(args):
-    # ## configuration
+    # config 
     tic = time.time()
     set_random_seeds(args.seed)
     if args.gpu: os.environ["CUDA_VISIBLE_DEVICES"] = str(args.gpu)
+    params = get_params(args)
+    IMAGE_PATH, DATA_PATH = get_image_and_data_path(params)
 
-    with open(os.path.join('config', 'sdd_raw_train.yaml')) as file:
-        params = yaml.load(file, Loader=yaml.FullLoader)
-
-    params['segmentation_model_fp'] = os.path.join(params['data_dir'], params['dataset_name'], 'segmentation_model.pth')
-    params['share_val_test'] = True
-    params.update(vars(args))
-    print(params)
-
-    # ## set up data
-    print('############ Prepare dataset ##############')
-    IMAGE_PATH = os.path.join(params['data_dir'], params['dataset_name'], 'raw', 'annotations')
-    assert os.path.isdir(IMAGE_PATH), 'raw data dir error'
-    DATA_PATH = os.path.join(params['data_dir'], params['dataset_name'], args.dataset_path)
-
+    # load data 
     if args.train_files == args.val_files:
         # train_files and val_files are fully overlapped 
         df_train, df_val, df_test = dataset_split(
@@ -46,36 +34,23 @@ def main(args):
     print(f"df_train: {df_train.shape}; #={df_train.shape[0]/(params['obs_len']+params['pred_len'])}")
     if df_val is not None: print(f"df_val: {df_val.shape}; #={df_val.shape[0]/(params['obs_len']+params['pred_len'])}")
     if df_test is not None: print(f"df_test: {df_test.shape}; #={df_test.shape[0]/(params['obs_len']+params['pred_len'])}")
+    # folder_name = f"{args.seed}__{'_'.join(args.dataset_path.split('/'))}__{'_'.join(args.train_files).rstrip('.pkl')}" 
+    # plot_given_trajectories_scenes_overlay(IMAGE_PATH, df_train, f'figures/scene_with_trajs_given/{folder_name}')
 
-    # ## model
+    # experiment name 
+    EXPERIMENT_NAME = get_experiment_name(args, df_train.shape[0])
+    print(f"Experiment {EXPERIMENT_NAME} has started")
+
+    # model
     model = YNetTrainer(params=params)
-
     if args.train_net == "modulator": model.model.initialize_style()
-
     if args.pretrained_ckpt is not None:
         model.load_params(args.pretrained_ckpt)
         print(f"Loaded checkpoint {args.pretrained_ckpt}")
     else:
         print("Training from scratch")
 
-    # ## experiment name 
-    EXPERIMENT_NAME = ""
-    EXPERIMENT_NAME += f"Seed_{args.seed}_"
-    EXPERIMENT_NAME += f"_Tr{'_'.join(['_'+f.split('.pkl')[0] for f in args.train_files])}_"
-    EXPERIMENT_NAME += f"_Val{'_'.join(['_'+f.split('.pkl')[0] for f in args.val_files])}_"
-    EXPERIMENT_NAME += f"_ValRatio_{args.val_ratio}_"
-    EXPERIMENT_NAME += f"_{(args.dataset_path).replace('/', '_')}"
-    EXPERIMENT_NAME += f"_{args.train_net}"
-    if args.fine_tune:
-        if args.train_net == 'all':
-            EXPERIMENT_NAME += '_FT'
-        elif args.train_net == 'adapter':
-            EXPERIMENT_NAME += f'_{args.adapter_type}__{"_".join(map(str, args.adapter_position))}__TrN_{str(int((df_train.shape[0])/20))}'
-        else:
-            EXPERIMENT_NAME += f'__TrN_{str(int((df_train.shape[0])/20))}'
-    print(f"Experiment {EXPERIMENT_NAME} has started")
-
-    # ## training
+    # training
     print('############ Train model ##############')
     val_ade, val_fde = model.train(df_train, df_val, IMAGE_PATH, IMAGE_PATH, EXPERIMENT_NAME)
 

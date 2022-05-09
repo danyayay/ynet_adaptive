@@ -4,6 +4,7 @@ import time
 
 from models.trainer import YNetTrainer
 from utils.parser import get_parser
+from utils.util import get_adapter_info
 from utils.write_files import write_csv, get_out_dir
 from utils.dataset import set_random_seeds, dataset_split
 
@@ -35,12 +36,7 @@ def main(args):
     # ## model
     print('############ Load model ##############')
     if 'adapter' in args.tuned_ckpt:
-        train_net, adapter_type = args.tuned_ckpt.split('__')[5].split('_')
-        adapter_position = [int(i) for i in args.tuned_ckpt.split('__')[6].split('_')]
-        params.update({
-            'train_net': train_net, 
-            'adapter_type': adapter_type, 
-            'adapter_position': adapter_position})
+        params = get_adapter_info(args.tuned_ckpt, params)
     model = YNetTrainer(params=params)
 
     if args.pretrained_ckpt is not None and args.tuned_ckpt is not None:
