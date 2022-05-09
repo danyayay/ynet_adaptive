@@ -81,7 +81,7 @@ def create_few_shot_plot(results_dir, out_dir, fontsize=16):
     plt.savefig(f'{out_dir}/result.png', bbox_inches='tight', pad_inches=0)
 
 
-def plot_input_space(semantic_images, observed_map, meta_ids, scene_id, out_dir='figures', format='png'):
+def plot_input_space(semantic_images, observed_map, meta_ids, scene_id, out_dir='figures/input_space', format='png'):
     # semantic_images: (batch_size, n_class, height, width)
     # observed_map: (batch_size, obs_len, height, width)
     fig, axes = plt.subplots(2, observed_map.shape[1], figsize=(observed_map.shape[1]*4, 2*4))
@@ -109,6 +109,144 @@ def plot_input_space(semantic_images, observed_map, meta_ids, scene_id, out_dir=
         plt.savefig(out_path, bbox_inches='tight')
         plt.close(fig)
         print(f'Saved {out_path}')
+
+
+def plot_feature_space_compare(
+    ckpts_hook_dict, index, 
+    out_dir='figures/feature_space_compare', format='png', 
+    compare_raw=True, compare_diff=False, compare_overlay=False, raw_img=None):
+    first_ckpt = list(ckpts_hook_dict)[0]
+    layers_name = ckpts_hook_dict[first_ckpt].keys()
+    for i, (meta_id, scene_id) in enumerate(index): 
+        for layer_name in layers_name:
+            n_ckpt = len(ckpts_hook_dict)
+            _, n_channel, height, width = ckpts_hook_dict[first_ckpt][layer_name].shape
+            while height >= 6:
+                height /= 2
+                width /= 2
+            
+            new_out_dir = out_dir + f'/{scene_id}__{meta_id}'
+            pathlib.Path(new_out_dir).mkdir(parents=True, exist_ok=True)
+
+            if compare_raw:
+                fig, axes = plt.subplots(n_ckpt, n_channel, figsize=(width*n_channel+1, height*n_ckpt))
+                for r, (ckpt_name, hook_dict) in enumerate(ckpts_hook_dict.items()):
+                    features = hook_dict[layer_name][i]
+                    if isinstance(features, torch.Tensor):
+                        features = features.cpu().detach().numpy()
+                    vmin, vmax = features.min(), features.max()
+                    for c in range(n_channel):
+                        im = axes[r, c].imshow(features[c], vmin=vmin, vmax=vmax, cmap='jet')
+                        if r == n_ckpt - 1:
+                            axes[r, c].set_xlabel(f'channel {c+1}')
+                        else:
+                            axes[r, c].set_xticklabels([])
+                        if c == 0: 
+                            axes[r, c].set_ylabel(ckpt_name)
+                        else:
+                            axes[r, c].set_yticklabels([])
+                    plt.colorbar(im, ax=axes[r, :].ravel().tolist(), shrink=0.8)
+                plt.subplots_adjust(wspace=0.01, hspace=0.02)
+                out_name = f'{layer_name}.{format}'
+                out_path = os.path.join(new_out_dir, out_name)
+                plt.savefig(out_path, bbox_inches='tight')
+                plt.close(fig)
+                print(f'Saved {out_path}')
+
+            # overlay decoder output 
+            if ('decoder' in layer_name) or ('encoder.stages.0' in layer_name):
+                if compare_overlay:
+                    fig, axes = plt.subplots(n_ckpt, n_channel, figsize=(width*n_channel, height*n_ckpt))
+                    for r, (ckpt_name, hook_dict) in enumerate(ckpts_hook_dict.items()):
+                        features = hook_dict[layer_name][i]
+                        if isinstance(features, torch.Tensor):
+                            features = features.cpu().detach().numpy()
+                        if isinstance(raw_img, torch.Tensor):
+                            raw_img = raw_img.cpu().detach().numpy()
+                        if raw_img.shape[0] == 1:
+                            corrected_img = get_correct_raw_img(raw_img[0])
+                        else:
+                            corrected_img = get_correct_raw_img(raw_img[i])
+                        vmin, vmax = features.min(), features.max()
+                        for c in range(n_channel):
+                            axes[r, c].imshow(corrected_img)
+                            im = axes[r, c].imshow(features[c], vmin=vmin, vmax=vmax, cmap='jet', alpha=0.4)
+                            axes[r, c].set_xlabel(f'channel {c+1}')
+                            if c == 0: 
+                                axes[r, c].set_ylabel(ckpt_name)
+                            else:
+                                axes[r, c].set_yticklabels([])
+                        plt.colorbar(im, ax=axes[r, :].ravel().tolist(), shrink=0.8)
+                    plt.subplots_adjust(wspace=0.01, hspace=0.02)
+                    out_name = f'{layer_name}__overlay.{format}'
+                    out_path = os.path.join(new_out_dir, out_name)
+                    plt.savefig(out_path, bbox_inches='tight')
+                    plt.close(fig)
+                    print(f'Saved {out_path}')
+                if compare_diff:
+                    fig, axes = plt.subplots(n_ckpt-1, n_channel, figsize=(width*n_channel+1, height*(n_ckpt-1)))
+                    r = 0
+                    for ckpt_name, hook_dict in ckpts_hook_dict.items():
+                        if ckpt_name != 'OODG':
+                            # prepare base 
+                            base_features = ckpts_hook_dict['OODG'][layer_name][i]
+                            if isinstance(base_features, torch.Tensor):
+                                base_features = base_features.cpu().detach().numpy()
+                            # other ckpt 
+                            features = hook_dict[layer_name][i]
+                            if isinstance(features, torch.Tensor):
+                                features = features.cpu().detach().numpy()
+                            if isinstance(raw_img, torch.Tensor):
+                                raw_img = raw_img.cpu().detach().numpy()
+                            if raw_img.shape[0] == 1:
+                                corrected_img = get_correct_raw_img(raw_img[0])
+                            else:
+                                corrected_img = get_correct_raw_img(raw_img[i])
+                            diff = features - base_features
+                            vmin, vmax = diff.min(), diff.max()
+                            # plot 
+                            if n_ckpt - 1 != 1:
+                                for c in range(n_channel):
+                                    axes[r, c].imshow(corrected_img)
+                                    if 'decoder' in layer_name:
+                                        # mask 
+                                        masked_array = np.ma.array(diff[c], mask=(-1 <= diff[c]) & (diff[c] <= 1))
+                                        cmap = matplotlib.cm.RdBu_r
+                                        cmap.set_bad('white', 0.2)
+                                        im = axes[r, c].imshow(masked_array, vmin=vmin, vmax=vmax, interpolation='nearest', cmap=cmap, alpha=0.5)
+                                    else:
+                                        im = axes[c].imshow(diff[c], vmin=vmin, vmax=vmax, cmap='RdBu_r', alpha=0.5)
+                                    axes[r, c].set_xlabel(f'channel {c+1}')
+                                    if c == 0: 
+                                        axes[r, c].set_ylabel(ckpt_name)
+                                    else:
+                                        axes[r, c].set_yticklabels([])
+                                plt.colorbar(im, ax=axes[r, :].ravel().tolist(), shrink=0.8)
+                            else:
+                                for c in range(n_channel):
+                                    axes[c].imshow(corrected_img)
+                                    if 'decoder' in layer_name:
+                                        # mask 
+                                        masked_array = np.ma.array(diff[c], mask=(-1 <= diff[c]) & (diff[c] <= 1))
+                                        cmap = matplotlib.cm.RdBu_r
+                                        cmap.set_bad('white', 0.1)
+                                        im = axes[c].imshow(masked_array, vmin=vmin, vmax=vmax, interpolation='nearest', cmap=cmap, alpha=0.5)
+                                    else:
+                                        im = axes[c].imshow(diff[c], vmin=vmin, vmax=vmax, cmap='RdBu_r', alpha=0.5)
+
+                                    axes[c].set_xlabel(f'channel {c+1}')
+                                    if c == 0: 
+                                        axes[c].set_ylabel(f'{ckpt_name} - OODG')
+                                    else:
+                                        axes[c].set_yticklabels([])
+                                plt.colorbar(im, ax=axes[:].ravel().tolist(), shrink=0.8)
+                            r += 1
+                    plt.subplots_adjust(wspace=0.01, hspace=0.02)
+                    out_name = f'{layer_name}__diff.{format}'
+                    out_path = os.path.join(new_out_dir, out_name)
+                    plt.savefig(out_path, bbox_inches='tight')
+                    plt.close(fig)
+                    print(f'Saved {out_path}') 
 
 
 def plot_feature_space(dict_features, out_dir='figures/feature_space', show_diff=True, format='png'):
@@ -427,6 +565,34 @@ def plot_trajectories_scenes_overlay(image_path, df_biker, df_ped, out_dir='figu
         print(f'Saved {out_path}')
 
 
+def plot_given_trajectories_scenes_overlay(image_path, df, out_dir='figures/scene_with_trajs_given', format='png'):
+    unique_scene = df.sceneId.unique()
+    scene_images = create_images_dict(unique_scene, image_path, 'reference.jpg', True)
+    for scene_id in unique_scene:
+        print(f'Plotting {scene_id}')
+        df_scene = df[df.sceneId == scene_id]
+        height, width = scene_images[scene_id].shape[0], scene_images[scene_id].shape[1]
+        fig = plt.figure(figsize=(height/50, width/50))
+        plt.imshow(scene_images[scene_id])
+        ms = 2
+        
+        colors = {'Pedestrian': 'b', 'Biker': 'r'}
+        for agent in ['Pedestrian', 'Biker']:
+            df_scene_agent = df_scene[df_scene.label == agent]
+            for _, traj in df_scene_agent.groupby('metaId'):
+                plt.plot(traj.x, traj.y, '.-', c=colors[agent], ms=ms, alpha=0.4)
+            plt.plot(0, 0, '.-', c=colors[agent], alpha=0.5, label=agent)
+
+        plt.plot(0,0,'w')
+        plt.title(f'scene: {scene_id}')
+        plt.legend(loc='best')
+        pathlib.Path(out_dir).mkdir(parents=True, exist_ok=True)
+        out_path = os.path.join(out_dir, scene_id + '.' + format)
+        plt.savefig(out_path, bbox_inches='tight')
+        plt.close(fig)
+        print(f'Saved {out_path}')
+
+
 def plot_obs_pred_trajs(image_path, dict_trajs, out_dir='figures/prediction', format='png', obs_len=8):
     first_dict = dict_trajs[list(dict_trajs)[0]]
     scene_images = create_images_dict(first_dict['sceneId'], image_path, 'reference.jpg', True)
@@ -469,7 +635,6 @@ def plot_prediction(image_path, ckpt_trajs_dict, out_dir='figures/prediction', f
         fig = plt.figure(figsize=(scene_image.shape[0]/100, scene_image.shape[1]/100))
         plt.imshow(scene_image)
         ms = 4
-        breakpoint()
         for j, (ckpt_name, trajs_dict) in enumerate(ckpt_trajs_dict.items()):
             gt_traj = trajs_dict['groundtruth'][i]
             pred_traj = trajs_dict['prediction'][i]
@@ -884,6 +1049,17 @@ def plot_importance_analysis(
                 )
 
 
+def get_correct_raw_img(input):
+    n_channel, height, width = input.shape
+    blue, green, red = input[0], input[1], input[2]
+    raw_img = np.empty((height, width, 3))
+    raw_img[:, :, 0] = red
+    raw_img[:, :, 1] = green 
+    raw_img[:, :, 2] = blue 
+    raw_img = (raw_img - input.min()) / (input.max() - input.min())
+    return raw_img 
+
+
 def plot_saliency_maps(
     input, grad_input, saliency_name, filename,
     out_dir='figures/saliency_maps', format='png', 
@@ -900,12 +1076,7 @@ def plot_saliency_maps(
         grad_input = grad_input.cpu().detach().numpy()
     
     # prepare input and switch channels
-    blue, green, red = input[0][0], input[0][1], input[0][2]
-    raw_img = np.empty((height, width, 3))
-    raw_img[:, :, 0] = red
-    raw_img[:, :, 1] = green 
-    raw_img[:, :, 2] = blue 
-    raw_img = (raw_img - input[0].min()) / (input[0].max() - input[0].min())
+    raw_img = get_correct_raw_img(input[0])
 
     # prepare grad 
     grad_img = grad_input.sum(axis=(0, 1))

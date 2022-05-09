@@ -42,8 +42,8 @@ def extract_test_msg(test_msg):
             'seed': re.search("'seed': ([\d+]),", msg).group(1),
             'pretrained_ckpt': re.search("'pretrained_ckpt': '(.*?)',", msg).group(1).split('/')[1],
             'tuned_ckpt': re.search("'tuned_ckpt': '(.*?)',", msg).group(1).split('/')[1],
-            'ade': metric.group(1), 
-            'fde': metric.group(2)}, index=[0])], ignore_index=True)
+            'ade': metric.group(1) if metric is not None else None, 
+            'fde': metric.group(2) if metric is not None else None}, index=[0])], ignore_index=True)
     df.seed = df.seed.astype(int)
     df.ade = df.ade.astype(float)
     df.fde = df.fde.astype(float)
@@ -77,7 +77,7 @@ def get_adapter_position(ckpt_path):
         return None 
 
 
-def extract_file(file_path, out_dir='../csv/log'):
+def extract_file(file_path, out_dir):
     with open(file_path, 'r') as f:
         msgs = f.read()
     if 'eval' in file_path:
@@ -96,7 +96,7 @@ def extract_file(file_path, out_dir='../csv/log'):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--file_path', default=None, type=str)
-    parser.add_argument('--out_dir', default=None, type=str)
+    parser.add_argument('--out_dir', default='csv/log', type=str)
     args = parser.parse_args()
     
     extract_file(args.file_path, args.out_dir)
