@@ -72,15 +72,32 @@ def get_adapter_info(ckpt_path, params):
         raise ValueError(f"{ckpt_path} is not an adapter's model")
 
 
-def restore_model(params, ckpt_name, pretrained_ckpt, tuned_ckpt=None):
-    if 'adapter' in ckpt_name:
-        updated_params = get_adapter_info(tuned_ckpt, params)
-        model = YNetTrainer(params=updated_params)
-        model.load_separated_params(pretrained_ckpt, tuned_ckpt)
-    elif ckpt_name != 'OODG':
+def get_ckpts_and_names(ckpts, ckpts_name, pretrained_ckpt, tuned_ckpts):
+    if ckpts is not None:
+        ckpts, ckpts_name = ckpts, ckpts_name
+        is_file_separated = False
+    elif pretrained_ckpt is not None:
+        ckpts = [pretrained_ckpt] + tuned_ckpts
+        ckpts_name = ['OODG'] + [get_ckpt_name(ckpt) for ckpt in tuned_ckpts]
+        is_file_separated = True
+    else:
+        raise ValueError('No checkpoint provided')
+    return ckpts, ckpts_name, is_file_separated
+
+
+def restore_model(
+    params, is_file_separated, 
+    ckpt_name, base_ckpt, separated_ckpt=None):
+    if (not is_file_separated) or (is_file_separated and ckpt_name == 'OODG'):
         model = YNetTrainer(params=params)
-        model.load_separated_params(pretrained_ckpt, tuned_ckpt)
-    else: # ckpt == OODG
-        model = YNetTrainer(params=params)
-        model.load_params(pretrained_ckpt)
+        model.load_params(base_ckpt)
+    else:  
+        if 'adapter' in ckpt_name:
+            updated_params = get_adapter_info(separated_ckpt, params)
+            model = YNetTrainer(params=updated_params)
+            model.load_separated_params(base_ckpt, separated_ckpt)
+        else:
+            model = YNetTrainer(params=params)
+            model.load_separated_params(base_ckpt, separated_ckpt)
+        
     return model 

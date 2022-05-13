@@ -4,7 +4,7 @@ import pathlib
 import argparse
 from models.trainer import YNetTrainer
 from utils.dataset import set_random_seeds, dataset_split, dataset_given_scenes
-from utils.visualize import plot_importance_analysis
+from evaluator.visualization import plot_importance_analysis
 
 
 def main(args):

@@ -5,7 +5,7 @@ import time
 from models.trainer import YNetTrainer
 from utils.parser import get_parser
 from utils.util import get_adapter_info
-from utils.write_files import write_csv, get_out_dir
+from evaluator.write_files import write_csv, get_out_dir
 from utils.dataset import set_random_seeds, dataset_split
 
 

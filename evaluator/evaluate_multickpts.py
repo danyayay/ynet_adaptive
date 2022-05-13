@@ -8,7 +8,7 @@ import pandas as pd
 from utils.dataset import set_random_seeds, dataset_split
 from utils.parser import get_parser
 from utils.util import get_ckpt_name, get_params, get_image_and_data_path, restore_model
-from utils.visualize import plot_prediction
+from evaluator.visualization import plot_prediction
 
 
 def main(args):

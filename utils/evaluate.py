@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 from utils.image_utils import get_patch, sampling, image2world
 from utils.kmeans import kmeans
-from utils.visualize import plot_input_space
+from evaluator.visualization import plot_input_space
 
 
 def torch_multivariate_gaussian_heatmap(coordinates, H, W, dist, sigma_factor, ratio, device, rot=False):

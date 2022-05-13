@@ -7,10 +7,10 @@ import argparse
 import numpy as np
 import pandas as pd
 import seaborn as sns
-import matplotlib
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
-matplotlib.use('Agg')
+mpl.use('Agg')
 from utils.dataset import create_images_dict
 
 
@@ -77,7 +77,7 @@ def create_few_shot_plot(results_dir, out_dir, fontsize=16):
     plt.xticks(fontsize=fontsize)
     plt.yticks(fontsize=fontsize)
     plt.legend(fontsize=fontsize)
-    ax.xaxis.set_major_locator(matplotlib.ticker.MaxNLocator(integer=True))
+    ax.xaxis.set_major_locator(mpl.ticker.MaxNLocator(integer=True))
     plt.savefig(f'{out_dir}/result.png', bbox_inches='tight', pad_inches=0)
 
 
@@ -111,12 +111,34 @@ def plot_input_space(semantic_images, observed_map, meta_ids, scene_id, out_dir=
         print(f'Saved {out_path}')
 
 
+def base_img_plot(ax, scene_img, semantic_img=None):
+    if semantic_img is not None:
+        _, height, width = semantic_img.shape
+        semantic_class = semantic_img.argmax(axis=0)
+        img = np.ones(shape=(height, width))
+        img[semantic_class == 1] = 0.5
+        img[semantic_class == 2] = 0
+        im = ax.imshow(img, cmap='gray')
+    else:
+        im = ax.imshow(scene_img)
+    ax.set_xticks([])
+    ax.set_yticks([])
+    return im
+
+
 def plot_feature_space_compare(
     ckpts_hook_dict, index, 
     out_dir='figures/feature_space_compare', format='png', 
-    compare_raw=True, compare_diff=False, compare_overlay=False, raw_img=None):
+    compare_raw=True, compare_diff=False, compare_overlay=False, 
+    scene_imgs=None, semantic_imgs=None, scale_row=True, inhance_diff=True):
+    # semantic_map (class=0~5): 
+    #     - channel 1: pavement
+    #     - channel 2: terrain 
     first_ckpt = list(ckpts_hook_dict)[0]
     layers_name = ckpts_hook_dict[first_ckpt].keys()
+    my_cmap = my_colormap()
+    cmap_div, cmap_clr = my_cmap, 'jet'
+    vcenter = 0
     for i, (meta_id, scene_id) in enumerate(index): 
         for layer_name in layers_name:
             n_ckpt = len(ckpts_hook_dict)
@@ -136,7 +158,11 @@ def plot_feature_space_compare(
                         features = features.cpu().detach().numpy()
                     vmin, vmax = features.min(), features.max()
                     for c in range(n_channel):
-                        im = axes[r, c].imshow(features[c], vmin=vmin, vmax=vmax, cmap='jet')
+                        if scale_row:
+                            im = axes[r, c].imshow(features[c], vmin=vmin, vmax=vmax)
+                        else:
+                            im = axes[r, c].imshow(features[c])
+                            plt.colorbar(im, ax=axes[r, c], shrink=0.5)
                         if r == n_ckpt - 1:
                             axes[r, c].set_xlabel(f'channel {c+1}')
                         else:
@@ -145,46 +171,72 @@ def plot_feature_space_compare(
                             axes[r, c].set_ylabel(ckpt_name)
                         else:
                             axes[r, c].set_yticklabels([])
-                    plt.colorbar(im, ax=axes[r, :].ravel().tolist(), shrink=0.8)
-                plt.subplots_adjust(wspace=0.01, hspace=0.02)
-                out_name = f'{layer_name}.{format}'
+                    if scale_row:
+                        plt.colorbar(im, ax=axes[r, :].ravel().tolist(), shrink=0.8)
+                plt.subplots_adjust(wspace=0.01, hspace=0.02, bottom=0.1, right=0.78, top=0.9)
+                out_name = f'{layer_name}__scaled__raw.{format}' if scale_row else f'{layer_name}__raw.{format}'
                 out_path = os.path.join(new_out_dir, out_name)
                 plt.savefig(out_path, bbox_inches='tight')
                 plt.close(fig)
                 print(f'Saved {out_path}')
 
             # overlay decoder output 
-            if ('decoder' in layer_name) or ('encoder.stages.0' in layer_name):
+            if 'decoder' in layer_name:
                 if compare_overlay:
-                    fig, axes = plt.subplots(n_ckpt, n_channel, figsize=(width*n_channel, height*n_ckpt))
+                    if semantic_imgs is not None: 
+                        fig, axes = plt.subplots(n_ckpt, n_channel+2, 
+                            figsize=(width*(n_channel+2), height*n_ckpt))
+                    else: 
+                        fig, axes = plt.subplots(n_ckpt, n_channel, 
+                            figsize=(width*n_channel, height*n_ckpt))
                     for r, (ckpt_name, hook_dict) in enumerate(ckpts_hook_dict.items()):
                         features = hook_dict[layer_name][i]
                         if isinstance(features, torch.Tensor):
                             features = features.cpu().detach().numpy()
-                        if isinstance(raw_img, torch.Tensor):
-                            raw_img = raw_img.cpu().detach().numpy()
-                        if raw_img.shape[0] == 1:
-                            corrected_img = get_correct_raw_img(raw_img[0])
+                        if isinstance(scene_imgs, torch.Tensor):
+                            scene_imgs = scene_imgs.cpu().detach().numpy()
+                        if isinstance(semantic_imgs, torch.Tensor):
+                            semantic_imgs = semantic_imgs.cpu().detach().numpy()
+                        scene_img = get_correct_scene_img(scene_imgs[0]) if scene_imgs.shape[0] == 1 \
+                            else get_correct_scene_img(scene_imgs[i])
+                        if semantic_imgs is not None:
+                            semantic_img = semantic_imgs[0] if semantic_imgs.shape[0] == 1 else semantic_imgs[i]
                         else:
-                            corrected_img = get_correct_raw_img(raw_img[i])
+                            semantic_img = None
                         vmin, vmax = features.min(), features.max()
                         for c in range(n_channel):
-                            axes[r, c].imshow(corrected_img)
-                            im = axes[r, c].imshow(features[c], vmin=vmin, vmax=vmax, cmap='jet', alpha=0.4)
+                            base_img_plot(axes[r, c], scene_img, semantic_img)
+                            if scale_row:
+                                im = axes[r, c].imshow(features[c], vmin=vmin, vmax=vmax, cmap=cmap_clr, alpha=0.5)
+                            else:
+                                im = axes[r, c].imshow(features[c], cmap=cmap_clr, alpha=0.5)
+                                plt.colorbar(im, ax=axes[r, c], shrink=0.5)
                             axes[r, c].set_xlabel(f'channel {c+1}')
                             if c == 0: 
                                 axes[r, c].set_ylabel(ckpt_name)
                             else:
                                 axes[r, c].set_yticklabels([])
-                        plt.colorbar(im, ax=axes[r, :].ravel().tolist(), shrink=0.8)
-                    plt.subplots_adjust(wspace=0.01, hspace=0.02)
-                    out_name = f'{layer_name}__overlay.{format}'
+                        if scale_row:
+                            plt.colorbar(im, ax=axes[r, :].ravel().tolist(), shrink=0.8)
+                        if semantic_img is not None:
+                            base_img_plot(axes[r, -2], scene_img)
+                            base_img_plot(axes[r, -1], scene_img, semantic_img)
+                    plt.subplots_adjust(wspace=0.01, hspace=0.02, bottom=0.1, right=0.78, top=0.9)
+                    out_name = f'{layer_name}__scaled' if scale_row else layer_name
+                    out_name = out_name + '__overlay_on_seg' if semantic_img is not None else out_name + '__overlay_on_scene'
+                    out_name = f'{out_name}.{format}'
                     out_path = os.path.join(new_out_dir, out_name)
                     plt.savefig(out_path, bbox_inches='tight')
                     plt.close(fig)
                     print(f'Saved {out_path}')
+
                 if compare_diff:
-                    fig, axes = plt.subplots(n_ckpt-1, n_channel, figsize=(width*n_channel+1, height*(n_ckpt-1)))
+                    if semantic_imgs is not None:
+                        fig, axes = plt.subplots(n_ckpt-1, n_channel+2, 
+                            figsize=(width*(n_channel+2)+1, height*(n_ckpt-1)))
+                    else:
+                        fig, axes = plt.subplots(n_ckpt-1, n_channel, 
+                            figsize=(width*n_channel+1, height*(n_ckpt-1)))
                     r = 0
                     for ckpt_name, hook_dict in ckpts_hook_dict.items():
                         if ckpt_name != 'OODG':
@@ -196,57 +248,96 @@ def plot_feature_space_compare(
                             features = hook_dict[layer_name][i]
                             if isinstance(features, torch.Tensor):
                                 features = features.cpu().detach().numpy()
-                            if isinstance(raw_img, torch.Tensor):
-                                raw_img = raw_img.cpu().detach().numpy()
-                            if raw_img.shape[0] == 1:
-                                corrected_img = get_correct_raw_img(raw_img[0])
+                            if isinstance(scene_imgs, torch.Tensor):
+                                scene_imgs = scene_imgs.cpu().detach().numpy()
+                            if isinstance(semantic_imgs, torch.Tensor):
+                                semantic_imgs = semantic_imgs.cpu().detach().numpy()
+                            scene_img = get_correct_scene_img(scene_imgs[0]) if scene_imgs.shape[0] == 1 \
+                                else get_correct_scene_img(scene_imgs[i])
+                            if semantic_imgs is not None:
+                                semantic_img = semantic_imgs[0] if semantic_imgs.shape[0] == 1 else semantic_imgs[i]
                             else:
-                                corrected_img = get_correct_raw_img(raw_img[i])
+                                semantic_img = None
                             diff = features - base_features
                             vmin, vmax = diff.min(), diff.max()
                             # plot 
                             if n_ckpt - 1 != 1:
+                                # more than 1 row 
                                 for c in range(n_channel):
-                                    axes[r, c].imshow(corrected_img)
-                                    if 'decoder' in layer_name:
-                                        # mask 
+                                    axes[r, c].imshow(scene_img)
+                                    if inhance_diff:
                                         masked_array = np.ma.array(diff[c], mask=(-1 <= diff[c]) & (diff[c] <= 1))
-                                        cmap = matplotlib.cm.RdBu_r
-                                        cmap.set_bad('white', 0.2)
-                                        im = axes[r, c].imshow(masked_array, vmin=vmin, vmax=vmax, interpolation='nearest', cmap=cmap, alpha=0.5)
+                                        cmap = mpl.cm.get_cmap(cmap_div)
+                                        cmap.set_bad('white', 0.1)
+                                        if not scale_row: 
+                                            vmin, vmax = diff[c].min(), diff[c].max()
+                                        divnorm = mpl.colors.TwoSlopeNorm(vcenter=vcenter, vmin=vmin, vmax=vmax)
+                                        im = axes[r, c].imshow(masked_array, cmap=cmap, norm=divnorm, alpha=0.5)
+                                        if not scale_row:
+                                            plt.colorbar(im, ax=axes[r, c], shrink=0.5)
                                     else:
-                                        im = axes[c].imshow(diff[c], vmin=vmin, vmax=vmax, cmap='RdBu_r', alpha=0.5)
+                                        if not scale_row:
+                                            vmin, vmax = diff[c].min(), diff[c].max()
+                                        divnorm = mpl.colors.TwoSlopeNorm(vcenter=vcenter, vmin=vmin, vmax=vmax)
+                                        im = axes[r, c].imshow(diff[c], cmap=cmap_div, norm=divnorm, alpha=0.5)
+                                        if not scale_row:
+                                            plt.colorbar(im, ax=axes[r, c], shrink=0.5)
                                     axes[r, c].set_xlabel(f'channel {c+1}')
                                     if c == 0: 
                                         axes[r, c].set_ylabel(ckpt_name)
                                     else:
                                         axes[r, c].set_yticklabels([])
-                                plt.colorbar(im, ax=axes[r, :].ravel().tolist(), shrink=0.8)
+                                if scale_row:
+                                    plt.colorbar(im, ax=axes[r, :].ravel().tolist(), shrink=0.8)
+                                if semantic_img is not None:
+                                    base_img_plot(axes[r, -2], scene_img)
+                                    base_img_plot(axes[r, -1], scene_img, semantic_img)
                             else:
+                                # only a single row 
                                 for c in range(n_channel):
-                                    axes[c].imshow(corrected_img)
-                                    if 'decoder' in layer_name:
-                                        # mask 
+                                    base_img_plot(axes[c], scene_img, semantic_img)
+                                    if inhance_diff:
                                         masked_array = np.ma.array(diff[c], mask=(-1 <= diff[c]) & (diff[c] <= 1))
-                                        cmap = matplotlib.cm.RdBu_r
+                                        cmap = mpl.cm.get_cmap(cmap_div)
                                         cmap.set_bad('white', 0.1)
-                                        im = axes[c].imshow(masked_array, vmin=vmin, vmax=vmax, interpolation='nearest', cmap=cmap, alpha=0.5)
+                                        if not scale_row: 
+                                            vmin, vmax = diff[c].min(), diff[c].max()
+                                        divnorm = mpl.colors.TwoSlopeNorm(vcenter=vcenter, vmin=vmin, vmax=vmax)
+                                        im = axes[c].imshow(masked_array, cmap=cmap, norm=divnorm, alpha=0.5)
+                                        if not scale_row: 
+                                            plt.colorbar(im, ax=axes[c], shrink=0.5)
                                     else:
-                                        im = axes[c].imshow(diff[c], vmin=vmin, vmax=vmax, cmap='RdBu_r', alpha=0.5)
-
+                                        if not scale_row: 
+                                            vmin, vmax = diff[c].min(), diff[c].max()
+                                        divnorm = mpl.colors.TwoSlopeNorm(vcenter=vcenter, vmin=vmin, vmax=vmax)
+                                        im = axes[c].imshow(diff[c], cmap=cmap_div, norm=divnorm, alpha=0.5)
+                                        if not scale_row: 
+                                            plt.colorbar(im, ax=axes[c], shrink=0.5)
                                     axes[c].set_xlabel(f'channel {c+1}')
-                                    if c == 0: 
-                                        axes[c].set_ylabel(f'{ckpt_name} - OODG')
-                                    else:
-                                        axes[c].set_yticklabels([])
-                                plt.colorbar(im, ax=axes[:].ravel().tolist(), shrink=0.8)
+                                    axes[c].set_yticklabels([])
+                                axes[n_channel//2].set_title(f'{ckpt_name} - OODG')
+                                if scale_row:
+                                    plt.colorbar(im, ax=axes[:].ravel().tolist(), shrink=0.8, location='right')
+                                if semantic_img is not None:
+                                    base_img_plot(axes[-2], scene_img)
+                                    base_img_plot(axes[-1], scene_img, semantic_img)
                             r += 1
-                    plt.subplots_adjust(wspace=0.01, hspace=0.02)
-                    out_name = f'{layer_name}__diff.{format}'
+                    plt.subplots_adjust(wspace=0.01, hspace=0.02, bottom=0.1, right=0.78, top=0.9)
+                    out_name = f'{layer_name}__scaled' if scale_row else layer_name 
+                    out_name = f'{out_name}__diff_on_seg.{format}' if semantic_img is not None else f'{out_name}__diff_on_scene.{format}'
                     out_path = os.path.join(new_out_dir, out_name)
                     plt.savefig(out_path, bbox_inches='tight')
                     plt.close(fig)
                     print(f'Saved {out_path}') 
+
+
+def my_colormap():
+    top = mpl.cm.get_cmap('Purples_r', 128)
+    bottom = mpl.cm.get_cmap('Blues', 128)
+    my_colors = np.vstack((top(np.linspace(0, 1, 128)),
+                        bottom(np.linspace(0, 1, 128))))
+    my_cmap = mpl.colors.ListedColormap(my_colors, name='my_cmap')
+    return my_cmap
 
 
 def plot_feature_space(dict_features, out_dir='figures/feature_space', show_diff=True, format='png'):
@@ -657,6 +748,10 @@ def plot_prediction(image_path, ckpt_trajs_dict, out_dir='figures/prediction', f
         print(f'Saved {out_path}')
 
 
+def plot_multiple_predictions():
+    pass 
+
+
 def plot_decoder_overlay(image_path, dict_features, out_dir='figures/decoder', format='png', resize_factor=0.25):
     # take decoder name 
     first_ckpt_dict = dict_features[list(dict_features)[0]]
@@ -1049,15 +1144,15 @@ def plot_importance_analysis(
                 )
 
 
-def get_correct_raw_img(input):
+def get_correct_scene_img(input):
     n_channel, height, width = input.shape
     blue, green, red = input[0], input[1], input[2]
-    raw_img = np.empty((height, width, 3))
-    raw_img[:, :, 0] = red
-    raw_img[:, :, 1] = green 
-    raw_img[:, :, 2] = blue 
-    raw_img = (raw_img - input.min()) / (input.max() - input.min())
-    return raw_img 
+    scene_img = np.empty((height, width, 3))
+    scene_img[:, :, 0] = red
+    scene_img[:, :, 1] = green 
+    scene_img[:, :, 2] = blue 
+    scene_img = (scene_img - input.min()) / (input.max() - input.min())
+    return scene_img 
 
 
 def plot_saliency_maps(
@@ -1065,7 +1160,6 @@ def plot_saliency_maps(
     out_dir='figures/saliency_maps', format='png', 
     side_by_side=True, best_point=None):
     # ## plot for one sample
-    scene_id, meta_id = filename.split('__')[1], filename.split('__')[2]
     _, _, height, width = input.shape
     fig, axes = plt.subplots(1, 2, figsize=(width/100*2+1, height/100))
 
@@ -1076,7 +1170,7 @@ def plot_saliency_maps(
         grad_input = grad_input.cpu().detach().numpy()
     
     # prepare input and switch channels
-    raw_img = get_correct_raw_img(input[0])
+    scene_img = get_correct_scene_img(input[0])
 
     # prepare grad 
     grad_img = grad_input.sum(axis=(0, 1))
@@ -1086,8 +1180,8 @@ def plot_saliency_maps(
 
     if side_by_side:
         # plot raw image
-        axes[0].imshow(raw_img)
-        axes[0].set_title(f'{scene_id}: {meta_id}')
+        axes[0].imshow(scene_img)
+        axes[0].set_title('original scene')
         # plot grad
         if best_point is not None:
             plt.scatter(best_point[0], best_point[1], c='r', marker='*')
@@ -1102,11 +1196,13 @@ def plot_saliency_maps(
 
     # plot overlay
     fig, ax = plt.subplots(1, 1, figsize=(width/100, height/100))
-    ax.imshow(raw_img) # num of y, num of x
-    ax.imshow(grad_img, cmap='copper', alpha=0.5)
+    ax.imshow(scene_img) # num of y, num of x
+    print(grad_img.min(), grad_img.max())
+    im = ax.imshow(grad_img, cmap='hot', vmin=0, alpha=0.65)
+    plt.colorbar(im, ax=ax, shrink=0.5)
     if best_point is not None:
-        plt.scatter(best_point[0], best_point[1], c='r', marker='*') 
-    ax.set_title(f'{meta_id}({scene_id}): {saliency_name}')
+        plt.scatter(best_point[0], best_point[1], c='r', s=4, marker='*') 
+    ax.set_title(saliency_name)
     # save 
     out_path = os.path.join(out_dir, f'{filename}__overlay.{format}')
     plt.savefig(out_path, bbox_inches='tight')

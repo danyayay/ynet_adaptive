@@ -1,4 +1,3 @@
-
 import os
 import cv2
 import torch
@@ -780,7 +779,25 @@ def filter_long_tail_df(df_varfs, varf_list, n=3):
     return df_varfs_filter, p_filter
 
 
-def dataset_split(data_path, train_files, val_ratio, n_leftouts, by_order='True', share_val_test=False):
+def dataset_split(
+    data_path, train_files, val_ratio=0.1, n_leftouts=None, 
+    by_order=True, share_val_test=False, given_scenes=None):
+    if n_leftouts:
+        df_train, df_val, df_test = dataset_split_given_ratio_and_leftout(
+            data_path, train_files, val_ratio, n_leftouts, 
+            by_order, share_val_test)
+    elif given_scenes:
+        df_test = dataset_split_given_scenes(
+            data_path, train_files, given_scenes)
+        df_train, df_val = None, None
+    else:
+        # TODO: cases where train files and val files do not overlap 
+        raise ValueError('No implementation in this case')
+    return df_train, df_val, df_test 
+
+
+def dataset_split_given_ratio_and_leftout(
+    data_path, train_files, val_ratio, n_leftouts=None, by_order=True, share_val_test=False):
     print(f"Split {train_files} given val_ratio={val_ratio}, n_leftout={n_leftouts}")
     df_train, df_val, df_test = pd.DataFrame([]), pd.DataFrame([]), pd.DataFrame([])
     for train_file, n_leftout in zip(train_files, n_leftouts):
@@ -857,11 +874,42 @@ def reduce_df_meta_ids(df, meta_ids):
     return df[(df["metaId"].values == meta_ids[:, None]).sum(axis=0).astype(bool)]
 
 
-def dataset_given_scenes(data_path, files, scenes):
+def dataset_split_given_scenes(data_path, files, scenes):
     print(f"Split {files} given scenes={scenes}")
     df = pd.concat([pd.read_pickle(os.path.join(data_path, file)) for file in files])
     df_selected = df[df.sceneId.isin(scenes)]
     return df_selected
+
+
+def get_meta_ids_focus(df=None, given_meta_ids=None, given_csv=None, random_n=None):
+    if given_meta_ids is not None:
+        if isinstance(given_meta_ids, int):
+            meta_ids_focus = [given_meta_ids]
+        elif isinstance(given_meta_ids, list):
+            meta_ids_focus = given_meta_ids
+        else:
+            raise ValueError(f'Invalid given_meta_ids={given_meta_ids}')
+    elif given_csv is not None:
+        path = given_csv['path']
+        col1, col2, op = given_csv['name'].split('__')
+        n_limited = given_csv['n_limited']
+        df_result = pd.read_csv(path)
+        if op == 'diff':
+            df_result.loc[:, 'diff'] = df_result[col1].values - df_result[col2].values
+        elif op == 'abs_diff':
+            df_result.loc[:, 'diff'] = np.abs(df_result[col1].values - df_result[col2].values)
+        else:
+            raise ValueError(f'Invalid op={op}')
+        meta_ids_focus = df_result.sort_values(
+            by='diff', ascending=False).head(n_limited).metaId.values
+    elif random_n is not None:
+        unique_meta_ids = df.metaId.unique() 
+        np.random.shuffle(unique_meta_ids)
+        meta_ids_focus = unique_meta_ids[:random_n]
+    else:
+        meta_ids_focus = df.metaId.unique() 
+    print('Focusing on meta_ids=', meta_ids_focus)
+    return meta_ids_focus
 
 
 def set_random_seeds(random_seed=0):
