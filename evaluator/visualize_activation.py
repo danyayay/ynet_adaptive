@@ -1,8 +1,8 @@
 import pandas as pd
-from utils.dataset import set_random_seeds, dataset_split, dataset_given_scenes
 from utils.parser import get_parser
-from utils.util import get_params, get_image_and_data_path, get_ckpt_name, restore_model
-from utils.visualize import plot_feature_space_compare
+from utils.dataset import set_random_seeds, dataset_split, get_meta_ids_focus
+from utils.util import get_params, get_image_and_data_path, restore_model, get_ckpts_and_names
+from evaluator.visualization import plot_feature_space_compare
 
 
 def main(args):
@@ -12,31 +12,18 @@ def main(args):
     IMAGE_PATH, DATA_PATH = get_image_and_data_path(params)
     params.update({'decision': 'map'})
 
-    # data 
-    if args.n_leftouts:
-        _, _, df_test = dataset_split(DATA_PATH, args.val_files, 0, args.n_leftouts)
-    elif args.scenes:
-        df_test = dataset_given_scenes(DATA_PATH, args.val_files, args.scenes)
-    else:
-        _, df_test, _ = dataset_split(DATA_PATH, args.val_files, 0)
+    # prepare data 
+    _, _, df_test = dataset_split(DATA_PATH, args.val_files, 0, args.n_leftouts)
     print(f"df_test: {df_test.shape}; #={df_test.shape[0]/(params['obs_len']+params['pred_len'])}")
+    meta_ids_focus = get_meta_ids_focus(df_test, 
+        given_csv={'path': args.result_path, 'name': args.result_name, 'n_limited': args.result_limited}, 
+        given_meta_ids=args.given_meta_ids, random_n=args.random_n)
+    df_test = df_test[df_test.metaId.isin(meta_ids_focus)]
+    print(f"df_test_limited: {df_test.shape}; #={df_test.shape[0]/(params['obs_len']+params['pred_len'])}")
 
     # ckpts
-    if args.pretrained_ckpt is not None:
-        ckpts = [args.pretrained_ckpt] + args.tuned_ckpts
-        ckpts_name = ['OODG'] + [get_ckpt_name(ckpt) for ckpt in args.tuned_ckpts]
-    else:
-        raise ValueError('No checkpoints provided')
-
-    # select most significant ones 
-    if args.n_limited is not None:
-        df_result = pd.read_csv(
-            './csv/comparison/1__filter_agent_type_deathCircle_0__Biker/OODG_encoder_0(20)_encoder_0-1(20).csv')
-        df_result.loc[:, 'diff_ade'] = df_result['ade_OODG'].values - df_result['ade_encoder_0(20)'].values
-        meta_ids_limited = df_result.sort_values(
-            by='diff_ade', ascending=False).head(args.n_limited).metaId.values
-        df_test = df_test[df_test.metaId.isin(meta_ids_limited)]
-        print(f"df_test_limited: {df_test.shape}; #={df_test.shape[0]/(params['obs_len']+params['pred_len'])}")
+    ckpts, ckpts_name, is_file_separated = get_ckpts_and_names(
+        args.ckpts, args.ckpts_name, args.pretrained_ckpt, args.tuned_ckpts)
 
     # main  
     ckpts_hook_dict = {}
@@ -45,7 +32,9 @@ def main(args):
         print(f'====== {ckpt_name} ======')
 
         # model 
-        model = restore_model(params, ckpt_name, args.pretrained_ckpt, ckpt)
+        model = restore_model(params, is_file_separated, ckpt_name, 
+            ckpt if not is_file_separated else args.pretrained_ckpt, 
+            None if not is_file_separated else ckpt)
         model.model.eval()
 
         # register layer 
@@ -67,26 +56,38 @@ def main(args):
         layers_hook['encoder.stages.0.0_input'] = layer
             
         # forward 
-        pred_goal_map, pred_traj_map, raw_img = model.forward_test(
-            df_test, IMAGE_PATH, require_input_grad=False, noisy_std_frac=None) 
+        pred_goal_map, pred_traj_map, raw_img, feature_input = model.forward_test(
+            df_test, IMAGE_PATH, set_input=[], noisy_std_frac=None) 
         
         # store 
         for layer_name in layers_dict.keys():
-            ckpts_hook_dict[ckpt_name][layer_name] = layers_hook[layer_name].output
+            ckpts_hook_dict[ckpt_name][layer_name+'_output'] = layers_hook[layer_name].output
         ckpts_hook_dict[ckpt_name]['encoder.stages.0.0_input'] = \
             layers_hook['encoder.stages.0.0_input'].input
-        ckpts_hook_dict[ckpt_name]['goal_decoder.predictor'] = pred_goal_map
-        ckpts_hook_dict[ckpt_name]['traj_decoder.predictor'] = pred_traj_map
+        semantic_imgs = layers_hook['encoder.stages.0.0_input'].input[:, :6]
+        pred_goal_map_sigmoid = model.model.sigmoid(pred_goal_map / params['temperature'])  
+        pred_traj_map_sigmoid = model.model.sigmoid(pred_traj_map / params['temperature'])
+        ckpts_hook_dict[ckpt_name]['goal_decoder.predictor_sigmoid'] = pred_goal_map_sigmoid
+        ckpts_hook_dict[ckpt_name]['traj_decoder.predictor_sigmoid'] = pred_traj_map_sigmoid
+        ckpts_hook_dict[ckpt_name]['goal_decoder.predictor_output'] = pred_goal_map
+        ckpts_hook_dict[ckpt_name]['traj_decoder.predictor_output'] = pred_traj_map
         
         for key, value in ckpts_hook_dict[ckpt_name].items():
             print(key, value.shape)
+        print('semantic_imgs', semantic_imgs.shape)
 
     # plot 
     folder_name = f"{args.seed}__{'_'.join(args.dataset_path.split('/'))}__{'_'.join(args.val_files).rstrip('.pkl')}" 
     index = df_test.groupby(by=['metaId', 'sceneId']).count().index
+    print(index)
     plot_feature_space_compare(ckpts_hook_dict, index, 
         f'figures/feature_space_compare/{folder_name}', 
-        compare_raw=True, compare_diff=True, compare_overlay=True, raw_img=raw_img)
+        compare_raw=args.compare_raw, compare_diff=args.compare_diff, compare_overlay=args.compare_overlay, 
+        scene_imgs=raw_img, semantic_imgs=None, scale_row=True, inhance_diff=False)
+    plot_feature_space_compare(ckpts_hook_dict, index, 
+        f'figures/feature_space_compare/{folder_name}', 
+        compare_raw=args.compare_raw, compare_diff=args.compare_diff, compare_overlay=args.compare_overlay, 
+        scene_imgs=raw_img, semantic_imgs=None, scale_row=False, inhance_diff=False)
     
 
 def hook_store_input(module, input, output):
@@ -99,11 +100,19 @@ def hook_store_output(module, input, output):
 
 if __name__ == '__main__':
     parser = get_parser(False)
-    # visualization
-    parser.add_argument('--tuned_ckpts', default=None, type=str, nargs='+')
-    parser.add_argument('--n_limited', default=None, type=int)
+    # data
+    parser.add_argument('--given_meta_ids', default=None, type=int, nargs='+')
+    parser.add_argument('--result_path', default=None, type=str)
+    parser.add_argument('--result_name', default=None, type=str)
+    parser.add_argument('--result_limited', default=None, type=int)
+    parser.add_argument('--random_n', default=None, type=int)
+    # plot 
+    parser.add_argument('--compare_raw', action='store_true')
+    parser.add_argument('--compare_diff', action='store_true')
+    parser.add_argument('--compare_overlay', action='store_true')
     args = parser.parse_args()
     main(args)
 
+# python -m pdb -m evaluator.visualize_activation --dataset_path filter/agent_type/deathCircle_0 --pretrained_ckpt ckpts/Seed_1_Train__Pedestrian__Val__Pedestrian__Val_Ratio_0.1_filter_agent_type__train_all_weights.pt --tuned_ckpts ckpts/Seed_1__Tr_Biker__Val_Biker__ValRatio_0.1__filter_agent_type_deathCircle_0__encoder_0__TrN_20.pt --val_files Biker.pkl --n_leftouts 500 --result_path './csv/comparison/1__filter_agent_type_deathCircle_0__Biker/OODG_encoder_0(20)_encoder_0-1(20).csv' --result_name 'ade_OODG__ade_encoder_0(20)__diff' --result_limited 1 --compare_raw --compare_diff --compare_overlay
 
-# python -m pdb -m evaluator.visualize_activation --dataset_path filter/agent_type/deathCircle_0 --pretrained_ckpt ckpts/Seed_1_Train__Pedestrian__Val__Pedestrian__Val_Ratio_0.1_filter_agent_type__train_all_weights.pt --tuned_ckpts ckpts/Seed_1__Tr_Biker__Val_Biker__ValRatio_0.1__filter_agent_type_deathCircle_0__encoder_0__TrN_20.pt --val_files Biker.pkl --n_leftouts 10 
+# python -m pdb -m evaluator.visualize_activation --dataset_path filter/agent_type --ckpts ckpts/Seed_1_Train__Pedestrian__Val__Pedestrian__Val_Ratio_0.1_filter_agent_type__train_all_weights.pt ckpts/Seed_1_Train__Biker__Val__Biker__Val_Ratio_0.1_filter_agent_type__train_encoder_weights.pt --ckpts_name OODG ET --val_files Biker.pkl --n_leftouts 500 --given_meta_ids 16205 16229

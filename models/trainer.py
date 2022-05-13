@@ -244,12 +244,12 @@ class YNetTrainer:
         else:
             return avg_ade, avg_fde, list_metrics
     
-    def forward_test(self, df_test, image_path, require_input_grad, noisy_std_frac):
-        return self._forward_test(df_test, image_path, require_input_grad, noisy_std_frac, **self.params)
+    def forward_test(self, df_test, image_path, set_input, noisy_std_frac):
+        return self._forward_test(df_test, image_path, set_input, noisy_std_frac, **self.params)
 
     def _forward_test(
         self, df_test, image_path, 
-        require_input_grad, noisy_std_frac, decision,
+        set_input, noisy_std_frac, decision,
         dataset_name, obs_len, pred_len, resize_factor, 
         use_raw_data, waypoints, kernlen, nsig, loss_scale, **kwargs):
 
@@ -263,12 +263,12 @@ class YNetTrainer:
         gt_template = torch.Tensor(create_gaussian_heatmap_template(
             size=self.template_size, kernlen=kernlen, nsig=nsig, normalize=False)).to(self.device)
         criterion = nn.BCEWithLogitsLoss()
-
+        
         # test 
         if len(test_loader) == 1:
             for traj, _, scene_id in test_loader:
                 scene_raw_img = test_images[scene_id].to(self.device).unsqueeze(0)
-                if noisy_std_frac is not None: 
+                if 'semantic' in set_input and (noisy_std_frac is not None): 
                     # noisy input
                     std = noisy_std_frac * (scene_raw_img.max() - scene_raw_img.min())
                     noisy_scene_img = scene_raw_img + scene_raw_img.new(scene_raw_img.size()).normal_(0, std)
@@ -279,28 +279,46 @@ class YNetTrainer:
                             noisy_scene_img, traj, input_template, gt_template, criterion, 
                             obs_len, pred_len, waypoints, loss_scale, self.device, False)
                     elif decision == 'map':
-                        pred_goal_map, pred_traj_map = self._forward_batch(
+                        pred_goal_map, pred_traj_map, feature_input = self._forward_batch(
                             noisy_scene_img, traj, input_template, gt_template, criterion, 
-                            obs_len, pred_len, waypoints, loss_scale, self.device, True)
+                            obs_len, pred_len, waypoints, loss_scale, self.device, 
+                            set_input, True)
                     else:
                         raise ValueError(f'No support for decision={decision}')
-                else:
+                elif ('semantic' not in set_input) and (noisy_std_frac is not None): 
+                    # forward 
+                    if decision == 'loss':
+                        goal_loss, traj_loss = self._forward_batch(
+                            noisy_scene_img, traj, input_template, gt_template, criterion, 
+                            obs_len, pred_len, waypoints, loss_scale, self.device, False)
+                    elif decision == 'map':
+                        pred_goal_map, pred_traj_map, semantic_input_cat, feature_input = self._forward_batch(
+                            scene_raw_img, traj, input_template, gt_template, criterion, 
+                            obs_len, pred_len, waypoints, loss_scale, self.device, 
+                            set_input, noisy_std_frac, True)
+                    else:
+                        raise ValueError(f'No support for decision={decision}')
+                else:  # noisy_std_frac is None
                     # require grad for input or not
                     scene_raw_img.requires_grad = False 
-                    if require_input_grad: scene_raw_img.requires_grad = True
+                    if 'scene' in set_input: scene_raw_img.requires_grad = True
                     # forward 
                     if decision == 'loss':
                         goal_loss, traj_loss = self._forward_batch(
                             scene_raw_img, traj, input_template, gt_template, criterion, 
                             obs_len, pred_len, waypoints, loss_scale, self.device, False)
                     elif decision == 'map':
-                        pred_goal_map, pred_traj_map = self._forward_batch(
+                        pred_goal_map, pred_traj_map, feature_input = self._forward_batch(
                             scene_raw_img, traj, input_template, gt_template, criterion, 
-                            obs_len, pred_len, waypoints, loss_scale, self.device, True)
+                            obs_len, pred_len, waypoints, loss_scale, self.device, 
+                            set_input, noisy_std_frac, True)
                     else:
                         raise ValueError(f'No support for decision={decision}')
+        elif len(test_loader) == 0:
+            raise ValueError('No data is provided')
         else:
-            raise ValueError(f'Received more than 1 batch ({len(test_loader)})')
+            # TODO: make it work for multiple scenes 
+            raise ValueError(f'Received more than 1 scene ({len(test_loader)})')
         
         if decision == 'loss':
             if noisy_std_frac is not None:
@@ -309,13 +327,14 @@ class YNetTrainer:
                 return goal_loss, traj_loss, scene_raw_img 
         elif decision == 'map':
             if noisy_std_frac is not None:
-                return pred_goal_map, pred_traj_map, scene_raw_img, noisy_scene_img
+                return pred_goal_map, pred_traj_map, scene_raw_img, noisy_scene_img, semantic_input_cat, feature_input
             else:
-                return pred_goal_map, pred_traj_map, scene_raw_img
+                return pred_goal_map, pred_traj_map, scene_raw_img, feature_input
 
     def _forward_batch(
         self, scene_raw_img, traj, input_template, gt_template, criterion, 
-        obs_len, pred_len, waypoints, loss_scale, device, return_pred_map):
+        obs_len, pred_len, waypoints, loss_scale, device, 
+        set_input=None, noisy_std_frac=None, return_pred_map=False):
         
         # model 
         model = self.model.to(self.device)
@@ -328,16 +347,41 @@ class YNetTrainer:
         observed_map = torch.stack(observed_map).reshape([-1, obs_len, H, W]) 
 
         # create heatmap for groundtruth future trajectories 
-        gt_future = traj[:, obs_len:].to(device)  
+        gt_future = traj[:, obs_len:].to(device)
         gt_future_map = get_patch(gt_template, gt_future.reshape(-1, 2).cpu().numpy(), H, W)
         gt_future_map = torch.stack(gt_future_map).reshape([-1, pred_len, H, W])
         
         # create semantic segmentation map for all bacthes 
         scene_image = model.segmentation(scene_raw_img)
-        semantic_image = scene_image.expand(observed_map.shape[0], -1, -1, -1)  
+        semantic_image = scene_image.expand(observed_map.shape[0], -1, -1, -1)
 
         # forward 
-        feature_input = torch.cat([semantic_image, observed_map], dim=1) 
+        observed_map.requires_grad = False 
+        noisy_semantic, noisy_traj = False, False 
+        if ('semantic' in set_input) and (noisy_std_frac is not None):
+            # noisy semantic
+            std = noisy_std_frac * (semantic_image.max() - semantic_image.min())
+            noisy_semantic_image = semantic_image + semantic_image.new(semantic_image.size()).normal_(0, std)
+            noisy_semantic_image.requires_grad = True
+            noisy_semantic = True 
+        if ('traj' in set_input) and (noisy_std_frac is not None): 
+            # noisy traj 
+            std = noisy_std_frac * (observed_map.max() - observed_map.min())
+            noisy_observed_map = observed_map + observed_map.new(observed_map.size()).normal_(0, std)
+            noisy_observed_map.requires_grad = True
+            noisy_traj = True 
+        elif 'traj' in set_input:
+            observed_map.requires_grad = True
+        
+        # feature input 
+        if noisy_semantic and noisy_traj:
+            feature_input = torch.cat([noisy_semantic_image, noisy_observed_map], dim=1)
+        elif noisy_semantic and not noisy_traj:
+            feature_input = torch.cat([noisy_semantic_image, observed_map], dim=1)
+        elif not noisy_semantic and noisy_traj:
+            feature_input = torch.cat([semantic_image, noisy_observed_map], dim=1)
+        else:
+            feature_input = torch.cat([semantic_image, observed_map], dim=1) 
         features = model.pred_features(feature_input)
         pred_goal_map = model.pred_goal(features)
 
@@ -357,7 +401,10 @@ class YNetTrainer:
         traj_loss = criterion(pred_traj_map, gt_future_map) * loss_scale  
         
         if return_pred_map:
-            return pred_goal_map, pred_traj_map
+            if noisy_semantic or noisy_traj:
+                return pred_goal_map, pred_traj_map, torch.cat([semantic_image, observed_map], dim=1), feature_input
+            else:
+                return pred_goal_map, pred_traj_map, feature_input
         return goal_loss, traj_loss
 
     def prepare_data(
