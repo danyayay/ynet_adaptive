@@ -30,21 +30,42 @@ def conv1x1(in_planes, out_planes=None, stride=1, bias=False):
         return nn.Conv2d(in_planes, out_planes, kernel_size=1, stride=stride, padding=0, bias=bias)
 
 
+def conv3x3(in_planes, out_planes=None, stride=1, bias=False):
+    if out_planes is None:
+        return nn.Conv2d(in_planes, in_planes, kernel_size=3, stride=stride, padding=1, bias=bias)
+    else:
+        return nn.Conv2d(in_planes, out_planes, kernel_size=3, stride=stride, padding=1, bias=bias)
+
+
 class Adapter(nn.Module):
     def __init__(self, planes, adapter_type, out_planes=None, stride=1):
         super(Adapter, self).__init__()
         self.adapter_type = adapter_type
         if adapter_type == 'serial':
             self.adapter_layer = nn.Sequential(nn.BatchNorm2d(planes), conv1x1(planes))
-        elif adapter_type == 'parallel':
-            self.adapter_layer = conv1x1(planes, out_planes, stride) 
+        elif adapter_type == 'parallel' or adapter_type == 'parallel_1x1':
+            self.adapter_layer = conv1x1(planes, out_planes, stride)
+        elif adapter_type == 'parallel_3x3':
+            self.adapter_layer = conv3x3(planes, out_planes, stride)
+        elif adapter_type == 'parallel_1x1_3x3':
+            self.adapter_layer = nn.ModuleList([
+                conv1x1(planes, out_planes, stride),
+                conv3x3(planes, out_planes, stride)
+            ])
         else:
             self.adapter_layer = conv1x1(planes)
 
     def forward(self, x):
-        y = self.adapter_layer(x)
-        if self.adapter_type == 'serial':
+        if len(self.adapter_type.split('_')) > 2:
+            y = 0
+            for layer in self.adapter_layer:
+                x_ = layer(x)
+                y += x_
+        elif 'serial' in self.adapter_type:
+            y = self.adapter_layer(x)
             y += x
+        else:
+            y = self.adapter_layer(x)
         return y
 
 
@@ -90,36 +111,38 @@ class YNetEncoder(nn.Module):
         self.adapter_type = adapter_type 
         self.adapter_position = adapter_position
         parellel_channels_in = [in_channels] + channels[:-1]
-        if self.adapter_type == 'serial':
-            self.adapters = nn.ModuleList([
-                Adapter(channels[i], adapter_type) for i in adapter_position])
-        elif self.adapter_type == 'parallel':
-            self.adapters = nn.ModuleList([
-                Adapter(parellel_channels_in[i], adapter_type, channels[i]) for i in adapter_position])
+        if self.adapter_type is not None:
+            if 'serial' in self.adapter_type:
+                self.adapters = nn.ModuleList([
+                    Adapter(channels[i], adapter_type) for i in adapter_position])
+            elif 'parallel' in self.adapter_type:
+                self.adapters = nn.ModuleList([
+                    Adapter(parellel_channels_in[i], adapter_type, channels[i]) for i in adapter_position])
 
     def forward(self, x):
         # Saves the feature maps Tensor of each layer into a list, as we will later need them again for the decoder
         features = []
         j = 0
         for i, stage in enumerate(self.stages):
-            if self.adapter_type == 'serial':
-                x = stage(x) 
-                if i in self.adapter_position:
-                    x = self.adapters[j](x)
-                    j += 1
-            elif self.adapter_type == 'parallel':
-                if isinstance(stage[0], nn.MaxPool2d):
-                    y = stage[0](x)
-                    x = stage(x)
+            if self.adapter_type is not None:
+                if 'serial' in self.adapter_type:
+                    x = stage(x) 
                     if i in self.adapter_position:
-                        x = x + self.adapters[j](y)
+                        x = self.adapters[j](x)
                         j += 1
-                else:
-                    y = stage(x)
-                    if i in self.adapter_position:
-                        y = y + self.adapters[j](x)
-                        j += 1
-                    x = y
+                elif 'parallel' in self.adapter_type:
+                    if isinstance(stage[0], nn.MaxPool2d):
+                        y = stage[0](x)
+                        x = stage(x)
+                        if i in self.adapter_position:
+                            x = x + self.adapters[j](y)
+                            j += 1
+                    else:
+                        y = stage(x)
+                        if i in self.adapter_position:
+                            y = y + self.adapters[j](x)
+                            j += 1
+                        x = y
             else:
                 x = stage(x)
             features.append(x)
@@ -240,15 +263,16 @@ class YNet(nn.Module):
             adapter_type=adapter_type, adapter_position=adapter_position)
 
         # initialize as 0
-        if adapter_type == 'serial':
-            if adapter_initialization == 'zero':
-                for n, p in self.encoder.adapters.named_parameters():
-                    if n.endswith('1.weight'):
+        if adapter_type is not None:
+            if 'serial' in adapter_type:
+                if adapter_initialization == 'zero':
+                    for n, p in self.encoder.adapters.named_parameters():
+                        if n.endswith('1.weight'):
+                            torch.nn.init.zeros_(p)
+            elif 'parallel' in adapter_type:
+                if adapter_initialization == 'zero':
+                    for n, p in self.encoder.adapters.named_parameters():
                         torch.nn.init.zeros_(p)
-        elif adapter_type == 'parallel':
-            if adapter_initialization == 'zero':
-                for n, p in self.encoder.adapters.named_parameters():
-                    torch.nn.init.zeros_(p)
 
         self.goal_decoder = YNetDecoder(encoder_channels, decoder_channels, output_len=pred_len)
         self.traj_decoder = YNetDecoder(encoder_channels, decoder_channels, output_len=pred_len, traj=n_waypoints)
