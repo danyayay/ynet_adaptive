@@ -4,7 +4,6 @@ import numpy as np
 import pandas as pd
 from utils.image_utils import get_patch, sampling, image2world
 from utils.kmeans import kmeans
-from evaluator.visualization import plot_input_space
 
 
 def torch_multivariate_gaussian_heatmap(coordinates, H, W, dist, sigma_factor, ratio, device, rot=False):
@@ -40,7 +39,7 @@ def evaluate(
     dataset_name, homo_mat, input_template, waypoints, mode, 
     n_goal, n_traj, obs_len, batch_size, resize_factor=0.25, with_style=False, 
     temperature=1, use_TTST=False, use_CWS=False, rel_thresh=0.002, CWS_params=None, 
-    return_features=False, viz_input=False):
+    return_preds=False, return_samples=False):
     """
 
     :param model: torch model
@@ -72,8 +71,14 @@ def evaluate(
     df_out = pd.DataFrame()
 
     # variables for visualization
-    if return_features:
-        trajs_dict = {'groundtruth': [], 'prediction': []}
+    if return_preds:
+        if return_samples:
+            trajs_dict = {'groundtruth': [], 'prediction': [], 'waypoint_sample': [], 'goal_map': [], 'goal_sigmoid_map': []} 
+        else:
+            trajs_dict = {'groundtruth': [], 'prediction': []} 
+    else:
+        trajs_dict = None 
+    
 
     with torch.no_grad():
         # outer loop, for loop over each scene as scenes have different image size and to calculate segmentation only once
@@ -101,11 +106,6 @@ def evaluate(
                 gt_future = trajectory[b:b+batch_size, obs_len:].to(device)  # (batch_size, pred_len)
                 semantic_image = scene_image.expand(observed_map.shape[0], -1, -1, -1)  # (batch_size, n_class, height, width)
 
-                if viz_input:
-                    plot_input_space(semantic_image.cpu().detach().numpy(), 
-                        observed_map.cpu().detach().numpy(), meta_ids[b:b+batch_size], 
-                        scene_id, 'figures/input_space')
-
                 # Forward pass
                 feature_input = torch.cat([semantic_image, observed_map], dim=1)  # (batch_size, n_class+obs_len, height, width)
                 features = model.pred_features(feature_input)  # n_layer=6 list of (batch_size, n_channel, height, width)       
@@ -115,8 +115,8 @@ def evaluate(
                     features = model.stylize_features(features, 0)
 
                 # Predict goal and waypoint probability distributions
-                pred_waypoint_map = model.pred_goal(features)  # (batch_size, pred_len, height, width)
-                pred_waypoint_map = pred_waypoint_map[:, waypoints]  # (batch_size, n_waypoints, height, width)
+                pred_goal_map = model.pred_goal(features)  # (batch_size, pred_len, height, width)
+                pred_waypoint_map = pred_goal_map[:, waypoints]  # (batch_size, n_waypoints, height, width)
 
                 pred_waypoint_map_sigmoid = pred_waypoint_map / temperature 
                 pred_waypoint_map_sigmoid = model.sigmoid(pred_waypoint_map_sigmoid)  # (batch_size, n_waypoints, height, width)
@@ -158,10 +158,6 @@ def evaluate(
                     goal_samples = goal_samples.permute(2, 0, 1, 3)  # (n_goal, batch_size, 1, n_coord)
 
                 # Predict waypoints:
-                # in case len(waypoints) == 1, so only goal is needed (goal counts as one waypoint in this implementation)
-                if len(waypoints) == 1:
-                    waypoint_samples = goal_samples
-
                 ################################################ CWS ###################################################
                 # CWS Begin
                 if use_CWS and len(waypoints) > 1:
@@ -228,9 +224,19 @@ def evaluate(
                     goal_samples = goal_samples.repeat(n_traj, 1, 1, 1)  # repeat K_a times
                     waypoint_samples = torch.cat([waypoint_samples, goal_samples], dim=2)
 
+                # in case len(waypoints) == 1, only goal is needed (goal counts as one waypoint in this implementation)
+                elif len(waypoints) == 1:
+                    waypoint_samples = goal_samples
+
+                if return_samples:
+                    trajs_dict['goal_map'].append(pred_goal_map.cpu().detach().numpy())
+                    trajs_dict['goal_sigmoid_map'].append(model.sigmoid(pred_goal_map / temperature).cpu().detach().numpy())
+                    # (n_goal, batch_size, 1, n_coord) -> (batch_size, 1, n_goal, n_coord)
+                    trajs_dict['waypoint_sample'].append(
+                        waypoint_samples.permute(1, 2, 0, 3).cpu().detach().numpy())  
+
                 # Interpolate trajectories given goal and waypoints
-                future_samples = []
-                list_traj_pred = []
+                trajs_samples = []
                 for waypoint in waypoint_samples:
                     waypoint_map = get_patch(
                         input_template, waypoint.reshape(-1, 2).cpu().numpy(), H, W)  # batch_size list of (height, width)
@@ -247,8 +253,8 @@ def evaluate(
                     # predict trajectory
                     pred_traj_map = model.pred_traj(traj_input)  # (batch_size, pred_len, height, width)
                     pred_traj = model.softargmax(pred_traj_map)  # (batch_size, pred_len, n_coord)
-                    future_samples.append(pred_traj)
-                future_samples = torch.stack(future_samples)  # (n_goal, batch_size, pred_len, n_coord)
+                    trajs_samples.append(pred_traj)
+                trajs_samples = torch.stack(trajs_samples)  # (n_goal, batch_size, pred_len, n_coord)
                 
                 gt_goal = gt_future[:, -1:]  # (batch_size, 1, n_coord)
 
@@ -258,19 +264,20 @@ def evaluate(
                     pred_traj = image2world(pred_traj, scene_id, homo_mat, resize_factor)
                     gt_future = image2world(gt_future, scene_id, homo_mat, resize_factor)
                 
-                ade_batch = ((((gt_future - future_samples) / resize_factor) ** 2).sum(dim=3) ** 0.5).mean(dim=2)
+                ade_batch = ((((gt_future - trajs_samples) / resize_factor) ** 2).sum(dim=3) ** 0.5).mean(dim=2)
                 fde_batch = ((((gt_goal - waypoint_samples[:, :, -1:]) / resize_factor) ** 2).sum(dim=3) ** 0.5)
                 
-                if return_features:
+                if return_preds:
                     if b == 0:
                         trajs_dict['groundtruth'].append(
                             trajectory.cpu().detach().numpy() / resize_factor)  # (batch_size, tot_len, n_coor)
                     # take the most accurate prediction only 
                     best_indices = ade_batch.argmin(axis=0)
-                    trajs_dict['prediction'].append((future_samples[
-                        best_indices, range(future_samples.shape[1]), ...] 
+                    trajs_dict['prediction'].append((trajs_samples[
+                        best_indices, range(trajs_samples.shape[1]), ...] 
                         / resize_factor).cpu().detach().numpy())  # (n_goal, batch_size, n_coor)
                 
+                # TODO: a potential bug? ADE and FDE may not take the same traj prediction 
                 ade = ade_batch.min(dim=0)[0].cpu().detach().numpy()  # (batch_size, )
                 fde = fde_batch.min(dim=0)[0][:,0].cpu().detach().numpy()  # (batch_size, )
                 val_ade_list.append(ade)
@@ -290,11 +297,10 @@ def evaluate(
         df_out.loc[:, 'ade'] = val_ade_arr
         df_out.loc[:, 'fde'] = val_fde_arr
 
-    if return_features:
+    if return_preds:
         for key, value in trajs_dict.items():
             trajs_dict[key] = np.concatenate(value, axis=0)
         trajs_dict['metaId'] = meta_id_ready
         trajs_dict['sceneId'] = scene_id_ready
-        return val_ade_avg, val_fde_avg, df_out, trajs_dict
-    else:
-        return val_ade_avg, val_fde_avg, df_out
+
+    return val_ade_avg, val_fde_avg, df_out, trajs_dict
