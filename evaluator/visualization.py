@@ -12,6 +12,7 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 mpl.use('Agg')
 from utils.dataset import create_images_dict
+from utils.image_utils import resize
 
 
 labels = {"all": "vanilla fine-tuning",
@@ -121,15 +122,15 @@ def base_img_plot(ax, scene_img, semantic_img=None):
         im = ax.imshow(img, cmap='gray')
     else:
         im = ax.imshow(scene_img)
-    ax.set_xticks([])
-    ax.set_yticks([])
+    ax.set_xticklabels([])
+    ax.set_yticklabels([])
     return im
 
 
 def plot_feature_space_compare(
     ckpts_hook_dict, index, 
     out_dir='figures/feature_space_compare', format='png', 
-    compare_raw=True, compare_diff=False, compare_overlay=False, 
+    compare_raw=True, compare_diff=False, compare_overlay=False, compare_relative=False,
     scene_imgs=None, semantic_imgs=None, scale_row=True, inhance_diff=True):
     # semantic_map (class=0~5): 
     #     - channel 1: pavement
@@ -325,6 +326,108 @@ def plot_feature_space_compare(
                     plt.subplots_adjust(wspace=0.01, hspace=0.02, bottom=0.1, right=0.78, top=0.9)
                     out_name = f'{layer_name}__scaled' if scale_row else layer_name 
                     out_name = f'{out_name}__diff_on_seg.{format}' if semantic_img is not None else f'{out_name}__diff_on_scene.{format}'
+                    out_path = os.path.join(new_out_dir, out_name)
+                    plt.savefig(out_path, bbox_inches='tight')
+                    plt.close(fig)
+                    print(f'Saved {out_path}')
+
+                if compare_relative:
+                    if semantic_imgs is not None:
+                        fig, axes = plt.subplots(n_ckpt-1, n_channel+2, 
+                            figsize=(width*(n_channel+2)+1, height*(n_ckpt-1)))
+                    else:
+                        fig, axes = plt.subplots(n_ckpt-1, n_channel, 
+                            figsize=(width*n_channel+1, height*(n_ckpt-1)))
+                    r = 0
+                    for ckpt_name, hook_dict in ckpts_hook_dict.items():
+                        if ckpt_name != 'OODG':
+                            # prepare base 
+                            base_features = ckpts_hook_dict['OODG'][layer_name][i]
+                            if isinstance(base_features, torch.Tensor):
+                                base_features = base_features.cpu().detach().numpy()
+                            # other ckpt 
+                            features = hook_dict[layer_name][i]
+                            if isinstance(features, torch.Tensor):
+                                features = features.cpu().detach().numpy()
+                            if isinstance(scene_imgs, torch.Tensor):
+                                scene_imgs = scene_imgs.cpu().detach().numpy()
+                            if isinstance(semantic_imgs, torch.Tensor):
+                                semantic_imgs = semantic_imgs.cpu().detach().numpy()
+                            scene_img = get_correct_scene_img(scene_imgs[0]) if scene_imgs.shape[0] == 1 \
+                                else get_correct_scene_img(scene_imgs[i])
+                            if semantic_imgs is not None:
+                                semantic_img = semantic_imgs[0] if semantic_imgs.shape[0] == 1 else semantic_imgs[i]
+                            else:
+                                semantic_img = None
+                            relative = np.empty(base_features.shape)
+                            relative.fill(np.nan)
+                            np.divide(features - base_features, np.abs(base_features), out=relative, where=base_features!=0)
+                            vmin, vmax = np.nanmin(relative), np.nanmax(relative)
+                            # plot 
+                            if n_ckpt - 1 != 1:
+                                # more than 1 row 
+                                for c in range(n_channel):
+                                    axes[r, c].imshow(scene_img)
+                                    if inhance_diff:
+                                        masked_array = np.ma.array(relative[c], mask=(-0.1 <= relative[c]) & (relative[c] <= 0.1))
+                                        cmap = mpl.cm.get_cmap(cmap_div)
+                                        cmap.set_bad('white', 0.1)
+                                        if not scale_row: 
+                                            vmin, vmax = np.min(relative[c]), np.max(relative[c])
+                                        divnorm = mpl.colors.TwoSlopeNorm(vcenter=vcenter, vmin=vmin, vmax=vmax)
+                                        im = axes[r, c].imshow(masked_array, cmap=cmap, norm=divnorm, alpha=0.5)
+                                        if not scale_row:
+                                            plt.colorbar(im, ax=axes[r, c], shrink=0.5)
+                                    else:
+                                        if not scale_row:
+                                            vmin, vmax = np.min(relative[c]), np.max(relative[c])
+                                        divnorm = mpl.colors.TwoSlopeNorm(vcenter=vcenter, vmin=vmin, vmax=vmax)
+                                        im = axes[r, c].imshow(relative[c], cmap=cmap_div, norm=divnorm, alpha=0.5)
+                                        if not scale_row:
+                                            plt.colorbar(im, ax=axes[r, c], shrink=0.5)
+                                    axes[r, c].set_xlabel(f'channel {c+1}')
+                                    if c == 0: 
+                                        axes[r, c].set_ylabel(ckpt_name)
+                                    else:
+                                        axes[r, c].set_yticklabels([])
+                                if scale_row:
+                                    plt.colorbar(im, ax=axes[r, :].ravel().tolist(), shrink=0.8)
+                                if semantic_img is not None:
+                                    base_img_plot(axes[r, -2], scene_img)
+                                    base_img_plot(axes[r, -1], scene_img, semantic_img)
+                            else:
+                                # only a single row 
+                                for c in range(n_channel):
+                                    base_img_plot(axes[c], scene_img, semantic_img)
+                                    if inhance_diff:
+                                        masked_array = np.ma.array(relative[c], mask=(-0.1 <= relative[c]) & (relative[c] <= 0.1))
+                                        cmap = mpl.cm.get_cmap(cmap_div)
+                                        cmap.set_bad('white', 0.1)
+                                        if not scale_row: 
+                                            vmin, vmax = np.min(relative[c]), np.max(relative[c])
+                                        divnorm = mpl.colors.TwoSlopeNorm(vcenter=vcenter, vmin=vmin, vmax=vmax)
+                                        im = axes[c].imshow(masked_array, cmap=cmap, norm=divnorm, alpha=0.5)
+                                        if not scale_row: 
+                                            plt.colorbar(im, ax=axes[c], shrink=0.5)
+                                    else:
+                                        if not scale_row: 
+                                            vmin, vmax = np.min(relative[c]), np.max(relative[c])
+                                        divnorm = mpl.colors.TwoSlopeNorm(vcenter=vcenter, vmin=vmin, vmax=vmax)
+                                        im = axes[c].imshow(relative[c], cmap=cmap_div, norm=divnorm, alpha=0.5)
+                                        if not scale_row: 
+                                            plt.colorbar(im, ax=axes[c], shrink=0.5)
+                                    axes[c].set_xlabel(f'channel {c+1}')
+                                    axes[c].set_yticklabels([])
+                                axes[n_channel//2].set_title(f'{ckpt_name} - OODG')
+                                if scale_row:
+                                    plt.colorbar(im, ax=axes[:].ravel().tolist(), shrink=0.8, location='right')
+                                if semantic_img is not None:
+                                    base_img_plot(axes[-2], scene_img)
+                                    base_img_plot(axes[-1], scene_img, semantic_img)
+                            r += 1
+                    plt.subplots_adjust(wspace=0.01, hspace=0.02, bottom=0.1, right=0.78, top=0.9)
+                    out_name = f'{layer_name}__scaled' if scale_row else layer_name 
+                    out_name = f'{out_name}__diff_rel_on_seg.{format}' if semantic_img is not None else f'{out_name}__diff_rel_on_scene.{format}'
                     out_path = os.path.join(new_out_dir, out_name)
                     plt.savefig(out_path, bbox_inches='tight')
                     plt.close(fig)
@@ -748,8 +851,103 @@ def plot_prediction(image_path, ckpt_trajs_dict, out_dir='figures/prediction', f
         print(f'Saved {out_path}')
 
 
-def plot_multiple_predictions():
-    pass 
+def plot_multiple_predictions(
+    image_path, ckpts_trajs_dict,
+    out_dir='figures/prediction_multiple', format='png', obs_len=8):
+    
+    # prepare scene images 
+    trajs_list = ckpts_trajs_dict[list(ckpts_trajs_dict)[0]]
+    first_dict = trajs_list[0]
+    n_round = len(trajs_list)
+    scene_images = create_images_dict(first_dict['sceneId'], image_path, 'reference.jpg', True)
+    # color
+    cmap = mpl.cm.get_cmap('tab10')
+    for i, meta_id in enumerate(first_dict['metaId']):
+        scene_id = first_dict['sceneId'][i]
+        scene_image = scene_images[scene_id]
+        fig = plt.figure(figsize=(scene_image.shape[0]/100, scene_image.shape[1]/100))
+        plt.imshow(scene_image)
+        ms = 4
+        for j, (ckpt_name, trajs_list) in enumerate(ckpts_trajs_dict.items()):
+            gt_traj = trajs_list[0]['groundtruth'][i]
+            if j == 0:
+                plt.plot(gt_traj[:obs_len,0], gt_traj[:obs_len,1], 
+                    '.-', ms=ms, c='black')
+                plt.plot(gt_traj[(obs_len-1):,0], gt_traj[(obs_len-1):,1], 
+                    '.-', ms=ms, c='black', label='groundtruth')
+            for n in range(n_round):   
+                pred_traj = trajs_list[n]['prediction'][i]            
+                pred_x = np.insert(pred_traj[:,0], 0, gt_traj[obs_len-1,0])
+                pred_y = np.insert(pred_traj[:,1], 0, gt_traj[obs_len-1,1])
+                plt.plot(pred_x, pred_y, '.-', c=cmap(j), ms=ms)
+            plt.plot(0, 0, '.-', c=cmap(j), ms=ms, label=ckpt_name)
+        title = f'meta_id={meta_id}, scene_id={scene_id}'
+        plt.title(title)
+        plt.legend(loc='best')
+        pathlib.Path(out_dir).mkdir(parents=True, exist_ok=True)
+        out_name = f'{meta_id}__{scene_id}'
+        out_path = os.path.join(out_dir, out_name + '.'+ format)
+        plt.savefig(out_path, bbox_inches='tight')
+        plt.close(fig)
+        print(f'Saved {out_path}')
+
+
+def plot_goal_map_with_samples(image_path, ckpts_trajs_dict,
+    out_dir='figures/goal_map_with_samples', format='png', 
+    resize_factor=0.25, waypoint=-1):
+    ms = 4
+    for ckpt_name, trajs_list in ckpts_trajs_dict.items():
+        n_round = len(trajs_list)
+        scene_images = create_images_dict(
+            trajs_list[0]['sceneId'], image_path, 'reference.jpg', True)
+        resize(scene_images, resize_factor)
+        for i, meta_id in enumerate(trajs_list[0]['metaId']):
+            scene_id = trajs_list[0]['sceneId'][i]
+            scene_image = scene_images[scene_id]
+            fig, axes = plt.subplots(2, n_round, figsize=(
+                scene_image.shape[0]/100*n_round, scene_image.shape[1]/100*2))
+            for r, output in enumerate(['output', 'sigmoid_output']):
+                for c, trajs_dict in enumerate(trajs_list):
+                    n_goal = trajs_dict['waypoint_sample'].shape[2]
+                    gt_traj = trajs_dict['groundtruth'][i] * resize_factor
+                    pred_traj = trajs_dict['prediction'][i] * resize_factor
+                    waypoint_sample = trajs_dict['waypoint_sample'][i, waypoint]
+                    goal_map = trajs_dict['goal_map'][i, waypoint]
+                    goal_sigmoid_map = trajs_dict['goal_sigmoid_map'][i, waypoint]               
+                    # show background scene image 
+                    axes[r, c].imshow(scene_image)
+                    # show groundtruth traj
+                    axes[r, c].plot(gt_traj[:,0], gt_traj[:,1], 
+                        '.-', ms=ms, c='black', label='groundtruth')
+                    # show goal map 
+                    if output == 'output':
+                        vmin, vmax = goal_map.min(), goal_map.max()
+                        im = axes[r, c].imshow(goal_map, vmin=vmin, vmax=vmax, cmap='jet', alpha=0.5)
+                    else:
+                        vmin, vmax = goal_sigmoid_map.min(), goal_sigmoid_map.max()
+                        im = axes[r, c].imshow(goal_sigmoid_map, vmin=vmin, vmax=vmax, cmap='jet', alpha=0.5)
+                    # show goal samples 
+                    for n in range(n_goal): 
+                        axes[r, c].scatter(waypoint_sample[n, 0], 
+                            waypoint_sample[n, 1], marker='o', c='white', s=ms)
+                    axes[r, c].scatter(pred_traj[waypoint, 0], 
+                        pred_traj[waypoint, 1], marker='x', c='m', s=ms*2)
+                    axes[r, c].set_yticklabels([])
+                    axes[r, c].set_xticklabels([])
+                    axes[r, c].set_xlabel(f'Round {c}')
+                axes[r, 0].set_ylabel(output)
+                plt.colorbar(im, ax=axes[r, :].ravel().tolist(), shrink=0.8, location='right')
+            # plt.subplots_adjust(wspace=0.05, hspace=0.05, bottom=0.1, right=0.8, top=0.9)
+            title = f'meta_id={meta_id}, scene_id={scene_id}'
+            axes[0, n_round//2].set_title(title)
+            plt.legend(loc='best')
+            out_dir_ = out_dir + f'/{ckpt_name}'
+            pathlib.Path(out_dir_).mkdir(parents=True, exist_ok=True)
+            out_name = f'{meta_id}__{scene_id}'
+            out_path = os.path.join(out_dir_, out_name + '.'+ format)
+            plt.savefig(out_path, bbox_inches='tight')
+            plt.close(fig)
+            print(f'Saved {out_path}')
 
 
 def plot_decoder_overlay(image_path, dict_features, out_dir='figures/decoder', format='png', resize_factor=0.25):
