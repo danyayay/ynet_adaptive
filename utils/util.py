@@ -18,6 +18,8 @@ def get_experiment_name(args, n_train):
             experiment += f'_{args.adapter_type}__{"_".join(map(str, args.adapter_position))}__TrN_{str(int(n_train/20))}'
         else:
             experiment += f'__TrN_{str(int(n_train/20))}'
+    if args.is_augment_data:
+        experiment += '__AUG'
     return experiment
 
 
@@ -60,7 +62,11 @@ def get_ckpt_name(ckpt_path):
 
 def get_adapter_info(ckpt_path, params):
     if 'adapter' in ckpt_path:
-        train_net, adapter_type = ckpt_path.split('__')[5].split('_')
+        if len(ckpt_path.split('__')[5].split('_')) > 2:
+            train_net = ckpt_path.split('__')[5].split('_')[0]
+            adapter_type = ckpt_path.split('__')[5].replace(train_net+'_', '')
+        else:
+            train_net, adapter_type = ckpt_path.split('__')[5].split('_')
         adapter_position = [int(i) for i in ckpt_path.split('__')[6].split('_')]
         updated_params = params.copy()
         updated_params.update({
@@ -99,5 +105,5 @@ def restore_model(
         else:
             model = YNetTrainer(params=params)
             model.load_separated_params(base_ckpt, separated_ckpt)
-        
+    
     return model 

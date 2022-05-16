@@ -268,7 +268,7 @@ def augment_data(data, image_path='data/SDD/train', images={}, image_file='refer
 
             data_rot['sceneId'] = scene + rot_angle
             data_rot['metaId'] = data_rot['metaId'] + metaId_max + 1
-            data = data.append(data_rot)
+            data = pd.concat([data, data_rot], axis=0)
 
     metaId_max = data['metaId'].max()
     for scene in data.sceneId.unique():
@@ -276,7 +276,7 @@ def augment_data(data, image_path='data/SDD/train', images={}, image_file='refer
         data_flip, im_flip = fliplr(data[data.sceneId == scene], im)
         data_flip['sceneId'] = data_flip['sceneId'] + '_fliplr'
         data_flip['metaId'] = data_flip['metaId'] + metaId_max + 1
-        data = data.append(data_flip)
+        data = pd.concat([data, data_flip], axis=0)
         images[scene + '_fliplr'] = im_flip
 
     return data, images
@@ -889,7 +889,7 @@ def get_meta_ids_focus(df=None, given_meta_ids=None, given_csv=None, random_n=No
             meta_ids_focus = given_meta_ids
         else:
             raise ValueError(f'Invalid given_meta_ids={given_meta_ids}')
-    elif given_csv is not None:
+    elif given_csv['path'] is not None:
         path = given_csv['path']
         col1, col2, op = given_csv['name'].split('__')
         n_limited = given_csv['n_limited']

@@ -1,72 +1,54 @@
-import os
-import yaml
-import time
-
-from models.trainer import YNetTrainer
+import time 
 from utils.parser import get_parser
-from utils.util import get_adapter_info
 from evaluator.write_files import write_csv, get_out_dir
 from utils.dataset import set_random_seeds, dataset_split
+from utils.util import get_params, get_image_and_data_path, restore_model, get_ckpts_and_names
 
 
 def main(args):
-    # ## configuration
+    # configuration
     tic = time.time()
-    if args.gpu: os.environ["CUDA_VISIBLE_DEVICES"] = str(args.gpu)
+    set_random_seeds(args.seed)
+    params = get_params(args)
+    IMAGE_PATH, DATA_PATH = get_image_and_data_path(params)
 
-    with open(os.path.join('config', 'sdd_raw_eval.yaml')) as file:
-        params = yaml.load(file, Loader=yaml.FullLoader)
-
-    params['segmentation_model_fp'] = os.path.join(params['data_dir'], params['dataset_name'], 'segmentation_model.pth')
-    params.update(vars(args))
-    print(params)
-
-    # ## set up data
-    print('############ Prepare dataset ##############')
-    IMAGE_PATH = os.path.join(params['data_dir'], params['dataset_name'], 'raw', 'annotations')
-    assert os.path.isdir(IMAGE_PATH), 'raw data dir error'
-    DATA_PATH = os.path.join(params['data_dir'], params['dataset_name'], args.dataset_path)
-
-    if args.n_leftouts:
-        _, _, df_test = dataset_split(DATA_PATH, args.val_files, args.val_ratio, args.n_leftouts)
-    else:
-        _, df_test, _ = dataset_split(DATA_PATH, args.val_files, args.val_ratio)
+    # prepare data 
+    _, _, df_test = dataset_split(DATA_PATH, args.val_files, 0, args.n_leftouts)
     print(f"df_test: {df_test.shape}; #={df_test.shape[0]/(params['obs_len']+params['pred_len'])}")
 
-    # ## model
-    print('############ Load model ##############')
-    if 'adapter' in args.tuned_ckpt:
-        params = get_adapter_info(args.tuned_ckpt, params)
-    model = YNetTrainer(params=params)
-
-    if args.pretrained_ckpt is not None and args.tuned_ckpt is not None:
-        model.load_separated_params(args.pretrained_ckpt, args.tuned_ckpt)
-        print(f"Loaded checkpoint {args.pretrained_ckpt} and {args.tuned_ckpt}")
-    elif args.pretrained_ckpt is not None:
-        if args.train_net == "modulator":
-            model.model.initialize_style()
-        model.load_params(args.pretrained_ckpt)
-        print(f"Loaded checkpoint {args.pretrained_ckpt}")
-    else:
-        raise ValueError("No checkpoint given!")
+    # ckpts
+    ckpts, ckpts_name, is_file_separated = get_ckpts_and_names(
+        args.ckpts, args.ckpts_name, args.pretrained_ckpt, [args.tuned_ckpt])
+    print(ckpts, ckpts_name)
+    if len(ckpts_name) == 1:
+        model = restore_model(params, is_file_separated, ckpts_name[0], 
+            ckpts[0] if not is_file_separated else args.pretrained_ckpt, 
+            None if not is_file_separated else ckpts[0])
+    elif len(ckpts_name) > 1:
+        for ckpt, ckpt_name in zip(ckpts, ckpts_name):
+            if ckpt_name != 'OODG':
+                model = restore_model(params, is_file_separated, ckpt_name, 
+                    ckpt if not is_file_separated else args.pretrained_ckpt, 
+                    None if not is_file_separated else ckpt)
     
-    # ## test
+    # test
     print('############ Test model ##############')
     set_random_seeds(args.seed)
-    ade, fde, _ = model.test(df_test, IMAGE_PATH, args.train_net == "modulator")
-    if params['out_csv_dir'] is not None:
-        out_dir = get_out_dir(params['out_csv_dir'], args.dataset_path, args.seed, args.train_net, args.val_files)
-        write_csv(out_dir, 'out-of-domain.csv', [ade], [fde])
+    ade, fde, _, _ = model.test(df_test, IMAGE_PATH, args.train_net == "modulator")
 
-    # time
     toc = time.time()
-    print(time.strftime("%Hh%Mm%Ss", time.gmtime(toc - tic)))
+    print('Time spent:', time.strftime("%Hh%Mm%Ss", time.gmtime(toc - tic)))
 
 
 if __name__ == '__main__':
-    parser = get_parser(train=False)
+    parser = get_parser(False)
     args = parser.parse_args()
     main(args)
 
 
-# python -m pdb test.py --seed 1 --batch_size 10 --dataset_path filter/agent_type/deathCircle_0/ --val_files Biker.pkl --val_ratio 0.1 --n_leftouts 10 --pretrained_ckpt ckpts/Seed_1_Train__Pedestrian__Val__Pedestrian__Val_Ratio_0.1_filter_agent_type__train_all_weights.pt --tuned_ckpt ckpts/Seed_1_Train__Biker__Val__Biker__Val_Ratio_0.1_filter_agent_type_deathCircle_0__train_adapter_parallel__0__TrN_8.pt
+# python -m pdb test.py --seed 1 --batch_size 10 --dataset_path filter/agent_type/deathCircle_0/ --val_files Biker.pkl --val_ratio 0.1 --n_leftouts 10 --pretrained_ckpt ckpts/Seed_1_Train__Pedestrian__Val__Pedestrian__Val_Ratio_0.1_filter_agent_type__train_all_weights.pt --tuned_ckpt ckpts/Seed_1__Tr_Biker__Val_Biker__ValRatio_0.1__filter_agent_type_deathCircle_0__encoder_0__TrN_10.pt
+
+# python -m pdb test.py --seed 1 --batch_size 10 --dataset_path filter/agent_type/deathCircle_0/ --val_files Biker.pkl --val_ratio 0.1 --n_leftouts 10 --ckpts ckpts/Seed_1_Train__Pedestrian__Val__Pedestrian__Val_Ratio_0.1_filter_agent_type__train_all_weights.pt --ckpts_name OODG
+
+
+# python -m pdb test.py --seed 1 --batch_size 10 --dataset_path filter/agent_type/deathCircle_0/ --val_files Biker.pkl --val_ratio 0.1 --n_leftouts 10 --pretrained_ckpt ckpts/Seed_1_Train__Pedestrian__Val__Pedestrian__Val_Ratio_0.1_filter_agent_type__train_all_weights.pt --tuned_ckpt ckpts/Seed_1__Tr_Biker__Val_Biker__ValRatio_0.1__filter_agent_type_deathCircle_0__adapter_serial__0__TrN_40.pt

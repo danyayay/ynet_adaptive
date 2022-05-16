@@ -9,16 +9,20 @@ def extract_train_msg(test_msg):
     msg_split = re.split('save_every_n', test_msg)[1:]
     df = pd.DataFrame(columns=['seed', 'pretrained_ckpt', 'experiment', 'n_param', 'n_epoch', 'ade', 'fde'])
     for msg in msg_split: 
-        metric = re.search("Round 0: \nTest ADE: ([\d\.]+) \nTest FDE: ([\d\.]+)", msg)
+        seed = re.search("'seed': ([\d+]),", msg)
+        pretrained_ckpt = re.search("'pretrained_ckpt': '(.*?)',", msg)
+        experiment = re.search("Experiment (.*?) has started", msg)
+        n_param = re.search("The number of trainable parameters: ([\d]+)", msg)
         n_epoch = re.search("Early stop at epoch ([\d]+)", msg)
+        metric = re.search("Round 0: \nTest ADE: ([\d\.]+) \nTest FDE: ([\d\.]+)", msg)
         df = pd.concat([df, pd.DataFrame({
-            'seed': re.search("'seed': ([\d+]),", msg).group(1),
-            'pretrained_ckpt': re.search("'pretrained_ckpt': '(.*?)',", msg).group(1).split('/')[1],
-            'experiment': re.search("Experiment (.*?) has started", msg).group(1),
-            'n_param': re.search("The number of trainable parameters: ([\d]+)", msg).group(1),
+            'seed': seed.group(1) if seed is not None else None,
+            'pretrained_ckpt': pretrained_ckpt.group(1).split('/')[1] if pretrained_ckpt is not None else None,
+            'experiment': experiment.group(1) if experiment is not None else None,
+            'n_param': n_param.group(1) if n_param is not None else 0,
             'n_epoch': n_epoch.group(1) if n_epoch is not None else 99,
-            'ade': metric.group(1), 
-            'fde': metric.group(2)}, index=[0])], ignore_index=True)
+            'ade': metric.group(1) if metric is not None else None,  
+            'fde': metric.group(2) if metric is not None else None, }, index=[0])], ignore_index=True)
     df.seed = df.seed.astype(int)
     df.n_param = df.n_param.astype(int)
     df.n_epoch = df.n_epoch.astype(int)
@@ -38,10 +42,13 @@ def extract_test_msg(test_msg):
     df = pd.DataFrame(columns=['seed', 'pretrained_ckpt', 'tuned_ckpt', 'ade', 'fde'])
     for msg in msg_split: 
         metric = re.search("Round 0: \nTest ADE: ([\d\.]+) \nTest FDE: ([\d\.]+)", msg)
+        seed = re.search("'seed': ([\d+]),", msg)
+        pretrained_ckpt = re.search("'pretrained_ckpt': '(.*?)',", msg)
+        tuned_ckpt = re.search("'tuned_ckpt': '(.*?)',", msg)
         df = pd.concat([df, pd.DataFrame({
-            'seed': re.search("'seed': ([\d+]),", msg).group(1),
-            'pretrained_ckpt': re.search("'pretrained_ckpt': '(.*?)',", msg).group(1).split('/')[1],
-            'tuned_ckpt': re.search("'tuned_ckpt': '(.*?)',", msg).group(1).split('/')[1],
+            'seed': seed.group(1) if seed is not None else None,
+            'pretrained_ckpt': pretrained_ckpt.group(1).split('/')[1] if pretrained_ckpt is not None else None,
+            'tuned_ckpt': tuned_ckpt.group(1).split('/')[1] if tuned_ckpt is not None else None,
             'ade': metric.group(1) if metric is not None else None, 
             'fde': metric.group(2) if metric is not None else None}, index=[0])], ignore_index=True)
     df.seed = df.seed.astype(int)
@@ -62,7 +69,7 @@ def get_train_net(ckpt_path):
 
 def get_n_train(ckpt_path):
     if 'adapter' in ckpt_path:
-        n_train = ckpt_path.split('__')[7].split('_')[1].split('.')[0]
+        n_train = ckpt_path.split('__')[7].split('_')[1].split('.')[0].split('__')[0]
     elif 'weight' in ckpt_path:
         n_train = ckpt_path.split('__')[6].split('_')[1]
     else:

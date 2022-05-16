@@ -53,7 +53,7 @@ class YNetTrainer:
         self, df_train, df_val, train_image_path, val_image_path, experiment_name, 
         dataset_name, resize_factor, obs_len, pred_len, batch_size, lr, n_epoch, 
         waypoints, n_goal, n_traj, kernlen, nsig, e_unfreeze, loss_scale, temperature,
-        use_raw_data=False, save_every_n=10, train_net="all", fine_tune=False, 
+        use_raw_data=False, save_every_n=10, train_net="all", fine_tune=False, is_augment_data=False,
         use_CWS=False, resl_thresh=0.002, CWS_params=None, n_early_stop=5, 
         steps=[20], lr_decay_ratio=0.1, **kwargs):
         """
@@ -72,10 +72,10 @@ class YNetTrainer:
         # get data
         train_images, train_loader, self.homo_mat = self.prepare_data(
             df_train, train_image_path, dataset_name, 'train', 
-            obs_len, pred_len, resize_factor, use_raw_data, fine_tune)
+            obs_len, pred_len, resize_factor, use_raw_data, is_augment_data)
         val_images, val_loader, _ = self.prepare_data(
             df_val, val_image_path, dataset_name, 'val', 
-            obs_len, pred_len, resize_factor, use_raw_data, fine_tune)
+            obs_len, pred_len, resize_factor, use_raw_data, False)
 
         # model 
         model = self.model.to(self.device)
@@ -140,7 +140,7 @@ class YNetTrainer:
                 e, obs_len, pred_len, batch_size, e_unfreeze, resize_factor, with_style)
 
             # For faster inference, we don't use TTST and CWS here, only for the test set evaluation
-            val_ADE, val_FDE, _ = evaluate(
+            val_ADE, val_FDE, _, _ = evaluate(
                 model, val_loader, val_images, self.device, 
                 dataset_name, self.homo_mat, input_template, waypoints, 'val', 
                 n_goal, n_traj, obs_len, batch_size, resize_factor, with_style,
@@ -174,16 +174,16 @@ class YNetTrainer:
 
         return self.val_ADE, self.val_FDE
 
-    def test(self, df_test, image_path, with_style, return_features=False, viz_input=False):
+    def test(self, df_test, image_path, with_style, return_preds=False, return_samples=False):
         return self._test(df_test, image_path, with_style=with_style, 
-            return_features=return_features, viz_input=viz_input, **self.params)
+            return_preds=return_preds, return_samples=return_samples, **self.params)
 
     def _test(
         self, df_test, image_path, dataset_name, resize_factor, 
         batch_size, n_round, obs_len, pred_len, 
         waypoints, n_goal, n_traj, temperature, rel_threshold, 
         use_TTST, use_CWS, CWS_params, use_raw_data=False, with_style=False, 
-        return_features=False, viz_input=False, **kwargs):
+        return_preds=False, return_samples=False, **kwargs):
         """
         Val function
         :param df_test: pd.df, val data
@@ -214,22 +214,14 @@ class YNetTrainer:
         print("TTST setting:", use_TTST)
         print('Start testing')
         for e in tqdm(range(n_round), desc='Round'):
-            if return_features:
-                test_ADE, test_FDE, df_metrics, trajs_dict = evaluate(
-                    model, test_loader, test_images, self.device, 
-                    dataset_name, self.homo_mat, input_template, waypoints, 'test',
-                    n_goal, n_traj, obs_len, batch_size, resize_factor, with_style,
-                    temperature, use_TTST, use_CWS, rel_threshold, CWS_params,
-                    True, viz_input)
-                list_trajs.append(trajs_dict)
-            else:
-                test_ADE, test_FDE, df_metrics = evaluate(
-                    model, test_loader, test_images, self.device, 
-                    dataset_name, self.homo_mat, input_template, waypoints, 'test',
-                    n_goal, n_traj, obs_len, batch_size, resize_factor, with_style,
-                    temperature, use_TTST, use_CWS, rel_threshold, CWS_params,
-                    False, viz_input)
+            test_ADE, test_FDE, df_metrics, trajs_dict = evaluate(
+                model, test_loader, test_images, self.device, 
+                dataset_name, self.homo_mat, input_template, waypoints, 'test',
+                n_goal, n_traj, obs_len, batch_size, resize_factor, with_style,
+                temperature, use_TTST, use_CWS, rel_threshold, CWS_params,
+                return_preds, return_samples)
             list_metrics.append(df_metrics)
+            list_trajs.append(trajs_dict)
             print(f'Round {e}: \nTest ADE: {test_ADE} \nTest FDE: {test_FDE}')
             self.eval_ADE.append(test_ADE)
             self.eval_FDE.append(test_FDE)
@@ -238,11 +230,7 @@ class YNetTrainer:
         avg_fde = sum(self.eval_FDE) / len(self.eval_FDE)
         print(
             f'\nAverage performance (by {n_round}): \nTest ADE: {avg_ade} \nTest FDE: {avg_fde}')
-
-        if return_features:
-            return avg_ade, avg_fde, list_metrics, list_trajs
-        else:
-            return avg_ade, avg_fde, list_metrics
+        return avg_ade, avg_fde, list_metrics, list_trajs
     
     def forward_test(self, df_test, image_path, set_input, noisy_std_frac):
         return self._forward_test(df_test, image_path, set_input, noisy_std_frac, **self.params)
@@ -390,13 +378,13 @@ class YNetTrainer:
         pred_waypoint_map = pred_goal_map[:, waypoints] 
         
         # way points 
-        gt_waypoints_maps_downsampled = [nn.AvgPool2d(
+        pred_waypoints_maps_downsampled = [nn.AvgPool2d(
             kernel_size=2**i, stride=2**i)(pred_waypoint_map) for i in range(1, len(features))]
-        gt_waypoints_maps_downsampled = [pred_waypoint_map] + gt_waypoints_maps_downsampled
+        pred_waypoints_maps_downsampled = [pred_waypoint_map] + pred_waypoints_maps_downsampled
         
         # traj loss
         traj_input = [torch.cat([feature, goal], dim=1) for feature, goal in zip(
-            features, gt_waypoints_maps_downsampled)]
+            features, pred_waypoints_maps_downsampled)]
         pred_traj_map = model.pred_traj(traj_input)
         traj_loss = criterion(pred_traj_map, gt_future_map) * loss_scale  
         
@@ -409,7 +397,7 @@ class YNetTrainer:
 
     def prepare_data(
         self, df, image_path, dataset_name, mode, obs_len, pred_len, 
-        resize_factor, use_raw_data, fine_tune=False):
+        resize_factor, use_raw_data, is_augment_data=False):
         """
         Prepare dataset for training, validation, and testing. 
 
@@ -449,15 +437,18 @@ class YNetTrainer:
             homo_mat = None
             seg_mask = False
         # Load scene images 
-        if (fine_tune & (mode == 'train')) | (mode == 'val') | (mode == 'test'):
+        if not is_augment_data:
+            # do not augment train data and images 
             images_dict = create_images_dict(
                 df.sceneId.unique(), image_path=image_path, 
                 image_file=image_file_name, use_raw_data=use_raw_data)
-        else: # mode == 'train' & not fine_tune
+            print('No data and images augmentation')
+        else: 
             # augment train data and images
             df, images_dict = augment_data(
                 df, image_path=image_path, image_file=image_file_name,
                 seg_mask=seg_mask, use_raw_data=use_raw_data)
+            print('Augmented data and images')
 
         # Initialize dataloaders
         dataset = SceneDataset(df, resize=resize_factor, total_len=obs_len+pred_len)

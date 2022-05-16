@@ -50,6 +50,21 @@ def main(args):
     else:
         print("Training from scratch")
 
+    # initialization check 
+    if args.initialization_check:
+        params_pretrained = params.copy()
+        params_pretrained.update({'adapter_type': None, 'adapter_position': None})
+        pretrained_model = YNetTrainer(params=params_pretrained)
+        pretrained_model.load_params(args.pretrained_ckpt)
+        set_random_seeds(args.seed)
+        ade_pre, fde_pre, _, _ = pretrained_model.test(df_test, IMAGE_PATH, args.train_net == "modulator")
+        set_random_seeds(args.seed)
+        ade_cur, fde_cur, _, _ = model.test(df_test, IMAGE_PATH, args.train_net == "modulator")
+        if ade_pre != ade_cur or fde_pre != fde_cur:
+            raise RuntimeError('Wrong model initialization')
+        else:
+            print('Passed initialization check')
+
     # training
     print('############ Train model ##############')
     val_ade, val_fde = model.train(df_train, df_val, IMAGE_PATH, IMAGE_PATH, EXPERIMENT_NAME)
@@ -58,22 +73,19 @@ def main(args):
     if params['out_csv_dir'] and args.n_leftouts:
         print('############ Test leftout data ##############')
         set_random_seeds(args.seed)
-        # test
-        test_ade, test_fde, _ = model.test(df_test, IMAGE_PATH, args.train_net == "modulator")
-        # save csv results
-        out_dir = get_out_dir(params['out_csv_dir'], args.dataset_path, args.seed, args.train_net, args.val_files, args.train_files)
-        write_csv(out_dir, 'fine_tune.csv', val_ade, val_fde, test_ade, test_fde)
+        test_ade, test_fde, _, _ = model.test(df_test, IMAGE_PATH, args.train_net == "modulator")
 
     toc = time.time()
-    print(time.strftime("%Hh%Mm%Ss", time.gmtime(toc - tic)))
+    print('Time spent:', time.strftime("%Hh%Mm%Ss", time.gmtime(toc - tic)))
 
 
 if __name__ == '__main__':
-    parser = get_parser(train=True)
+    parser = get_parser(True)
+    parser.add_argument('--initialization_check', action='store_true')
     args = parser.parse_args()
 
     main(args)
 
-# python -m pdb train.py --fine_tune --seed 1 --batch_size 8 --n_epoch 10 --dataset_path filter/agent_type/deathCircle_0/ --train_files Biker.pkl --val_files Biker.pkl --val_ratio 0.1 --n_leftouts 100 --pretrained_ckpt ckpts/Seed_1_Train__Pedestrian__Val__Pedestrian__Val_Ratio_0.1_filter_agent_type__train_all_weights.pt --lr 0.00005 --n_train_batch 1 --train_net adapter --adapter_type parallel --adapter_position 0
+# python -m pdb train.py --fine_tune --seed 1 --n_epoch 3 --batch_size 8 --n_epoch 10 --dataset_path filter/agent_type/deathCircle_0/ --train_files Biker.pkl --val_files Biker.pkl --val_ratio 0.1 --n_leftouts 10 --pretrained_ckpt ckpts/Seed_1_Train__Pedestrian__Val__Pedestrian__Val_Ratio_0.1_filter_agent_type__train_all_weights.pt --lr 0.00005 --n_train_batch 1 --train_net adapter --adapter_type parallel --adapter_position 0 --is_augment_data
 
 # python -m pdb train.py --fine_tune --seed 1 --batch_size 10 --n_epoch 10 --dataset_path filter/agent_type/deathCircle_0/ --train_files Biker.pkl --val_files Biker.pkl --val_ratio 0.1 --n_leftouts 500 --n_train_batch 16 --ckpt ckpts/Seed_1_Train__Pedestrian__Val__Pedestrian__Val_Ratio_0.1_filter_agent_type__train_all_weights.pt --lr 0.00005 --train_net adapter --adapter_type serial --adapter_position 0 1 2 3 4

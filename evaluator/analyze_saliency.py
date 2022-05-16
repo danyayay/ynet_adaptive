@@ -307,7 +307,7 @@ if __name__ == '__main__':
     parser.add_argument('--n_smooth', default=4, type=int)
     parser.add_argument('--GradCAM', action='store_true')
 
-    args=parser.parse_args()
+    args = parser.parse_args()
 
     main(args)
 
