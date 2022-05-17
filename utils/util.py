@@ -15,11 +15,12 @@ def get_experiment_name(args, n_train):
         if args.train_net == 'all':
             experiment += '_FT'
         elif args.train_net == 'adapter':
-            experiment += f'_{args.adapter_type}__{"_".join(map(str, args.adapter_position))}__TrN_{str(int(n_train/20))}'
-        else:
-            experiment += f'__TrN_{str(int(n_train/20))}'
+            experiment += f'_{args.adapter_type}__{"_".join(map(str, args.adapter_position))}'
+    experiment += f'__TrN_{str(int(n_train/20))}'
     if args.is_augment_data:
         experiment += '__AUG'
+    if args.fine_tune:
+        experiment += f'__lr_{args.lr}'
     return experiment
 
 

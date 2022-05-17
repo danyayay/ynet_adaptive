@@ -276,7 +276,7 @@ def evaluate(
                     trajs_dict['prediction'].append((trajs_samples[
                         best_indices, range(trajs_samples.shape[1]), ...] 
                         / resize_factor).cpu().detach().numpy())  # (n_goal, batch_size, n_coor)
-                
+
                 # TODO: a potential bug? ADE and FDE may not take the same traj prediction 
                 ade = ade_batch.min(dim=0)[0].cpu().detach().numpy()  # (batch_size, )
                 fde = fde_batch.min(dim=0)[0][:,0].cpu().detach().numpy()  # (batch_size, )

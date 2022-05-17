@@ -1,6 +1,5 @@
 import time 
 from utils.parser import get_parser
-from evaluator.write_files import write_csv, get_out_dir
 from utils.dataset import set_random_seeds, dataset_split
 from utils.util import get_params, get_image_and_data_path, restore_model, get_ckpts_and_names
 

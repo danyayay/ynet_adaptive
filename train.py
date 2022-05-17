@@ -5,7 +5,6 @@ import pandas as pd
 from models.trainer import YNetTrainer
 from utils.parser import get_parser
 from utils.util import get_experiment_name, get_params, get_image_and_data_path
-from evaluator.write_files import write_csv, get_out_dir
 from utils.dataset import set_random_seeds, limit_samples, dataset_split
 from evaluator.visualization import plot_given_trajectories_scenes_overlay
 
