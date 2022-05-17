@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import loralib as lora
 from utils.softargmax import SoftArgmax2D, create_meshgrid
 
 
@@ -23,40 +24,47 @@ class StyleModulator(nn.Module):
         return stylized
 
 
-def conv1x1(in_planes, out_planes=None, stride=1, bias=False):
+def conv2d(in_planes, out_planes=None, kernel_size=1, stride=1, padding=None, bias=False):
+    if padding is None: padding = kernel_size // 2
     if out_planes is None:
-        return nn.Conv2d(in_planes, in_planes, kernel_size=1, stride=stride, padding=0, bias=bias)
+        return nn.Conv2d(in_planes, in_planes, 
+            kernel_size=kernel_size, stride=stride, padding=padding, bias=bias)
     else:
-        return nn.Conv2d(in_planes, out_planes, kernel_size=1, stride=stride, padding=0, bias=bias)
-
-
-def conv3x3(in_planes, out_planes=None, stride=1, bias=False):
-    if out_planes is None:
-        return nn.Conv2d(in_planes, in_planes, kernel_size=3, stride=stride, padding=1, bias=bias)
-    else:
-        return nn.Conv2d(in_planes, out_planes, kernel_size=3, stride=stride, padding=1, bias=bias)
+        return nn.Conv2d(in_planes, out_planes, 
+            kernel_size=kernel_size, stride=stride, padding=padding, bias=bias)
 
 
 class Adapter(nn.Module):
     def __init__(self, planes, adapter_type, out_planes=None, stride=1):
         super(Adapter, self).__init__()
         self.adapter_type = adapter_type
+        self.is_multiple_conv = False 
+        # default serial adapter 
         if adapter_type == 'serial':
-            self.adapter_layer = nn.Sequential(nn.BatchNorm2d(planes), conv1x1(planes))
-        elif adapter_type == 'parallel' or adapter_type == 'parallel_1x1':
-            self.adapter_layer = conv1x1(planes, out_planes, stride)
-        elif adapter_type == 'parallel_3x3':
-            self.adapter_layer = conv3x3(planes, out_planes, stride)
-        elif adapter_type == 'parallel_1x1_3x3':
-            self.adapter_layer = nn.ModuleList([
-                conv1x1(planes, out_planes, stride),
-                conv3x3(planes, out_planes, stride)
-            ])
+            self.adapter_layer = nn.Sequential(nn.BatchNorm2d(planes), conv2d(planes))
+        # default parallel adapter 
+        elif adapter_type == 'parallel':
+            self.adapter_layer = conv2d(planes, out_planes, 1, stride)
+        # parallel adapter with changed filter size 
+        elif ('parallel' in adapter_type) and (len(adapter_type.split('_')) <= 2):
+            kernel_size = int(adapter_type.split('_')[1].split('x')[0])
+            self.adapter_layer = conv2d(planes, out_planes, kernel_size, stride)
+        # multiple parallel adapter 
+        elif ('parallel' in adapter_type) and (len(adapter_type.split('_')) > 2):
+            sizes = adapter_type.split('_')[1:]
+            self.is_multiple_conv = True
+            self.adapter_layer = nn.ModuleList()
+            for size in sizes:
+                kernel_size = int(size.split('x')[0])
+                self.adapter_layer.append(conv2d(planes, out_planes, kernel_size, stride))
+        # lora adapter 
+        elif adapter_type == 'lora':
+            self.adapter_layer = lora.Conv2d(planes, out_planes, kernel_size=3, padding=1, r=1)             
         else:
-            self.adapter_layer = conv1x1(planes)
+            self.adapter_layer = conv2d(planes)
 
     def forward(self, x):
-        if len(self.adapter_type.split('_')) > 2:
+        if self.is_multiple_conv:
             y = 0
             for layer in self.adapter_layer:
                 x_ = layer(x)
@@ -115,7 +123,7 @@ class YNetEncoder(nn.Module):
             if 'serial' in self.adapter_type:
                 self.adapters = nn.ModuleList([
                     Adapter(channels[i], adapter_type) for i in adapter_position])
-            elif 'parallel' in self.adapter_type:
+            elif 'parallel' in self.adapter_type or 'lora' in self.adapter_type:
                 self.adapters = nn.ModuleList([
                     Adapter(parellel_channels_in[i], adapter_type, channels[i]) for i in adapter_position])
 
@@ -130,7 +138,7 @@ class YNetEncoder(nn.Module):
                     if i in self.adapter_position:
                         x = self.adapters[j](x)
                         j += 1
-                elif 'parallel' in self.adapter_type:
+                elif ('parallel' in self.adapter_type) or ('lora' in self.adapter_type):
                     if isinstance(stage[0], nn.MaxPool2d):
                         y = stage[0](x)
                         x = stage(x)
@@ -265,13 +273,12 @@ class YNet(nn.Module):
         # initialize as 0
         if adapter_type is not None:
             if 'serial' in adapter_type:
-                if adapter_initialization == 'zero':
-                    for n, p in self.encoder.adapters.named_parameters():
-                        if n.endswith('1.weight'):
-                            torch.nn.init.zeros_(p)
-            elif 'parallel' in adapter_type:
-                if adapter_initialization == 'zero':
-                    for n, p in self.encoder.adapters.named_parameters():
+                for n, p in self.encoder.adapters.named_parameters():
+                    if n.endswith('1.weight'):
+                        torch.nn.init.zeros_(p)
+            elif ('parallel' in adapter_type) or ('lora' in adapter_type):
+                for n, p in self.encoder.adapters.named_parameters():
+                    if 'lora' not in n:
                         torch.nn.init.zeros_(p)
 
         self.goal_decoder = YNetDecoder(encoder_channels, decoder_channels, output_len=pred_len)
