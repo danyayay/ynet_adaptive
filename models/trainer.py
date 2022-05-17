@@ -41,9 +41,8 @@ class YNetTrainer:
             encoder_channels=params['encoder_channels'],
             decoder_channels=params['decoder_channels'],
             n_waypoints=len(params['waypoints']),
-            adapter_type=params['adapter_type'], 
-            adapter_position=params['adapter_position'],
-            adapter_initialization=params['adapter_initialization']
+            train_net=params['train_net'], 
+            position=params['position']
         )
     
     def train(self, df_train, df_val, train_image_path, val_image_path, experiment_name):
@@ -53,7 +52,7 @@ class YNetTrainer:
         self, df_train, df_val, train_image_path, val_image_path, experiment_name, 
         dataset_name, resize_factor, obs_len, pred_len, batch_size, lr, n_epoch, 
         waypoints, n_goal, n_traj, kernlen, nsig, e_unfreeze, loss_scale, temperature,
-        use_raw_data=False, save_every_n=10, train_net="all", fine_tune=False, is_augment_data=False,
+        use_raw_data=False, save_every_n=10, train_net="all", position=[], fine_tune=False, is_augment_data=False,
         use_CWS=False, resl_thresh=0.002, CWS_params=None, n_early_stop=5, 
         steps=[20], lr_decay_ratio=0.1, **kwargs):
         """
@@ -87,28 +86,29 @@ class YNetTrainer:
         if train_net != 'all':
             for param in model.parameters():
                 param.requires_grad = False
-            if train_net == "encoder":
-                for param in model.encoder.parameters():
-                    param.requires_grad = True
-            elif train_net == "modulator":
+            # modulator 
+            if train_net == "modulator":
                 for param in model.style_modulators.parameters():
                     param.requires_grad = True
-            elif train_net == 'adapter':
+            # tune the whole encoder 
+            elif train_net == "encoder" and len(position) == 0:
+                for param in model.encoder.parameters():
+                    param.requires_grad = True
+            # tune partial encoder 
+            elif train_net == 'encoder' and len(position) > 0:
+                for param_name, param in model.encoder.named_parameters():
+                    param_layer = int(param_name.split('.')[1])
+                    if param_layer in position:
+                        param.requires_grad = True
+            # serial / parallel adapter 
+            elif 'serial' in train_net or 'parallel' in train_net:
                 for param_name, param in model.encoder.named_parameters():
                     if 'adapter_layer' in param_name: 
                         param.requires_grad = True
-            elif len(train_net.split('_')[-1].split('-')) == 1:
-                layer_num = int(train_net.split('_')[-1])
+            # lora 
+            elif 'lora' in train_net:
                 for param_name, param in model.encoder.named_parameters():
-                    param_layer = int(param_name.split('.')[1])
-                    if param_layer == layer_num:
-                        param.requires_grad = True
-            elif len(train_net.split('_')[-1].split('-')) == 2:
-                layer_lower, layer_upper = train_net.split('_')[-1].split('-')
-                layer_lower, layer_upper = int(layer_lower), int(layer_upper)
-                for param_name, param in model.encoder.named_parameters():
-                    param_layer = int(param_name.split('.')[1])
-                    if (param_layer >= layer_lower) and (param_layer <= layer_upper):
+                    if 'lora' in param_name:
                         param.requires_grad = True
             else:
                 raise ValueError(f'No support for train_net={train_net}')

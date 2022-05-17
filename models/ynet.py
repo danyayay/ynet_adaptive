@@ -35,20 +35,21 @@ def conv2d(in_planes, out_planes=None, kernel_size=1, stride=1, padding=None, bi
 
 
 class Adapter(nn.Module):
-    def __init__(self, planes, adapter_type, out_planes=None, stride=1):
+    def __init__(self, planes, adapter_type, out_planes=None, stride=1, is_bias=False):
         super(Adapter, self).__init__()
         self.adapter_type = adapter_type
+        self.is_bias = is_bias 
         self.is_multiple_conv = False 
         # default serial adapter 
         if adapter_type == 'serial':
-            self.adapter_layer = nn.Sequential(nn.BatchNorm2d(planes), conv2d(planes))
+            self.adapter_layer = nn.Sequential(nn.BatchNorm2d(planes), conv2d(planes, bias=is_bias))
         # default parallel adapter 
         elif adapter_type == 'parallel':
-            self.adapter_layer = conv2d(planes, out_planes, 1, stride)
+            self.adapter_layer = conv2d(planes, out_planes, 1, stride, bias=is_bias)
         # parallel adapter with changed filter size 
         elif ('parallel' in adapter_type) and (len(adapter_type.split('_')) <= 2):
             kernel_size = int(adapter_type.split('_')[1].split('x')[0])
-            self.adapter_layer = conv2d(planes, out_planes, kernel_size, stride)
+            self.adapter_layer = conv2d(planes, out_planes, kernel_size, stride, bias=is_bias)
         # multiple parallel adapter 
         elif ('parallel' in adapter_type) and (len(adapter_type.split('_')) > 2):
             sizes = adapter_type.split('_')[1:]
@@ -56,12 +57,20 @@ class Adapter(nn.Module):
             self.adapter_layer = nn.ModuleList()
             for size in sizes:
                 kernel_size = int(size.split('x')[0])
-                self.adapter_layer.append(conv2d(planes, out_planes, kernel_size, stride))
-        # lora adapter 
-        elif adapter_type == 'lora':
-            self.adapter_layer = lora.Conv2d(planes, out_planes, kernel_size=3, padding=1, r=1)             
+                self.adapter_layer.append(conv2d(planes, out_planes, kernel_size, stride, bias=is_bias))       
         else:
-            self.adapter_layer = conv2d(planes)
+            self.adapter_layer = conv2d(planes, bias=is_bias)
+        
+        # initialize parameters
+        self.initialize()
+
+    def initialize(self):
+        if self.adapter_type == 'serial':
+            nn.init.zeros_(self.adapter_layer[1].weight)
+            if self.is_bias: nn.init.zeros_(self.adapter_layer[1].bias)
+        elif 'parallel' in self.adapter_type:
+            for p in self.adapter_layer.parameters():
+                nn.init.zeros_(p)
 
     def forward(self, x):
         if self.is_multiple_conv:
@@ -80,34 +89,50 @@ class Adapter(nn.Module):
 class YNetEncoder(nn.Module):
     def __init__(
         self, in_channels, channels=(64, 128, 256, 512, 512), 
-        adapter_type=None, adapter_position=None):
+        train_net=None, position=[]):
         """
         Encoder model
         :param in_channels: int, n_semantic_classes + obs_len
         :param channels: list, hidden layer channels
         """
         super(YNetEncoder, self).__init__()
+
+        self.train_net = train_net
+        self.position = position
+        if 'lora' in self.train_net: 
+            rank = int(self.train_net.split('_')[1]) if len(self.train_net.split('_')) > 1 else 1
+
         self.stages = nn.ModuleList()
 
         # First block
-        self.stages.append(
-            nn.Sequential(
-                nn.Conv2d(in_channels, channels[0], kernel_size=(3, 3), stride=(1, 1), padding=(1, 1)),
-                nn.ReLU(inplace=False),
-            )
-        )
+        modules = []
+        if 'lora' in self.train_net and 0 in self.position:
+            modules.append(lora.Conv2d(in_channels, channels[0], 
+                kernel_size=3, r=rank, stride=(1, 1), padding=(1, 1)))
+        else:
+            modules.append(nn.Conv2d(in_channels, channels[0], 
+                kernel_size=(3, 3), stride=(1, 1), padding=(1, 1)))
+        modules.append(nn.ReLU(inplace=False))
+        self.stages.append(nn.Sequential(*modules))
 
-        # Subsequent blocks, each starting with MaxPool
+        # Subsequent blocks, each starts with MaxPool
         for i in range(len(channels) - 1):
-            self.stages.append(
-                nn.Sequential(
-                    nn.MaxPool2d(kernel_size=2, stride=2, padding=0, dilation=1, ceil_mode=False),
-                    nn.Conv2d(channels[i], channels[i+1], kernel_size=(3, 3), stride=(1, 1), padding=(1, 1)),
-                    nn.ReLU(inplace=False),
-                    nn.Conv2d(channels[i+1], channels[i+1], kernel_size=(3, 3), stride=(1, 1), padding=(1, 1)),
-                    nn.ReLU(inplace=False)
-                )
-            )
+            modules = [nn.MaxPool2d(kernel_size=2, stride=2, padding=0, dilation=1, ceil_mode=False)]
+            if 'lora' in self.train_net and i+1 in self.position:
+                modules.append(lora.Conv2d(channels[i], channels[i+1], 
+                    kernel_size=3, r=rank, stride=(1, 1), padding=(1, 1)))
+                modules.append(nn.ReLU(inplace=False))
+                modules.append(lora.Conv2d(channels[i+1], channels[i+1], 
+                    kernel_size=3, r=rank, stride=(1, 1), padding=(1, 1)))
+                modules.append(nn.ReLU(inplace=False))
+            else:
+                modules.append(nn.Conv2d(channels[i], channels[i+1], 
+                    kernel_size=3, stride=(1, 1), padding=(1, 1)))
+                modules.append(nn.ReLU(inplace=False))
+                modules.append(nn.Conv2d(channels[i+1], channels[i+1], 
+                    kernel_size=3, stride=(1, 1), padding=(1, 1)))
+                modules.append(nn.ReLU(inplace=False))
+            self.stages.append(nn.Sequential(*modules))
 
         # Last MaxPool layer before passing the features into decoder
         self.stages.append(
@@ -116,41 +141,38 @@ class YNetEncoder(nn.Module):
                 )
             )
 
-        self.adapter_type = adapter_type 
-        self.adapter_position = adapter_position
-        parellel_channels_in = [in_channels] + channels[:-1]
-        if self.adapter_type is not None:
-            if 'serial' in self.adapter_type:
-                self.adapters = nn.ModuleList([
-                    Adapter(channels[i], adapter_type) for i in adapter_position])
-            elif 'parallel' in self.adapter_type or 'lora' in self.adapter_type:
-                self.adapters = nn.ModuleList([
-                    Adapter(parellel_channels_in[i], adapter_type, channels[i]) for i in adapter_position])
+        # adapter
+        par_channels_in = [in_channels] + channels[:-1]
+        if 'serial' in self.train_net:
+            self.adapters = nn.ModuleList([
+                Adapter(channels[i], train_net) for i in position])
+        elif 'parallel' in self.train_net:
+            self.adapters = nn.ModuleList([
+                Adapter(par_channels_in[i], train_net, channels[i]) for i in position])
 
     def forward(self, x):
         # Saves the feature maps Tensor of each layer into a list, as we will later need them again for the decoder
         features = []
         j = 0
         for i, stage in enumerate(self.stages):
-            if self.adapter_type is not None:
-                if 'serial' in self.adapter_type:
-                    x = stage(x) 
-                    if i in self.adapter_position:
-                        x = self.adapters[j](x)
+            if 'serial' in self.train_net:
+                x = stage(x) 
+                if i in self.position:
+                    x = self.adapters[j](x)
+                    j += 1
+            elif 'parallel' in self.train_net:
+                if isinstance(stage[0], nn.MaxPool2d):
+                    y = stage[0](x)
+                    x = stage(x)
+                    if i in self.position:
+                        x = x + self.adapters[j](y)
                         j += 1
-                elif ('parallel' in self.adapter_type) or ('lora' in self.adapter_type):
-                    if isinstance(stage[0], nn.MaxPool2d):
-                        y = stage[0](x)
-                        x = stage(x)
-                        if i in self.adapter_position:
-                            x = x + self.adapters[j](y)
-                            j += 1
-                    else:
-                        y = stage(x)
-                        if i in self.adapter_position:
-                            y = y + self.adapters[j](x)
-                            j += 1
-                        x = y
+                else:
+                    y = stage(x)
+                    if i in self.position:
+                        y = y + self.adapters[j](x)
+                        j += 1
+                    x = y
             else:
                 x = stage(x)
             features.append(x)
@@ -238,7 +260,7 @@ class YNet(nn.Module):
         self, obs_len, pred_len, segmentation_model_fp, 
         use_features_only=False, n_semantic_classes=6,
         encoder_channels=[], decoder_channels=[], n_waypoints=1, 
-        adapter_type=None, adapter_position=None, adapter_initialization='zero'):
+        train_net=None, position=[]):
         """
         Complete Y-net Architecture including semantic segmentation backbone, heatmap embedding and ConvPredictor
         :param obs_len: int, observed timesteps
@@ -268,18 +290,7 @@ class YNet(nn.Module):
 
         self.encoder = YNetEncoder(
             in_channels=n_semantic_classes + obs_len, channels=encoder_channels,
-            adapter_type=adapter_type, adapter_position=adapter_position)
-
-        # initialize as 0
-        if adapter_type is not None:
-            if 'serial' in adapter_type:
-                for n, p in self.encoder.adapters.named_parameters():
-                    if n.endswith('1.weight'):
-                        torch.nn.init.zeros_(p)
-            elif ('parallel' in adapter_type) or ('lora' in adapter_type):
-                for n, p in self.encoder.adapters.named_parameters():
-                    if 'lora' not in n:
-                        torch.nn.init.zeros_(p)
+            train_net=train_net, position=position)
 
         self.goal_decoder = YNetDecoder(encoder_channels, decoder_channels, output_len=pred_len)
         self.traj_decoder = YNetDecoder(encoder_channels, decoder_channels, output_len=pred_len, traj=n_waypoints)

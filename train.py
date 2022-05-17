@@ -50,9 +50,9 @@ def main(args):
         print("Training from scratch")
 
     # initialization check 
-    if args.initialization_check:
+    if args.init_check:
         params_pretrained = params.copy()
-        params_pretrained.update({'adapter_type': None, 'adapter_position': None})
+        params_pretrained.update({'position': []})
         pretrained_model = YNetTrainer(params=params_pretrained)
         pretrained_model.load_params(args.pretrained_ckpt)
         set_random_seeds(args.seed)
@@ -80,11 +80,11 @@ def main(args):
 
 if __name__ == '__main__':
     parser = get_parser(True)
-    parser.add_argument('--initialization_check', action='store_true')
+    parser.add_argument('--init_check', action='store_true')
     args = parser.parse_args()
 
     main(args)
 
-# python -m pdb train.py --fine_tune --seed 1 --n_epoch 3 --batch_size 8 --n_epoch 10 --dataset_path filter/agent_type/deathCircle_0/ --train_files Biker.pkl --val_files Biker.pkl --val_ratio 0.1 --n_leftouts 10 --pretrained_ckpt ckpts/Seed_1_Train__Pedestrian__Val__Pedestrian__Val_Ratio_0.1_filter_agent_type__train_all_weights.pt --lr 0.00005 --n_train_batch 1 --train_net adapter --adapter_type parallel --adapter_position 0 --is_augment_data
+# python -m pdb train.py --fine_tune --seed 1 --n_epoch 3 --batch_size 8 --dataset_path filter/agent_type/deathCircle_0/ --train_files Biker.pkl --val_files Biker.pkl --val_ratio 0.1 --n_leftouts 10 --pretrained_ckpt ckpts/Seed_1_Train__Pedestrian__Val__Pedestrian__Val_Ratio_0.1_filter_agent_type__train_all_weights.pt --lr 0.00005 --n_train_batch 1 --train_net adapter --adapter_type parallel --adapter_position 0 --is_augment_data --gpu 1
 
 # python -m pdb train.py --fine_tune --seed 1 --batch_size 10 --n_epoch 10 --dataset_path filter/agent_type/deathCircle_0/ --train_files Biker.pkl --val_files Biker.pkl --val_ratio 0.1 --n_leftouts 500 --n_train_batch 16 --ckpt ckpts/Seed_1_Train__Pedestrian__Val__Pedestrian__Val_Ratio_0.1_filter_agent_type__train_all_weights.pt --lr 0.00005 --train_net adapter --adapter_type serial --adapter_position 0 1 2 3 4

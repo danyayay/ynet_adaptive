@@ -22,10 +22,9 @@ def get_model_args(parser):
     parser.add_argument('--tuned_ckpts', default=None, type=str, nargs='+')
     
     # adapter
-    parser.add_argument('--adapter_type', default=None, type=str)
-    parser.add_argument('--adapter_position', default=None, type=int, nargs='+')
-    parser.add_argument('--adapter_initialization', default='zero', type=str)
-    
+    parser.add_argument('--position', default=None, type=int, nargs='+')
+    parser.add_argument("--train_net", default="all", type=str, 
+        help="train all parameters or only encoder or with modulator")
     return parser
 
 
@@ -34,8 +33,6 @@ def get_general_args(parser):
     parser.add_argument("--batch_size", default=8, type=int)
     parser.add_argument("--gpu", default=None, type=int, help='gpu id to use')
     parser.add_argument("--n_round", default=1, type=int, help='number of rounds in stochastics eval process')  
-    parser.add_argument("--train_net", default="all", type=str, 
-        help="train all parameters or only encoder or with modulator")
     return parser
 
 

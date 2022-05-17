@@ -11,16 +11,10 @@ def get_experiment_name(args, n_train):
     experiment += f"_ValRatio_{args.val_ratio}_"
     experiment += f"_{(args.dataset_path).replace('/', '_')}"
     experiment += f"_{args.train_net}"
-    if args.fine_tune:
-        if args.train_net == 'all':
-            experiment += '_FT'
-        elif args.train_net == 'adapter':
-            experiment += f'_{args.adapter_type}__{"_".join(map(str, args.adapter_position))}'
+    if args.position != []: experiment += f'__{"_".join(map(str, args.position))}' 
     experiment += f'__TrN_{str(int(n_train/20))}'
-    if args.is_augment_data:
-        experiment += '__AUG'
-    if args.fine_tune:
-        experiment += f'__lr_{args.lr}'
+    if args.is_augment_data: experiment += '__AUG'
+    if args.fine_tune: experiment += f'__lr_{args.lr}'
     return experiment
 
 
@@ -47,9 +41,9 @@ def get_image_and_data_path(params):
 def get_ckpt_name(ckpt_path):
     if 'adapter' in ckpt_path:
         train_net = ckpt_path.split('__')[5]
-        adapter_position = ckpt_path.split('__')[6]
+        position = ckpt_path.split('__')[6]
         n_train = ckpt_path.split('__')[7].split('_')[1].split('.')[0]
-        ckpt_name = f'{train_net}[{adapter_position}]({n_train})'
+        ckpt_name = f'{train_net}[{position}]({n_train})'
     elif 'weight' in ckpt_path:
         train_net = ckpt_path.split('__')[5]
         n_train = ckpt_path.split('__')[6].split('_')[1]
@@ -68,12 +62,11 @@ def get_adapter_info(ckpt_path, params):
             adapter_type = ckpt_path.split('__')[5].replace(train_net+'_', '')
         else:
             train_net, adapter_type = ckpt_path.split('__')[5].split('_')
-        adapter_position = [int(i) for i in ckpt_path.split('__')[6].split('_')]
+        position = [int(i) for i in ckpt_path.split('__')[6].split('_')]
         updated_params = params.copy()
         updated_params.update({
             'train_net': train_net, 
-            'adapter_type': adapter_type, 
-            'adapter_position': adapter_position})
+            'position': position})
         return updated_params
     else:
         raise ValueError(f"{ckpt_path} is not an adapter's model")
