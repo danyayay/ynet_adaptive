@@ -87,7 +87,7 @@ def get_ckpts_and_names(ckpts, ckpts_name, pretrained_ckpt, tuned_ckpts):
 def restore_model(
     params, is_file_separated, 
     base_ckpt, separated_ckpt=None):
-    if (not is_file_separated) or ('all' in base_ckpt) or ('train' in base_ckpt):
+    if not is_file_separated:
         model = YNetTrainer(params=params)
         model.load_params(base_ckpt)
     else:  
