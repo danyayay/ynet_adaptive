@@ -2,7 +2,7 @@ import pandas as pd
 from utils.parser import get_parser
 from utils.dataset import set_random_seeds, dataset_split, get_meta_ids_focus
 from utils.util import get_params, get_image_and_data_path, restore_model, get_ckpts_and_names
-from evaluator.visualization import plot_feature_space_compare
+from evaluator.visualization import plot_activation
 
 
 def main(args):
@@ -80,13 +80,13 @@ def main(args):
     folder_name = f"{args.seed}__{'_'.join(args.dataset_path.split('/'))}__{'_'.join(args.val_files).rstrip('.pkl')}/{'_'.join(ckpts_name)}" 
     index = df_test.groupby(by=['metaId', 'sceneId']).count().index
     print(index)
-    plot_feature_space_compare(ckpts_hook_dict, index, 
-        f'figures/feature_space_compare/{folder_name}', 
+    plot_activation(ckpts_hook_dict, index, 
+        f'figures/activation/{folder_name}', 
         compare_raw=args.compare_raw, compare_diff=args.compare_diff, 
         compare_overlay=args.compare_overlay, compare_relative=args.compare_relative, 
         scene_imgs=raw_img, semantic_imgs=None, scale_row=True, inhance_diff=False)
-    plot_feature_space_compare(ckpts_hook_dict, index, 
-        f'figures/feature_space_compare/{folder_name}', 
+    plot_activation(ckpts_hook_dict, index, 
+        f'figures/activation/{folder_name}', 
         compare_raw=args.compare_raw, compare_diff=args.compare_diff, 
         compare_overlay=args.compare_overlay, compare_relative=args.compare_relative,
         scene_imgs=raw_img, semantic_imgs=None, scale_row=False, inhance_diff=False)

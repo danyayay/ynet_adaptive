@@ -3,6 +3,7 @@ import re
 import argparse
 import pathlib
 import pandas as pd
+from utils.util import get_position
 
 
 def extract_train_msg(test_msg):
@@ -30,9 +31,10 @@ def extract_train_msg(test_msg):
     df.fde = df.fde.astype(float)
     df['train_net'] = df['experiment'].apply(lambda x: get_train_net(x))
     df['n_train'] = df['experiment'].apply(lambda x: get_n_train(x)).astype(int)
-    df['adapter_position'] = df['experiment'].apply(lambda x: get_adapter_position(x))
+    df['position'] = df['experiment'].apply(lambda x: get_position(x, return_list=False))
+    df['lr'] = df['experiment'].apply(lambda x: get_lr(x))
     # reorder columns 
-    reordered_cols = ['seed', 'train_net', 'n_train', 'adapter_position', 'n_param', 'n_epoch', 'ade', 'fde', 'experiment', 'pretrained_ckpt']
+    reordered_cols = ['seed', 'train_net', 'n_train', 'position', 'n_param', 'n_epoch', 'lr', 'ade', 'fde', 'experiment', 'pretrained_ckpt']
     df = df.reindex(columns=reordered_cols)
     return df
 
@@ -56,9 +58,9 @@ def extract_test_msg(test_msg):
     df.fde = df.fde.astype(float)
     df['train_net'] = df['tuned_ckpt'].apply(lambda x: get_train_net(x))
     df['n_train'] = df['tuned_ckpt'].apply(lambda x: get_n_train(x)).astype(int)
-    df['adapter_position'] = df['tuned_ckpt'].apply(lambda x: get_adapter_position(x))
+    df['position'] = df['tuned_ckpt'].apply(lambda x: get_position(x, return_list=False))
     # reorder columns 
-    reordered_cols = ['seed', 'train_net', 'n_train', 'adapter_position', 'ade', 'fde', 'tuned_ckpt', 'pretrained_ckpt']
+    reordered_cols = ['seed', 'train_net', 'n_train', 'position', 'ade', 'fde', 'tuned_ckpt', 'pretrained_ckpt']
     df = df.reindex(columns=reordered_cols)
     return df
 
@@ -68,20 +70,18 @@ def get_train_net(ckpt_path):
 
 
 def get_n_train(ckpt_path):
-    if 'adapter' in ckpt_path:
-        n_train = ckpt_path.split('__')[7].split('_')[1].split('.')[0].split('__')[0]
-    elif 'weight' in ckpt_path:
-        n_train = ckpt_path.split('__')[6].split('_')[1]
+    if 'Pos' in ckpt_path: 
+        n_train = int(ckpt_path.split('__')[7].split('_')[1])
     else:
-        n_train = ckpt_path.split('__')[6].split('_')[1].split('.')[0]
+        n_train = int(ckpt_path.split('__')[6].split('_')[1])
     return n_train
 
 
-def get_adapter_position(ckpt_path):
-    if 'adapter' in ckpt_path:
-        return ckpt_path.split('__')[6]
+def get_lr(ckpt_path):
+    if 'lr' in ckpt_path: 
+        return ckpt_path.split('lr_')[1].split('_')[0]
     else:
-        return None 
+        return 0.00005
 
 
 def extract_file(file_path, out_dir):
@@ -94,9 +94,12 @@ def extract_file(file_path, out_dir):
     else:
         raise ValueError('Unclear eval/train function to use')
     pathlib.Path(out_dir).mkdir(parents=True, exist_ok=True)
-    file_name = re.search('/([^/]+).out', file_path).group(1)
+    if '/' in file_path:
+        file_name = re.search('/([^/]+).out', file_path).group(1)
+    else:
+        file_name = file_path.replace('.out', '')
     out_name = f'{out_dir}/{file_name}.csv'
-    print(out_name)
+    print(f'Saved {out_name}')
     df.to_csv(out_name, index=False)
 
 

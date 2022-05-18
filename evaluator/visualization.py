@@ -27,7 +27,6 @@ labels_ckpt = {
     'ET': 'encoder finetuning'
 }
 
-
 colors = {
     'OODG': 'tab:blue', 'FT': 'tab:orange', 'ET': 'tab:red', 
     'diff_OODG_FT': 'tab:orange', 'diff_OODG_ET': 'tab:red'}
@@ -127,11 +126,11 @@ def base_img_plot(ax, scene_img, semantic_img=None):
     return im
 
 
-def plot_feature_space_compare(
+def plot_activation(
     ckpts_hook_dict, index, 
-    out_dir='figures/feature_space_compare', format='png', 
+    out_dir='figures/activation', format='png', 
     compare_raw=True, compare_diff=False, compare_overlay=False, compare_relative=False,
-    scene_imgs=None, semantic_imgs=None, scale_row=True, inhance_diff=True):
+    scene_imgs=None, semantic_imgs=None, scale_row=True, inhance_diff=True, single_output=False):
     # semantic_map (class=0~5): 
     #     - channel 1: pavement
     #     - channel 2: terrain 
