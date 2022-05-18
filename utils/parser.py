@@ -21,7 +21,7 @@ def get_model_args(parser):
     parser.add_argument("--tuned_ckpt", default=None, type=str)
     parser.add_argument('--tuned_ckpts', default=None, type=str, nargs='+')
     
-    # adapter
+    # added net 
     parser.add_argument('--position', default=None, type=int, nargs='+')
     parser.add_argument("--train_net", default="all", type=str, 
         help="train all parameters or only encoder or with modulator")

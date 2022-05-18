@@ -20,13 +20,13 @@ def main(args):
         args.ckpts, args.ckpts_name, args.pretrained_ckpt, [args.tuned_ckpt])
     print(ckpts, ckpts_name)
     if len(ckpts_name) == 1:
-        model = restore_model(params, is_file_separated, ckpts_name[0], 
+        model = restore_model(params, is_file_separated,
             ckpts[0] if not is_file_separated else args.pretrained_ckpt, 
             None if not is_file_separated else ckpts[0])
     elif len(ckpts_name) > 1:
         for ckpt, ckpt_name in zip(ckpts, ckpts_name):
             if ckpt_name != 'OODG':
-                model = restore_model(params, is_file_separated, ckpt_name, 
+                model = restore_model(params, is_file_separated, 
                     ckpt if not is_file_separated else args.pretrained_ckpt, 
                     None if not is_file_separated else ckpt)
     

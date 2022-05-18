@@ -83,7 +83,7 @@ class YNetTrainer:
         for param in model.semantic_segmentation.parameters():
             param.requires_grad = False
 
-        if train_net != 'all':
+        if train_net != 'all' or train_net != 'train':
             for param in model.parameters():
                 param.requires_grad = False
             # modulator 

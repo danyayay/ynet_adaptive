@@ -11,10 +11,10 @@ def get_experiment_name(args, n_train):
     experiment += f"_ValRatio_{args.val_ratio}_"
     experiment += f"_{(args.dataset_path).replace('/', '_')}"
     experiment += f"_{args.train_net}"
-    if args.position != []: experiment += f'__{"_".join(map(str, args.position))}' 
+    if args.position != []: experiment += f'__Pos_{"_".join(map(str, args.position))}' 
     experiment += f'__TrN_{str(int(n_train/20))}'
-    if args.is_augment_data: experiment += '__AUG'
     if args.fine_tune: experiment += f'__lr_{args.lr}'
+    if args.is_augment_data: experiment += '__AUG'
     return experiment
 
 
@@ -38,38 +38,34 @@ def get_image_and_data_path(params):
     return image_path, data_path 
 
 
-def get_ckpt_name(ckpt_path):
-    if 'adapter' in ckpt_path:
-        train_net = ckpt_path.split('__')[5]
-        position = ckpt_path.split('__')[6]
-        n_train = ckpt_path.split('__')[7].split('_')[1].split('.')[0]
-        ckpt_name = f'{train_net}[{position}]({n_train})'
-    elif 'weight' in ckpt_path:
-        train_net = ckpt_path.split('__')[5]
-        n_train = ckpt_path.split('__')[6].split('_')[1]
-        ckpt_name = f'{train_net}({n_train})'
+def get_position(ckpt_path, return_list=True):
+    position = [int(i) for i in ckpt_path.split('__')[6].split('_') if i != 'Pos']
+    if return_list:
+        return position
     else:
-        train_net = ckpt_path.split('__')[5]
-        n_train = ckpt_path.split('__')[6].split('_')[1].split('.')[0]
+        return '_'.join(map(str, position))
+
+
+def get_ckpt_name(ckpt_path):
+    train_net = ckpt_path.split('__')[5]
+    if 'Pos' in ckpt_path:
+        position = get_position(ckpt_path, return_list=False)
+        n_train = ckpt_path.split('__')[7].split('_')[1]
+        ckpt_name = f'{train_net}[{position}]({n_train})'
+    else:
+        n_train = ckpt_path.split('__')[6].split('_')[1]
         ckpt_name = f'{train_net}({n_train})'
     return ckpt_name 
 
 
-def get_adapter_info(ckpt_path, params):
-    if 'adapter' in ckpt_path:
-        if len(ckpt_path.split('__')[5].split('_')) > 2:
-            train_net = ckpt_path.split('__')[5].split('_')[0]
-            adapter_type = ckpt_path.split('__')[5].replace(train_net+'_', '')
-        else:
-            train_net, adapter_type = ckpt_path.split('__')[5].split('_')
-        position = [int(i) for i in ckpt_path.split('__')[6].split('_')]
-        updated_params = params.copy()
-        updated_params.update({
-            'train_net': train_net, 
-            'position': position})
-        return updated_params
-    else:
-        raise ValueError(f"{ckpt_path} is not an adapter's model")
+def update_params(ckpt_path, params):
+    train_net = ckpt_path.split('__')[5]
+    updated_params = params.copy()
+    updated_params.update({'train_net': train_net})
+    if 'Pos' in ckpt_path:
+        position = get_position(ckpt_path)
+        updated_params.update({'position': position})
+    return updated_params
 
 
 def get_ckpts_and_names(ckpts, ckpts_name, pretrained_ckpt, tuned_ckpts):
@@ -87,17 +83,12 @@ def get_ckpts_and_names(ckpts, ckpts_name, pretrained_ckpt, tuned_ckpts):
 
 def restore_model(
     params, is_file_separated, 
-    ckpt_name, base_ckpt, separated_ckpt=None):
-    if (not is_file_separated) or (is_file_separated and ckpt_name == 'OODG'):
+    base_ckpt, separated_ckpt=None):
+    if (not is_file_separated) or ('all' in base_ckpt) or ('train' in base_ckpt):
         model = YNetTrainer(params=params)
         model.load_params(base_ckpt)
     else:  
-        if 'adapter' in ckpt_name:
-            updated_params = get_adapter_info(separated_ckpt, params)
-            model = YNetTrainer(params=updated_params)
-            model.load_separated_params(base_ckpt, separated_ckpt)
-        else:
-            model = YNetTrainer(params=params)
-            model.load_separated_params(base_ckpt, separated_ckpt)
-    
+        updated_params = update_params(separated_ckpt, params)
+        model = YNetTrainer(params=updated_params)
+        model.load_separated_params(base_ckpt, separated_ckpt)    
     return model 

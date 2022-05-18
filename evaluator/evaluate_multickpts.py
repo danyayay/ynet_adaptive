@@ -38,7 +38,7 @@ def main(args):
         print(f'====== Testing for {ckpt_name} ======')
 
         # load model 
-        model = restore_model(params, is_file_separated, ckpt_name, 
+        model = restore_model(params, is_file_separated, 
             ckpt if not is_file_separated else args.pretrained_ckpt, 
             None if not is_file_separated else ckpt)
 
