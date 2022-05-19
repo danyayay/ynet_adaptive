@@ -84,3 +84,6 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     main(args)
+
+
+# python -m pdb train_copy.py --fine_tune --seed 1 --batch_size 8 --n_epoch 3 --dataset_path filter/agent_type/deathCircle_0/ --train_files Biker.pkl --val_files Biker.pkl --val_ratio 0.1 --n_leftouts 10 --n_train_batch 1 --pretrained_ckpt ckpts/Seed_1__Tr_Pedestrian__Val_Pedestrian__ValRatio_0.1__filter_agent_type__train.pt --lr 0.0005 --train_net parallelBlock --position 0

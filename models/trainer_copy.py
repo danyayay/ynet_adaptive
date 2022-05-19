@@ -100,10 +100,15 @@ class YNetTrainer:
                     param_layer = int(param_name.split('.')[1])
                     if param_layer in position:
                         param.requires_grad = True
-            # serial / parallel adapter 
-            elif 'serial' in train_net or 'parallel' in train_net:
+            # serial adapter
+            elif 'serial' in train_net:
                 for param_name, param in model.encoder.named_parameters():
-                    if 'adapter_layer' in param_name: 
+                    if 'serial' in param_name: 
+                        param.requires_grad = True
+            # parallel adapter
+            elif 'parallel' in train_net:
+                for param_name, param in model.encoder.named_parameters():
+                    if 'parallel' in param_name: 
                         param.requires_grad = True
             # lora 
             elif 'lora' in train_net:
@@ -111,7 +116,7 @@ class YNetTrainer:
                     if 'lora' in param_name:
                         param.requires_grad = True
             else:
-                raise ValueError(f'No support for train_net={train_net}')
+                raise ValueError(f'Invalid train_net={train_net}')
         optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
         lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=steps, gamma=lr_decay_ratio)
@@ -472,7 +477,7 @@ class YNetTrainer:
             print('Loaded ynet model to CPU')
 
     def save_params(self, path, train_net):
-        if train_net == 'all':
+        if train_net == 'all' or train_net == 'train':
             state_dict = self.model.state_dict()
         else:
             # save parameters with requires_grad = True
