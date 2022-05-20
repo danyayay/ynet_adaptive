@@ -126,11 +126,91 @@ def base_img_plot(ax, scene_img, semantic_img=None):
     return im
 
 
+def plot_activation_single(
+    ckpts_hook_dict, index, df_test, image_path, 
+    out_dir='figures/activation', format='png', 
+    resize_factor=0.25, obs_len=8, 
+    scene_imgs=None, semantic_imgs=None, zoom_in=False):
+    # scene 
+    scene_images = create_images_dict(index.sceneId.unique(), image_path, 'reference.jpg', True)
+    # body 
+    first_ckpt = list(ckpts_hook_dict)[0]
+    layers_name = ckpts_hook_dict[first_ckpt].keys()
+    my_cmap = my_colormap()
+    cmap_div = my_cmap
+    vcenter = 0
+    for i, (meta_id, scene_id) in enumerate(index): 
+        for layer_name in layers_name:
+            if 'decoder' in layer_name:
+                n_ckpt = len(ckpts_hook_dict)
+                _, n_channel, height, width = ckpts_hook_dict[first_ckpt][layer_name].shape
+                while height >= 6:
+                    height /= 2
+                    width /= 2
+                
+                new_out_dir = out_dir + f'/{scene_id}__{meta_id}'
+                pathlib.Path(new_out_dir).mkdir(parents=True, exist_ok=True)
+
+                fig, axes = plt.subplots(n_ckpt-1, 1, 
+                    figsize=(width+1, height*(n_ckpt-1)), squeeze=False)
+                r = 0
+                for ckpt_name, hook_dict in ckpts_hook_dict.items():
+                    if ckpt_name != 'OODG':
+                        # prepare base 
+                        base_features = ckpts_hook_dict['OODG'][layer_name][i]
+                        if isinstance(base_features, torch.Tensor):
+                            base_features = base_features.cpu().detach().numpy()
+                        # other ckpt 
+                        features = hook_dict[layer_name][i]
+                        if isinstance(features, torch.Tensor):
+                            features = features.cpu().detach().numpy()
+                        if isinstance(scene_imgs, torch.Tensor):
+                            scene_imgs = scene_imgs.cpu().detach().numpy()
+                        if isinstance(semantic_imgs, torch.Tensor):
+                            semantic_imgs = semantic_imgs.cpu().detach().numpy()
+                        scene_img = get_correct_scene_img(scene_imgs[0]) if scene_imgs.shape[0] == 1 \
+                            else get_correct_scene_img(scene_imgs[i])
+                        if semantic_imgs is not None:
+                            semantic_img = semantic_imgs[0] if semantic_imgs.shape[0] == 1 else semantic_imgs[i]
+                        else:
+                            semantic_img = None
+                        diff = features - base_features
+                        diff_single = diff.mean(axis=0)
+                        vmin, vmax = diff_single.min(), diff_single.max()
+                        # plot background 
+                        axes[r, 0].imshow(scene_img)
+                        # plot groundtruth 
+                        df_meta = df_test[df_test.metaId == meta_id]
+                        axes[r, 0].plot(
+                            df_meta.x.values[:obs_len] * resize_factor, 
+                            df_meta.y.values[:obs_len] * resize_factor, 
+                            '.-', c='k', linewidth=1, markersize=3, label='observation')
+                        axes[r, 0].plot(
+                            df_meta.x.values[obs_len:] * resize_factor, 
+                            df_meta.y.values[obs_len:] * resize_factor, 
+                            '.-', c='g', linewidth=2, markersize=5, label='groundtruth prediction')
+                        # plot map 
+                        divnorm = mpl.colors.TwoSlopeNorm(
+                            vcenter=vcenter, vmin=vmin, vmax=vmax)
+                        im = axes[r, 0].imshow(
+                            diff_single, cmap=cmap_div, norm=divnorm, alpha=0.5)
+                        plt.colorbar(im, ax=axes[r, 0], shrink=0.5)
+                        r += 1
+                plt.legend()
+                plt.subplots_adjust(wspace=0.01, hspace=0.02, bottom=0.1, right=0.78, top=0.9)
+                out_name = f'{layer_name}__diff_single_on_seg.{format}' if semantic_img is not None else f'{layer_name}__diff_single_on_scene.{format}'
+                out_path = os.path.join(new_out_dir, out_name)
+                plt.savefig(out_path, bbox_inches='tight')
+                plt.close(fig)
+                print(f'Saved {out_path}')
+
+
 def plot_activation(
     ckpts_hook_dict, index, 
     out_dir='figures/activation', format='png', 
     compare_raw=True, compare_diff=False, compare_overlay=False, compare_relative=False,
-    scene_imgs=None, semantic_imgs=None, scale_row=True, inhance_diff=True, single_output=False):
+    scene_imgs=None, semantic_imgs=None, scale_row=True, inhance_diff=True, 
+    single_output=False, zoom_in=False):
     # semantic_map (class=0~5): 
     #     - channel 1: pavement
     #     - channel 2: terrain 
@@ -230,13 +310,14 @@ def plot_activation(
                     plt.close(fig)
                     print(f'Saved {out_path}')
 
-                if compare_diff:
+                if compare_diff and not single_output:
                     if semantic_imgs is not None:
                         fig, axes = plt.subplots(n_ckpt-1, n_channel+2, 
                             figsize=(width*(n_channel+2)+1, height*(n_ckpt-1)))
                     else:
                         fig, axes = plt.subplots(n_ckpt-1, n_channel, 
                             figsize=(width*n_channel+1, height*(n_ckpt-1)))
+
                     r = 0
                     for ckpt_name, hook_dict in ckpts_hook_dict.items():
                         if ckpt_name != 'OODG':
@@ -325,6 +406,48 @@ def plot_activation(
                     plt.subplots_adjust(wspace=0.01, hspace=0.02, bottom=0.1, right=0.78, top=0.9)
                     out_name = f'{layer_name}__scaled' if scale_row else layer_name 
                     out_name = f'{out_name}__diff_on_seg.{format}' if semantic_img is not None else f'{out_name}__diff_on_scene.{format}'
+                    out_path = os.path.join(new_out_dir, out_name)
+                    plt.savefig(out_path, bbox_inches='tight')
+                    plt.close(fig)
+                    print(f'Saved {out_path}')
+
+                if compare_diff and single_output:
+                    fig, axes = plt.subplots(n_ckpt-1, 1, 
+                        figsize=(width+1, height*(n_ckpt-1)), squeeze=False)
+                    r = 0
+                    for ckpt_name, hook_dict in ckpts_hook_dict.items():
+                        if ckpt_name != 'OODG':
+                            # prepare base 
+                            base_features = ckpts_hook_dict['OODG'][layer_name][i]
+                            if isinstance(base_features, torch.Tensor):
+                                base_features = base_features.cpu().detach().numpy()
+                            # other ckpt 
+                            features = hook_dict[layer_name][i]
+                            if isinstance(features, torch.Tensor):
+                                features = features.cpu().detach().numpy()
+                            if isinstance(scene_imgs, torch.Tensor):
+                                scene_imgs = scene_imgs.cpu().detach().numpy()
+                            if isinstance(semantic_imgs, torch.Tensor):
+                                semantic_imgs = semantic_imgs.cpu().detach().numpy()
+                            scene_img = get_correct_scene_img(scene_imgs[0]) if scene_imgs.shape[0] == 1 \
+                                else get_correct_scene_img(scene_imgs[i])
+                            if semantic_imgs is not None:
+                                semantic_img = semantic_imgs[0] if semantic_imgs.shape[0] == 1 else semantic_imgs[i]
+                            else:
+                                semantic_img = None
+                            diff = features - base_features
+                            diff_single = diff.mean(axis=0)
+                            vmin, vmax = diff_single.min(), diff_single.max()
+                            v_max = max(abs(vmin), vmax)
+                            print(vmin, vmax, diff_single.mean())
+                            # plot 
+                            axes[r, 0].imshow(scene_img)
+                            divnorm = mpl.colors.TwoSlopeNorm(vcenter=vcenter, vmin=-v_max, vmax=v_max)
+                            im = axes[r, 0].imshow(diff_single, cmap=cmap_div, norm=divnorm, alpha=0.5)
+                            plt.colorbar(im, ax=axes[r, 0], shrink=0.5)
+                            r += 1
+                    plt.subplots_adjust(wspace=0.01, hspace=0.02, bottom=0.1, right=0.78, top=0.9)
+                    out_name = f'{layer_name}__diff_single_on_seg.{format}' if semantic_img is not None else f'{layer_name}__diff_single_on_scene.{format}'
                     out_path = os.path.join(new_out_dir, out_name)
                     plt.savefig(out_path, bbox_inches='tight')
                     plt.close(fig)
@@ -434,8 +557,8 @@ def plot_activation(
 
 
 def my_colormap():
-    top = mpl.cm.get_cmap('Purples_r', 128)
-    bottom = mpl.cm.get_cmap('Blues', 128)
+    top = mpl.cm.get_cmap('Blues_r', 128)
+    bottom = mpl.cm.get_cmap('Oranges', 128)
     my_colors = np.vstack((top(np.linspace(0, 1, 128)),
                         bottom(np.linspace(0, 1, 128))))
     my_cmap = mpl.colors.ListedColormap(my_colors, name='my_cmap')

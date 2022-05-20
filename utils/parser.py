@@ -23,6 +23,7 @@ def get_model_args(parser):
     
     # added net 
     parser.add_argument('--position', default=[], type=int, nargs='+')
+    parser.add_argument('--all_bias', action='store_true')
     parser.add_argument("--train_net", default="all", type=str, 
         help="train all parameters or only encoder or with modulator")
     return parser

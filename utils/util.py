@@ -15,6 +15,7 @@ def get_experiment_name(args, n_train):
     experiment += f'__TrN_{str(int(n_train/20))}'
     if args.fine_tune: experiment += f'__lr_{args.lr}'
     if args.is_augment_data: experiment += '__AUG'
+    if args.all_bias: experiment += '__bias'
     return experiment
 
 

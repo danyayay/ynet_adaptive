@@ -85,6 +85,4 @@ if __name__ == '__main__':
 
     main(args)
 
-# python -m pdb train.py --fine_tune --seed 1 --n_epoch 3 --batch_size 8 --dataset_path filter/agent_type/deathCircle_0/ --train_files Biker.pkl --val_files Biker.pkl --val_ratio 0.1 --n_leftouts 10 --pretrained_ckpt ckpts/Seed_1_Train__Pedestrian__Val__Pedestrian__Val_Ratio_0.1_filter_agent_type__train_all_weights.pt --lr 0.00005 --n_train_batch 1 --train_net adapter --adapter_type parallel --adapter_position 0 --is_augment_data --gpu 1
-
-# python -m pdb train.py --fine_tune --seed 1 --batch_size 10 --n_epoch 10 --dataset_path filter/agent_type/deathCircle_0/ --train_files Biker.pkl --val_files Biker.pkl --val_ratio 0.1 --n_leftouts 500 --n_train_batch 16 --ckpt ckpts/Seed_1_Train__Pedestrian__Val__Pedestrian__Val_Ratio_0.1_filter_agent_type__train_all_weights.pt --lr 0.00005 --train_net adapter --adapter_type serial --adapter_position 0 1 2 3 4
+# python -m pdb train.py --fine_tune --seed 1 --n_epoch 3 --batch_size 8 --dataset_path filter/agent_type/deathCircle_0/ --train_files Biker.pkl --val_files Biker.pkl --val_ratio 0.1 --n_leftouts 10 --pretrained_ckpt ckpts/Seed_1__Tr_Pedestrian__Val_Pedestrian__ValRatio_0.1__filter_agent_type__train.pt --lr 0.00005 --n_train_batch 1 --train_net bias

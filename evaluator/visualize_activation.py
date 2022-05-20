@@ -2,7 +2,7 @@ import pandas as pd
 from utils.parser import get_parser
 from utils.dataset import set_random_seeds, dataset_split, get_meta_ids_focus
 from utils.util import get_params, get_image_and_data_path, restore_model, get_ckpts_and_names
-from evaluator.visualization import plot_activation
+from evaluator.visualization import plot_activation, plot_activation_single
 
 
 def main(args):
@@ -80,16 +80,20 @@ def main(args):
     folder_name = f"{args.seed}__{'_'.join(args.dataset_path.split('/'))}__{'_'.join(args.val_files).rstrip('.pkl')}/{'_'.join(ckpts_name)}" 
     index = df_test.groupby(by=['metaId', 'sceneId']).count().index
     print(index)
-    plot_activation(ckpts_hook_dict, index, 
-        f'figures/activation/{folder_name}', 
-        compare_raw=args.compare_raw, compare_diff=args.compare_diff, 
-        compare_overlay=args.compare_overlay, compare_relative=args.compare_relative, 
-        scene_imgs=raw_img, semantic_imgs=None, scale_row=True, inhance_diff=False)
-    plot_activation(ckpts_hook_dict, index, 
-        f'figures/activation/{folder_name}', 
-        compare_raw=args.compare_raw, compare_diff=args.compare_diff, 
-        compare_overlay=args.compare_overlay, compare_relative=args.compare_relative,
-        scene_imgs=raw_img, semantic_imgs=None, scale_row=False, inhance_diff=False)
+    plot_activation_single(
+        ckpts_hook_dict, index, df_test, 
+        f'figures/activation_yy', 
+        scene_imgs=raw_img, semantic_imgs=None, zoom_in=False)
+    # plot_activation(ckpts_hook_dict, index, 
+    #     f'figures/activation/{folder_name}', 
+    #     compare_raw=args.compare_raw, compare_diff=args.compare_diff, 
+    #     compare_overlay=args.compare_overlay, compare_relative=args.compare_relative, 
+    #     scene_imgs=raw_img, semantic_imgs=None, scale_row=True, inhance_diff=False)
+    # plot_activation(ckpts_hook_dict, index, 
+    #     f'figures/activation/{folder_name}', 
+    #     compare_raw=args.compare_raw, compare_diff=args.compare_diff, 
+    #     compare_overlay=args.compare_overlay, compare_relative=args.compare_relative,
+    #     scene_imgs=raw_img, semantic_imgs=None, scale_row=False, inhance_diff=False)
     
 
 def hook_store_input(module, input, output):
@@ -116,14 +120,4 @@ if __name__ == '__main__':
     args = parser.parse_args()
     main(args)
 
-# python -m pdb -m evaluator.visualize_activation --dataset_path filter/agent_type/deathCircle_0 --pretrained_ckpt ckpts/Seed_1_Train__Pedestrian__Val__Pedestrian__Val_Ratio_0.1_filter_agent_type__train_all_weights.pt --tuned_ckpts ckpts/Seed_1__Tr_Biker__Val_Biker__ValRatio_0.1__filter_agent_type_deathCircle_0__encoder_0__TrN_20.pt --val_files Biker.pkl --n_leftouts 500 --result_path './csv/comparison/1__filter_agent_type_deathCircle_0__Biker/OODG_encoder_0(20)_encoder_0-1(20).csv' --result_name 'ade_OODG__ade_encoder_0(20)__diff' --result_limited 1 --compare_raw --compare_diff --compare_overlay
-
-# python -m pdb -m evaluator.visualize_activation --dataset_path filter/agent_type/deathCircle_0 --pretrained_ckpt ckpts/Seed_1_Train__Pedestrian__Val__Pedestrian__Val_Ratio_0.1_filter_agent_type__train_all_weights.pt --tuned_ckpts ckpts/Seed_1__Tr_Biker__Val_Biker__ValRatio_0.1__filter_agent_type_deathCircle_0__encoder_0__TrN_20.pt ckpts/Seed_1__Tr_Biker__Val_Biker__ValRatio_0.1__filter_agent_type_deathCircle_0__encoder_0-4__TrN_20.pt ckpts/Seed_1__Tr_Biker__Val_Biker__ValRatio_0.1__filter_agent_type_deathCircle_0__encoder_0__TrN_160.pt ckpts/Seed_1__Tr_Biker__Val_Biker__ValRatio_0.1__filter_agent_type_deathCircle_0__encoder_0-4__TrN_160.pt ckpts/Seed_1__Tr_Biker__Val_Biker__ValRatio_0.1__filter_agent_type_deathCircle_0__adapter_parallel__0__TrN_20.pt ckpts/Seed_1__Tr_Biker__Val_Biker__ValRatio_0.1__filter_agent_type_deathCircle_0__adapter_parallel__0_1_2_3_4__TrN_20.pt --val_files Biker.pkl --n_leftouts 500 --given_meta_ids 5334 5445 5466 5607 5635 5711 5726 5767 5775 5885 5890 5972 5982 6060 6063 6098 6228 6252 6269 6310 --compare_raw --compare_diff --compare_overlay
-
-# python -m pdb -m evaluator.visualize_activation --dataset_path filter/agent_type/deathCircle_0 --ckpts ckpts/Seed_1_Train__Pedestrian__Val__Pedestrian__Val_Ratio_0.1_filter_agent_type__train_all_weights.pt ckpts/Seed_1_Train__Biker__Val__Biker__Val_Ratio_0.1_filter_agent_type_deathCircle_0__train_encoder_0__TN_160_weights ckpts/Seed_1_Train__Biker__Val__Biker__Val_Ratio_0.1_filter_agent_type_deathCircle_0__train_encoder_0-4__TN_160_weights.pt --ckpts OODG encoder_0(160) encoder_0-4(160) --val_files Biker.pkl --n_leftouts 500 --given_meta_ids 5334 5445 5466 5607 5635 5711 5726 5767 5775 5885 5890 5972 5982 6060 6063 6098 6228 6252 6269 6310 --compare_raw --compare_diff --compare_overlay
-
-
-# python -m pdb -m evaluator.visualize_activation --dataset_path filter/agent_type --ckpts ckpts/Seed_1_Train__Pedestrian__Val__Pedestrian__Val_Ratio_0.1_filter_agent_type__train_all_weights.pt ckpts/Seed_1_Train__Biker__Val__Biker__Val_Ratio_0.1_filter_agent_type__train_encoder_weights.pt --ckpts_name OODG ET --val_files Biker.pkl --n_leftouts 500 --given_meta_ids 16205 16229
-
-
-# python -m pdb -m evaluator.visualize_activation --dataset_path filter/agent_type/deathCircle_0 --pretrained_ckpt ckpts/Seed_1_Train__Pedestrian__Val__Pedestrian__Val_Ratio_0.1_filter_agent_type__train_all_weights.pt --tuned_ckpts ckpts/Seed_1__Tr_Biker__Val_Biker__ValRatio_0.1__filter_agent_type_deathCircle_0__encoder_0-4__TrN_20.pt --val_files Biker.pkl --n_leftouts 10 --given_meta_ids 6318 --compare_relative 
+# python -m pdb -m evaluator.visualize_activation --dataset_path filter/agent_type/deathCircle_0 --pretrained_ckpt ckpts/Seed_1__Tr_Pedestrian__Val_Pedestrian__ValRatio_0.1__filter_agent_type__train.pt --tuned_ckpts ckpts/Seed_1__Tr_Biker__Val_Biker__ValRatio_0.1__filter_agent_type_deathCircle_0__lora_1__Pos_0_1_2_3_4__TrN_20__lr_0.0005.pt --val_files Biker.pkl --n_leftouts 10 --given_meta_ids 6318 --compare_diff 

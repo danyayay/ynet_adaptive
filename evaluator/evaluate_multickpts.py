@@ -45,7 +45,7 @@ def main(args):
 
         # test 
         set_random_seeds(args.seed)
-        _, _, list_metrics, _ = model.test(df_test, IMAGE_PATH, False, True, True) 
+        _, _, list_metrics, list_trajs = model.test(df_test, IMAGE_PATH, False, True, True) 
 
         # store ade/fde comparison
         for r in range(args.n_round):
@@ -57,15 +57,15 @@ def main(args):
         df_to_merge = df_to_merge.rename({
             'ade': f'ade_{ckpt_name}', 'fde': f'fde_{ckpt_name}'}, axis=1)
         df_result = df_to_merge if i == 0 else df_result.merge(df_to_merge, on=['metaId', 'sceneId'])
-        # if args.n_round == 1:
-        #     ckpts_trajs_dict[ckpt_name] = list_trajs[0]
-        # else:
-        #     ckpts_trajs_dict[ckpt_name] = list_trajs
+        if args.n_round == 1:
+            ckpts_trajs_dict[ckpt_name] = list_trajs[0]
+        else:
+            ckpts_trajs_dict[ckpt_name] = list_trajs
 
     folder_name = f"{args.seed}__{'_'.join(args.dataset_path.split('/'))}__{'_'.join(args.val_files).rstrip('.pkl')}" 
     out_dir = f'csv/comparison/{folder_name}'
     pathlib.Path(out_dir).mkdir(parents=True, exist_ok=True)
-    csv_name = f"{'_'.join(ckpts_name)}__N{meta_ids_focus.shape[0]}"
+    csv_name = f"{'_'.join(ckpts_name)}__N{len(meta_ids_focus)}_R{args.n_round}"
     out_name = f'{out_dir}/{csv_name}.csv'
     df_result.to_csv(out_name, index=False)
     print(f'Saved {out_name}')
@@ -77,8 +77,8 @@ def main(args):
         else:
             plot_multiple_predictions(IMAGE_PATH, ckpts_trajs_dict, 
                 f'figures/prediction_multiple/{folder_name}/{"_".join(ckpts_name)}')
-            plot_goal_map_with_samples(IMAGE_PATH, ckpts_trajs_dict, 
-                f'figures/goal_map_with_samples/{folder_name}')
+            # plot_goal_map_with_samples(IMAGE_PATH, ckpts_trajs_dict, 
+            #     f'figures/goal_map_with_samples/{folder_name}')
         
 
 def hook_store_output(module, input, output): 
@@ -99,6 +99,6 @@ if __name__ == '__main__':
 
     main(args)
 
-# python -m pdb -m evaluator.evaluate_multickpts --dataset_path filter/agent_type/deathCircle_0 --val_files Biker.pkl --n_leftouts 10 --pretrained_ckpt ckpts/Seed_1__Tr_Pedestrian__Val_Pedestrian__ValRatio_0.1__filter_agent_type__train.pt --tuned_ckpts ckpts/Seed_1__Tr_Biker__Val_Biker__ValRatio_0.1__filter_agent_type_deathCircle_0__encoder_0__TrN_20.pt --n_round 2 --given_meta_ids 6318
+# python -m pdb -m evaluator.evaluate_multickpts --dataset_path filter/agent_type/deathCircle_0 --val_files Biker.pkl --n_leftouts 10 --pretrained_ckpt ckpts/Seed_1__Tr_Pedestrian__Val_Pedestrian__ValRatio_0.1__filter_agent_type__train.pt --tuned_ckpts ckpts/Seed_1__Tr_Biker__Val_Biker__ValRatio_0.1__filter_agent_type_deathCircle_0__lora_1__Pos_0_1_2_3_4__TrN_20__lr_0.0005.pt --n_round 2 --given_meta_ids 6318
 
-# python -m pdb -m evaluator.evaluate_multickpts --dataset_path filter/agent_type/deathCircle_0 --val_files Biker.pkl --n_leftouts 500 --pretrained_ckpt ckpts/Seed_1__Tr_Pedestrian__Val_Pedestrian__ValRatio_0.1__filter_agent_type__train.pt --tuned_ckpts ckpts/Seed_1__Tr_Biker__Val_Biker__ValRatio_0.1__filter_agent_type_deathCircle_0__encoder_0__TrN_20.pt --result_path './csv/comparison/1__filter_agent_type_deathCircle_0__Biker/OODG_encoder_0(20)_encoder_0-1(20).csv' --result_name 'ade_OODG__ade_encoder_0(20)__diff' --result_limited 5 --n_round 10 
+# python -m pdb -m evaluator.evaluate_multickpts --dataset_path filter/agent_type/deathCircle_0 --val_files Biker.pkl --n_leftouts 500 --pretrained_ckpt ckpts/Seed_1__Tr_Pedestrian__Val_Pedestrian__ValRatio_0.1__filter_agent_type__train.pt --tuned_ckpts ckpts/Seed_1__Tr_Biker__Val_Biker__ValRatio_0.1__filter_agent_type_deathCircle_0__lora_1__Pos_0_1_2_3_4__TrN_20__lr_0.0005.pt --result_path './csv/comparison/1__filter_agent_type_deathCircle_0__Biker/OODG_encoder_0(20)_encoder_0-1(20).csv' --result_name 'ade_OODG__ade_encoder_0(20)__diff' --result_limited 5 --n_round 10 
