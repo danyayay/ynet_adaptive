@@ -127,33 +127,26 @@ def base_img_plot(ax, scene_img, semantic_img=None):
 
 
 def plot_activation_single(
-    ckpts_hook_dict, index, df_test, image_path, 
-    out_dir='figures/activation', format='png', 
-    resize_factor=0.25, obs_len=8, 
-    scene_imgs=None, semantic_imgs=None, zoom_in=False):
+    ckpts_hook_dict, index, df_test, image_path,
+    out_dir='figures/activation', format='png', obs_len=8, resize_factor=0.25,
+    display_scene_img=True, inhance_threshold=None, zoom_in=False):
     # scene 
-    scene_images = create_images_dict(index.sceneId.unique(), image_path, 'reference.jpg', True)
+    unique_scene = np.unique(np.array([idx[1] for idx in index]))
+    scene_images = create_images_dict(unique_scene, image_path, 'reference.jpg', True)
     # body 
     first_ckpt = list(ckpts_hook_dict)[0]
     layers_name = ckpts_hook_dict[first_ckpt].keys()
-    my_cmap = my_colormap()
-    cmap_div = my_cmap
-    vcenter = 0
     for i, (meta_id, scene_id) in enumerate(index): 
         for layer_name in layers_name:
-            if 'decoder' in layer_name:
-                n_ckpt = len(ckpts_hook_dict)
-                _, n_channel, height, width = ckpts_hook_dict[first_ckpt][layer_name].shape
-                while height >= 6:
+            if 'goal_decoder' in layer_name:
+                _, _, height, width = ckpts_hook_dict[first_ckpt][layer_name].shape
+                while height >= 10:
                     height /= 2
                     width /= 2
                 
                 new_out_dir = out_dir + f'/{scene_id}__{meta_id}'
                 pathlib.Path(new_out_dir).mkdir(parents=True, exist_ok=True)
 
-                fig, axes = plt.subplots(n_ckpt-1, 1, 
-                    figsize=(width+1, height*(n_ckpt-1)), squeeze=False)
-                r = 0
                 for ckpt_name, hook_dict in ckpts_hook_dict.items():
                     if ckpt_name != 'OODG':
                         # prepare base 
@@ -164,45 +157,87 @@ def plot_activation_single(
                         features = hook_dict[layer_name][i]
                         if isinstance(features, torch.Tensor):
                             features = features.cpu().detach().numpy()
-                        if isinstance(scene_imgs, torch.Tensor):
-                            scene_imgs = scene_imgs.cpu().detach().numpy()
-                        if isinstance(semantic_imgs, torch.Tensor):
-                            semantic_imgs = semantic_imgs.cpu().detach().numpy()
-                        scene_img = get_correct_scene_img(scene_imgs[0]) if scene_imgs.shape[0] == 1 \
-                            else get_correct_scene_img(scene_imgs[i])
-                        if semantic_imgs is not None:
-                            semantic_img = semantic_imgs[0] if semantic_imgs.shape[0] == 1 else semantic_imgs[i]
-                        else:
-                            semantic_img = None
+                        scene_img = get_correct_scene_img(scene_images[scene_id], -1)
                         diff = features - base_features
                         diff_single = diff.mean(axis=0)
+                        diff_single = cv2.resize(
+                            diff_single, (0, 0), fx=1/resize_factor, fy=1/resize_factor, interpolation=cv2.INTER_AREA)
+                        diff_single = diff_single[:scene_img.shape[0], :scene_img.shape[1]]
+                        print('scene_img:', scene_img.shape, 'diff_single:', diff_single.shape)
                         vmin, vmax = diff_single.min(), diff_single.max()
-                        # plot background 
-                        axes[r, 0].imshow(scene_img)
-                        # plot groundtruth 
+                        print('vmin:', vmin, 'vmax:', vmax)
                         df_meta = df_test[df_test.metaId == meta_id]
-                        axes[r, 0].plot(
-                            df_meta.x.values[:obs_len] * resize_factor, 
-                            df_meta.y.values[:obs_len] * resize_factor, 
-                            '.-', c='k', linewidth=1, markersize=3, label='observation')
-                        axes[r, 0].plot(
-                            df_meta.x.values[obs_len:] * resize_factor, 
-                            df_meta.y.values[obs_len:] * resize_factor, 
-                            '.-', c='g', linewidth=2, markersize=5, label='groundtruth prediction')
-                        # plot map 
-                        divnorm = mpl.colors.TwoSlopeNorm(
-                            vcenter=vcenter, vmin=vmin, vmax=vmax)
-                        im = axes[r, 0].imshow(
-                            diff_single, cmap=cmap_div, norm=divnorm, alpha=0.5)
-                        plt.colorbar(im, ax=axes[r, 0], shrink=0.5)
-                        r += 1
-                plt.legend()
-                plt.subplots_adjust(wspace=0.01, hspace=0.02, bottom=0.1, right=0.78, top=0.9)
-                out_name = f'{layer_name}__diff_single_on_seg.{format}' if semantic_img is not None else f'{layer_name}__diff_single_on_scene.{format}'
-                out_path = os.path.join(new_out_dir, out_name)
-                plt.savefig(out_path, bbox_inches='tight')
-                plt.close(fig)
-                print(f'Saved {out_path}')
+                        # plot 
+                        if display_scene_img:
+                            fig, axes = plt.subplots(1, 2, figsize=(width*2, height))
+                            # plot background 
+                            axes[0].imshow(scene_img)
+                            axes[1].imshow(scene_img)
+                            # plot groundtruth 
+                            axes[1].plot(df_meta.x.values[:obs_len], df_meta.y.values[:obs_len], 
+                                '.-', c='lightgreen', linewidth=1, markersize=3, label='observation')
+                            axes[1].plot(df_meta.x.values[(obs_len-1):], df_meta.y.values[(obs_len-1):], 
+                                '.-', c='gold', linewidth=1, markersize=3, label='groundtruth prediction')
+                            # plot map 
+                            if vmin > 0: vmin = 0
+                            if vmax < 0: vmax = 0
+                            divnorm = mpl.colors.TwoSlopeNorm(vcenter=0, vmin=vmin, vmax=vmax)
+                            if inhance_threshold is not None:
+                                cmap_div = get_hollow_cmap(inhance_threshold)
+                            else:
+                                cmap_div = get_ordinary_cmap()
+                            axes[1].imshow(diff_single, cmap=cmap_div, norm=divnorm, alpha=0.5)
+                            axes[0].set_yticklabels([])
+                            axes[0].set_xticklabels([])
+                            axes[1].set_yticklabels([]) 
+                            axes[1].set_xticklabels([])
+                            axes[0].set_xticks([])
+                            axes[0].set_yticks([])
+                            axes[1].set_xticks([])
+                            axes[1].set_yticks([])
+                            plt.legend()
+                            plt.subplots_adjust(wspace=0.02, hspace=0.02, bottom=0.1, right=0.78, top=0.9)
+                        else:
+                            fig, ax = plt.subplots(1, 1, figsize=(width, height))
+                            ax.imshow(scene_img)
+                            ax.set_yticklabels([])
+                            ax.set_xticklabels([])
+                            ax.set_xticks([])
+                            ax.set_yticks([])
+                            out_path = f'{new_out_dir}/{scene_id}.png'
+                            plt.savefig(out_path, bbox_inches='tight')
+                            plt.close(fig)
+                            print(f'Saved {out_path}')
+
+                            fig, ax = plt.subplots(1, 1, figsize=(width, height))
+                            # plot background 
+                            ax.imshow(scene_img)
+                            # plot groundtruth 
+                            ax.plot(df_meta.x.values[:obs_len], df_meta.y.values[:obs_len], 
+                                '.-', c='lightgreen', linewidth=1, markersize=3, label='observation')
+                            ax.plot(df_meta.x.values[(obs_len-1):], df_meta.y.values[(obs_len-1):], 
+                                '.-', c='gold', linewidth=1, markersize=3, label='groundtruth prediction')
+                            # plot map 
+                            if vmin > 0: vmin = 0
+                            if vmax < 0: vmax = 0
+                            divnorm = mpl.colors.TwoSlopeNorm(vcenter=0, vmin=vmin, vmax=vmax)
+                            if inhance_threshold is not None:
+                                cmap_div = get_hollow_cmap(inhance_threshold)
+                            else:
+                                cmap_div = get_ordinary_cmap()
+                            ax.imshow(diff_single, cmap=cmap_div, norm=divnorm, alpha=0.5)
+                            ax.set_yticklabels([])
+                            ax.set_xticklabels([])
+                            ax.set_xticks([])
+                            ax.set_yticks([])
+                            plt.legend()
+                        out_name = f'{ckpt_name}__{layer_name}__diff_single'
+                        if display_scene_img: out_name = out_name + '__scene'
+                        out_name = out_name + f'__{inhance_threshold}.{format}' if inhance_threshold is not None else out_name + f'.{format}'
+                        out_path = os.path.join(new_out_dir, out_name)
+                        plt.savefig(out_path, bbox_inches='tight')
+                        plt.close(fig)
+                        print(f'Saved {out_path}')
 
 
 def plot_activation(
@@ -216,7 +251,7 @@ def plot_activation(
     #     - channel 2: terrain 
     first_ckpt = list(ckpts_hook_dict)[0]
     layers_name = ckpts_hook_dict[first_ckpt].keys()
-    my_cmap = my_colormap()
+    my_cmap = get_ordinary_cmap()
     cmap_div, cmap_clr = my_cmap, 'jet'
     vcenter = 0
     for i, (meta_id, scene_id) in enumerate(index): 
@@ -556,13 +591,37 @@ def plot_activation(
                     print(f'Saved {out_path}') 
 
 
-def my_colormap():
+def get_ordinary_cmap():
     top = mpl.cm.get_cmap('Blues_r', 128)
     bottom = mpl.cm.get_cmap('Oranges', 128)
     my_colors = np.vstack((top(np.linspace(0, 1, 128)),
                         bottom(np.linspace(0, 1, 128))))
     my_cmap = mpl.colors.ListedColormap(my_colors, name='my_cmap')
     return my_cmap
+
+
+def get_hollow_cmap(threshold):
+    N = 256
+    cut = int(N * threshold)   
+    n_color = N // 2 - cut
+    decrease = mpl.cm.get_cmap('Blues_r', n_color)
+    increase = mpl.cm.get_cmap('Oranges', n_color)
+    transparent = np.array([[1, 1, 1, 0]])
+    my_colors = np.vstack((
+        decrease(np.linspace(0, 1, n_color)),
+        transparent.repeat(N-n_color*2, axis=0), 
+        increase(np.linspace(0, 1, n_color))))
+    my_cmap = mpl.colors.ListedColormap(my_colors, name='my_cmap')
+    return my_cmap 
+
+
+def adjust_cmap(cmap, threshold):
+    N = 256
+    new_colors = cmap(np.linspace(0, 1, N))
+    transparent = np.array([1, 1, 1, 0])
+    new_colors[int(N/2-N*threshold): int(N/2+N*threshold), :] = transparent
+    new_cmap = mpl.colors.ListedColormap(new_colors)
+    return new_cmap
 
 
 def plot_feature_space(dict_features, out_dir='figures/feature_space', show_diff=True, format='png'):
@@ -1464,9 +1523,15 @@ def plot_importance_analysis(
                 )
 
 
-def get_correct_scene_img(input):
-    n_channel, height, width = input.shape
-    blue, green, red = input[0], input[1], input[2]
+def get_correct_scene_img(input, c_place=-1):
+    if c_place == -1:
+        height, width, _ = input.shape
+        blue, green, red = input[:,:,0], input[:,:,1], input[:,:,2]
+    elif c_place == 0:
+        _, height, width = input.shape
+        blue, green, red = input[0], input[1], input[2]
+    else:
+        raise ValueError
     scene_img = np.empty((height, width, 3))
     scene_img[:, :, 0] = red
     scene_img[:, :, 1] = green 

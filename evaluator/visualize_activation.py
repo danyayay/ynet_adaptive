@@ -81,9 +81,21 @@ def main(args):
     index = df_test.groupby(by=['metaId', 'sceneId']).count().index
     print(index)
     plot_activation_single(
-        ckpts_hook_dict, index, df_test, 
-        f'figures/activation_yy', 
-        scene_imgs=raw_img, semantic_imgs=None, zoom_in=False)
+        ckpts_hook_dict, index, df_test, IMAGE_PATH, 
+        out_dir='figures/activation_yy', display_scene_img=False,
+        inhance_threshold=0.1, zoom_in=False)
+    # plot_activation_single(
+    #     ckpts_hook_dict, index, df_test, IMAGE_PATH, 
+    #     out_dir='figures/activation_yy', display_scene_img=False,
+    #     inhance_threshold=0.15, zoom_in=False)
+    # plot_activation_single(
+    #     ckpts_hook_dict, index, df_test, IMAGE_PATH, 
+    #     out_dir='figures/activation_yy', display_scene_img=True,
+    #     inhance_threshold=0.1, zoom_in=False)
+    # plot_activation_single(
+    #     ckpts_hook_dict, index, df_test, IMAGE_PATH, 
+    #     out_dir='figures/activation_yy', display_scene_img=True,
+    #     inhance_threshold=0.15, zoom_in=False)
     # plot_activation(ckpts_hook_dict, index, 
     #     f'figures/activation/{folder_name}', 
     #     compare_raw=args.compare_raw, compare_diff=args.compare_diff, 
@@ -120,4 +132,10 @@ if __name__ == '__main__':
     args = parser.parse_args()
     main(args)
 
-# python -m pdb -m evaluator.visualize_activation --dataset_path filter/agent_type/deathCircle_0 --pretrained_ckpt ckpts/Seed_1__Tr_Pedestrian__Val_Pedestrian__ValRatio_0.1__filter_agent_type__train.pt --tuned_ckpts ckpts/Seed_1__Tr_Biker__Val_Biker__ValRatio_0.1__filter_agent_type_deathCircle_0__lora_1__Pos_0_1_2_3_4__TrN_20__lr_0.0005.pt --val_files Biker.pkl --n_leftouts 10 --given_meta_ids 6318 --compare_diff 
+# python -m pdb -m evaluator.visualize_activation --dataset_path filter/agent_type/deathCircle_0 --pretrained_ckpt ckpts/Seed_1__Tr_Pedestrian__Val_Pedestrian__ValRatio_0.1__filter_agent_type__train.pt --tuned_ckpts ckpts/Seed_1__Tr_Biker__Val_Biker__ValRatio_0.1__filter_agent_type_deathCircle_0__lora_1__Pos_0_1_2_3_4__TrN_20__lr_0.0005.pt --val_files Biker.pkl --n_leftouts 500 
+
+# --given_meta_ids 5358 5883 5982
+
+# --given_meta_ids 5711 6060 5670 5334 6063 6269 5885 6310 5767 6322 5445 5358 5726 6230 5468 5890 5883 5715 5450 6228 
+
+# --result_path "csv/comparison/1__filter_agent_type_deathCircle_0__Biker/OODG_lora_1[0_1_2_3_4]20__N500.csv" --result_name "ade_lora_1[0_1_2_3_4](20)__fde_lora_1[0_1_2_3_4](20)__diff" --result_limited 100
