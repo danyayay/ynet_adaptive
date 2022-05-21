@@ -1,8 +1,5 @@
 list_seed=(1 2 3)
 batch_size=10
-
-dataset_name=sdd
-out_csv_dir=csv 
 val_ratio=0
 
 declare -A A=( ["dataset_path"]="filter/avg_vel/Pedestrian/" ["filename"]="0.1_0.3.pkl" ["n_test"]=100 \
@@ -16,7 +13,7 @@ declare -A C=( ["dataset_path"]="filter/avg_den100/Pedestrian/" ["filename"]="0_
 declare -A D=( ["dataset_path"]="filter/avg_den100/Pedestrian/" ["filename"]="1.7_4.3.pkl" ["n_test"]=350 \
     ["ckpt"]="ckpts/Seed_1_Train__1.7_4.3__Val__1.7_4.3__Val_Ratio_0.1_filter_avg_den100_Pedestrian__train_all_weights.pt")
 declare -A E=( ["dataset_path"]="filter/agent_type/" ["filename"]="Pedestrian.pkl" ["n_test"]=1500 \
-    ["ckpt"]="ckpts/Seed_1_Train__Pedestrian__Val__Pedestrian__Val_Ratio_0.1_filter_agent_type__train_all_weights.pt")
+    ["ckpt"]="ckpts/Seed_1__Tr_Pedestrian__Val_Pedestrian__ValRatio_0.1__filter_agent_type__train.pt")
 declare -A F=( ["dataset_path"]="filter/agent_type/" ["filename"]="Biker.pkl" ["n_test"]=500 \
     ["ckpt"]="ckpts/Seed_1_Train__Biker__Val__Biker__Val_Ratio_0.1_filter_agent_type__train_all_weights.pt")
 
@@ -24,8 +21,9 @@ declare -A F=( ["dataset_path"]="filter/agent_type/" ["filename"]="Biker.pkl" ["
 # dataset_path=${AB["dataset_path"]}
 # ckpt=${AB["ckpt"]}
 # # ## evaluate_on
-# val_files=${B["filename"]}
-# n_leftouts=${B["n_test"]}
+# dataset_path=${F["dataset_path"]}
+# val_files=${F["filename"]}
+# n_leftouts=${F["n_test"]}
 
 
 # for seed in ${list_seed[@]}
@@ -34,25 +32,61 @@ declare -A F=( ["dataset_path"]="filter/agent_type/" ["filename"]="Biker.pkl" ["
 # done
 
 
-dataset_path="filter/agent_type/"
-val_files="Biker.pkl"
+# dataset_path="filter/agent_type/"
+# val_files="Biker.pkl"
+# n_leftouts=500
+# list_n_train=(10 20 40 200 400 2000)
+# list_train_net=("all_FT" "encoder")
+# list_ckpt=()
+# for n_train in ${list_n_train[@]}; do
+#     for train_net in ${list_train_net[@]}; do
+#         list_ckpt+=("ckpts/Seed_1_Train__Biker__Val__Biker__Val_Ratio_0.1_filter_agent_type__train_${train_net}_${n_train}_weights.pt")
+#     done
+# done
+
+# list_train_net=("encoder_0" "encoder_0-1" "encoder_0-2" "encoder_0-3" "encoder_0-4" "encoder_1" "encoder_1-2" "encoder_1-3" "encoder_1-4" "encoder_2" "encoder_2-3" "encoder_2-4" "encoder_3" "encoder_3-4" "encoder_4")
+# list_tuned_ckpt=()
+# for n_train in ${list_n_train[@]}; do
+#     for train_net in ${list_train_net[@]}; do
+#         list_tuned_ckpt+=("ckpts/Seed_1__Tr_Biker__Val_Biker__ValRatio_0.1__filter_agent_type_deathCircle_0__${train_net}__TrN_${n_train}.pt")
+#     done
+# done
+
+# dataset_path=filter/agent_type/deathCircle_0
+# val_files=Biker.pkl
+# n_leftouts=500
+# pretrained_ckpt=ckpts/Seed_1__Tr_Pedestrian__Val_Pedestrian__ValRatio_0.1__filter_agent_type__train.pt
+# list_train_net=(adapter_serial)
+# list_adapter_position=("0" "0_1" "0_1_2" "0_1_2_3" "0_1_2_3_4" "1" "1_2" "1_2_3" "1_2_3_4" "2" "2_3" "2_3_4" "3" "3_4" "4")
+# list_n_train=(10 20 30 40)
+# list_tuned_ckpt=()
+# for train_net in ${list_train_net[@]}; do
+#     for adapter_position in ${list_adapter_position[@]}; do
+#         for n_train in ${list_n_train[@]}; do
+#             list_tuned_ckpt+=("ckpts/Seed_1__Tr_Biker__Val_Biker__ValRatio_0.1__filter_agent_type_deathCircle_0__${train_net}__${adapter_position}__TrN_${n_train}.pt")
+#         done
+#     done 
+# done
+
+dataset_path=filter/agent_type/deathCircle_0/
+val_files=Biker.pkl
 n_leftouts=500
-list_n_train=(10 20 40 200 400 2000)
-list_train_net=("all_FT" "encoder")
-list_ckpt=()
-for n_train in ${list_n_train[@]}; do
-    for train_net in ${list_train_net[@]}; do
-        list_ckpt+=("ckpts/Seed_1_Train__Biker__Val__Biker__Val_Ratio_0.1_filter_agent_type__train_${train_net}_${n_train}_weights.pt")
-    done
-done
+pretrained_ckpt=ckpts/Seed_1__Tr_Pedestrian__Val_Pedestrian__ValRatio_0.1__filter_agent_type__train.pt
 
-
-for seed in ${list_seed[@]}; do
-    for ckpt in ${list_ckpt[@]}; do
-        python test.py --seed $seed --batch_size $batch_size --dataset_name $dataset_name --dataset_path $dataset_path --val_files $val_files --out_csv_dir $out_csv_dir --val_ratio $val_ratio --ckpt $ckpt --n_leftouts $n_leftouts
+list_train_net=(lora_1)
+list_n_train=(20 40) 
+list_lr=(0.05 0.001 0.005)
+list_tuned_ckpt=()
+for train_net in ${list_train_net[@]}; do
+    for n_train in ${list_n_train[@]}; do
+        for lr in ${list_lr[@]}; do
+            list_tuned_ckpt+=("ckpts/Seed_1__Tr_Biker__Val_Biker__ValRatio_0.1__filter_agent_type_deathCircle_0__${train_net}__Pos_0_1_2_3_4__TrN_${n_train}__lr_${lr}__bias.pt")
+        done 
     done 
 done
 
-
-
-# ckpt=ckpts/Seed_1_Train__0.25_0.75__1.25_1.75__2.25_2.75__Val__0.25_0.75__1.25_1.75__2.25_2.75__Val_Ratio_0.3_dataset_ped_biker_gap_weights.pt # Pre-trained model
+for seed in ${list_seed[@]}; do
+    for tuned_ckpt in ${list_tuned_ckpt[@]}; do 
+        python test.py --seed $seed --batch_size $batch_size --dataset_path $dataset_path --val_files $val_files --val_ratio $val_ratio --pretrained_ckpt $pretrained_ckpt --tuned_ckpt $tuned_ckpt --n_leftouts $n_leftouts
+    done 
+done 

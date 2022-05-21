@@ -78,7 +78,7 @@ class YNetTrainer:
         dataset_name, resize_factor, obs_len, pred_len, batch_size, lr, n_epoch, 
         waypoints, n_goal, n_traj, kernlen, nsig, e_unfreeze, loss_scale, temperature,
         use_raw_data=False, save_every_n=10, train_net="all", position=[], 
-        fine_tune=False, is_augment_data=False, all_bias=False, 
+        fine_tune=False, is_augment_data=False, ynet_bias=False, 
         use_CWS=False, resl_thresh=0.002, CWS_params=None, n_early_stop=5, 
         steps=[20], lr_decay_ratio=0.1, **kwargs):
         """
@@ -147,7 +147,7 @@ class YNetTrainer:
             else:
                 raise NotImplementedError
             # tuning all bias or not 
-            if all_bias: 
+            if ynet_bias: 
                 model = mark_ynet_bias_trainable(model)
         optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
