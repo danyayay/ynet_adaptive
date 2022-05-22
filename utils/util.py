@@ -52,6 +52,7 @@ def get_position(ckpt_path, return_list=True):
 
 
 def get_ckpt_name(ckpt_path):
+    ckpt_path = ckpt_path.split('/')[-1]
     train_net = ckpt_path.split('__')[5]
     if 'Pos' in ckpt_path:
         position = get_position(ckpt_path, return_list=False)
@@ -64,6 +65,7 @@ def get_ckpt_name(ckpt_path):
 
 
 def update_params(ckpt_path, params):
+    ckpt_path = ckpt_path.split('/')[-1]
     train_net = ckpt_path.split('__')[5]
     updated_params = params.copy()
     updated_params.update({'train_net': train_net})

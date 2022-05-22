@@ -1,5 +1,6 @@
 import os 
 import yaml 
+import numpy as np 
 from models.trainer_copy import YNetTrainer
 
 
@@ -13,8 +14,9 @@ def get_experiment_name(args, n_train):
     experiment += f"_{args.train_net}"
     if args.position != []: experiment += f'__Pos_{"_".join(map(str, args.position))}' 
     experiment += f'__TrN_{str(int(n_train/20))}'
-    if args.fine_tune: experiment += f'__lr_{args.lr}'
+    if args.fine_tune: experiment += f'__lr_{np.format_float_positional(args.lr, trim="-")}'
     if args.is_augment_data: experiment += '__AUG'
+    if args.ynet_bias: experiment += '__bias'
     return experiment
 
 
@@ -50,6 +52,7 @@ def get_position(ckpt_path, return_list=True):
 
 
 def get_ckpt_name(ckpt_path):
+    ckpt_path = ckpt_path.split('/')[-1]
     train_net = ckpt_path.split('__')[5]
     if 'Pos' in ckpt_path:
         position = get_position(ckpt_path, return_list=False)
@@ -62,6 +65,7 @@ def get_ckpt_name(ckpt_path):
 
 
 def update_params(ckpt_path, params):
+    ckpt_path = ckpt_path.split('/')[-1]
     train_net = ckpt_path.split('__')[5]
     updated_params = params.copy()
     updated_params.update({'train_net': train_net})
