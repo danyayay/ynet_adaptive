@@ -33,8 +33,10 @@ def extract_train_msg(test_msg):
     df['n_train'] = df['experiment'].apply(lambda x: get_n_train(x)).astype(int)
     df['position'] = df['experiment'].apply(lambda x: get_position(x, return_list=False))
     df['lr'] = df['experiment'].apply(lambda x: get_lr(x))
+    df['is_ynet_bias'] = df['experiment'].apply(lambda x: get_bool_bias(x))
+    df['is_augment'] = df['experiment'].apply(lambda x: get_bool_aug(x))
     # reorder columns 
-    reordered_cols = ['seed', 'train_net', 'n_train', 'position', 'n_param', 'n_epoch', 'lr', 'ade', 'fde', 'experiment', 'pretrained_ckpt']
+    reordered_cols = ['seed', 'train_net', 'n_train', 'position', 'n_param', 'n_epoch', 'lr', 'is_ynet_bias', 'is_augment', 'ade', 'fde', 'experiment', 'pretrained_ckpt']
     df = df.reindex(columns=reordered_cols)
     return df
 
@@ -60,8 +62,10 @@ def extract_test_msg(test_msg):
     df['n_train'] = df['tuned_ckpt'].apply(lambda x: get_n_train(x)).astype(int)
     df['position'] = df['tuned_ckpt'].apply(lambda x: get_position(x, return_list=False))
     df['lr'] = df['tuned_ckpt'].apply(lambda x: get_lr(x))
+    df['is_ynet_bias'] = df['tuned_ckpt'].apply(lambda x: get_bool_bias(x))
+    df['is_augment'] = df['tuned_ckpt'].apply(lambda x: get_bool_aug(x))
     # reorder columns 
-    reordered_cols = ['seed', 'train_net', 'n_train', 'position', 'lr', 'ade', 'fde', 'tuned_ckpt', 'pretrained_ckpt']
+    reordered_cols = ['seed', 'train_net', 'n_train', 'position', 'lr', 'is_ynet_bias', 'is_augment', 'ade', 'fde', 'tuned_ckpt', 'pretrained_ckpt']
     df = df.reindex(columns=reordered_cols)
     return df
 
@@ -80,9 +84,23 @@ def get_n_train(ckpt_path):
 
 def get_lr(ckpt_path):
     if 'lr' in ckpt_path: 
-        return ckpt_path.split('lr_')[1].split('_')[0]
+        return ckpt_path.split('lr_')[1].split('_')[0].split('.pt')[0]
     else:
         return 0.00005
+
+
+def get_bool_bias(ckpt_path):
+    if 'bias' in ckpt_path.split('TrN')[-1]:
+        return True
+    else:
+        return False 
+
+
+def get_bool_aug(ckpt_path):
+    if 'AUG' in ckpt_path:
+        return True 
+    else:
+        return False 
 
 
 def extract_file(file_path, out_dir):
