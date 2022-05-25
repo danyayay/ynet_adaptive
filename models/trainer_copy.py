@@ -15,6 +15,31 @@ from utils.dataloader import SceneDataset, scene_collate
 from utils.evaluate_copy import evaluate
 
 
+def mark_encoder_bias_trainable(model):
+    for param_name, param in model.encoder.named_parameters():
+        if 'bias' in param_name: param.requires_grad = True
+    return model 
+
+
+def mark_goal_bias_trainable(model):
+    for param_name, param in model.goal_decoder.named_parameters():
+        if 'bias' in param_name: param.requires_grad = True
+    return model 
+
+
+def mark_traj_bias_trainable(model):
+    for param_name, param in model.traj_decoder.named_parameters():
+        if 'bias' in param_name: param.requires_grad = True
+    return model 
+
+
+def mark_ynet_bias_trainable(model):
+    model = mark_encoder_bias_trainable(model)
+    model = mark_goal_bias_trainable(model)
+    model = mark_traj_bias_trainable(model)
+    return model 
+
+
 class YNetTrainer:
     def __init__(self, params, device=None):
         """
@@ -52,7 +77,8 @@ class YNetTrainer:
         self, df_train, df_val, train_image_path, val_image_path, experiment_name, 
         dataset_name, resize_factor, obs_len, pred_len, batch_size, lr, n_epoch, 
         waypoints, n_goal, n_traj, kernlen, nsig, e_unfreeze, loss_scale, temperature,
-        use_raw_data=False, save_every_n=10, train_net="all", position=[], fine_tune=False, is_augment_data=False,
+        use_raw_data=False, save_every_n=10, train_net="all", position=[], 
+        fine_tune=False, is_augment_data=False, ynet_bias=False, 
         use_CWS=False, resl_thresh=0.002, CWS_params=None, n_early_stop=5, 
         steps=[20], lr_decay_ratio=0.1, **kwargs):
         """
@@ -84,8 +110,7 @@ class YNetTrainer:
             param.requires_grad = False
 
         if train_net != 'all' or train_net != 'train':
-            for param in model.parameters():
-                param.requires_grad = False
+            for param in model.parameters(): param.requires_grad = False
             # modulator 
             if train_net == "modulator":
                 for param in model.style_modulators.parameters():
@@ -98,25 +123,35 @@ class YNetTrainer:
             elif train_net == 'encoder' and len(position) > 0:
                 for param_name, param in model.encoder.named_parameters():
                     param_layer = int(param_name.split('.')[1])
-                    if param_layer in position:
-                        param.requires_grad = True
+                    if param_layer in position: param.requires_grad = True
             # serial adapter
             elif 'serial' in train_net:
                 for param_name, param in model.encoder.named_parameters():
-                    if 'serial' in param_name: 
-                        param.requires_grad = True
+                    if 'serial' in param_name: param.requires_grad = True
             # parallel adapter
             elif 'parallel' in train_net:
                 for param_name, param in model.encoder.named_parameters():
-                    if 'parallel' in param_name: 
-                        param.requires_grad = True
+                    if 'parallel' in param_name: param.requires_grad = True
             # lora 
             elif 'lora' in train_net:
                 for param_name, param in model.encoder.named_parameters():
-                    if 'lora' in param_name:
-                        param.requires_grad = True
+                    if 'lora' in param_name: param.requires_grad = True
+            elif 'semantic' in train_net:
+                for param_name, param in model.named_parameters():
+                    if 'semantic_adapter' in param_name: param.requires_grad = True
+            elif train_net == 'biasEncoder':
+                model = mark_encoder_bias_trainable(model)
+            elif train_net == 'biasGoal':
+                model = mark_goal_bias_trainable(model)
+            elif train_net == 'biasTraj':
+                model = mark_traj_bias_trainable(model)
+            elif train_net == 'bias':
+                model = mark_ynet_bias_trainable(model)
             else:
-                raise ValueError(f'Invalid train_net={train_net}')
+                raise NotImplementedError
+            # tuning all bias or not 
+            if ynet_bias: 
+                model = mark_ynet_bias_trainable(model)
         optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
         lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=steps, gamma=lr_decay_ratio)
@@ -347,6 +382,8 @@ class YNetTrainer:
         # create semantic segmentation map for all bacthes 
         scene_image = model.segmentation(scene_raw_img)
         semantic_image = scene_image.expand(observed_map.shape[0], -1, -1, -1)
+        # possibly adapt semantic image 
+        semantic_image = model.adapt_semantic(semantic_image)
 
         # forward 
         observed_map.requires_grad = False 

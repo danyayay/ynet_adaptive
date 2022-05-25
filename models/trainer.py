@@ -136,6 +136,9 @@ class YNetTrainer:
             elif 'lora' in train_net:
                 for param_name, param in model.encoder.named_parameters():
                     if 'lora' in param_name: param.requires_grad = True
+            elif 'semantic' in train_net:
+                for param_name, param in model.named_parameters():
+                    if 'semantic_adapter' in param_name: param.requires_grad = True
             elif train_net == 'biasEncoder':
                 model = mark_encoder_bias_trainable(model)
             elif train_net == 'biasGoal':
@@ -379,6 +382,8 @@ class YNetTrainer:
         # create semantic segmentation map for all bacthes 
         scene_image = model.segmentation(scene_raw_img)
         semantic_image = scene_image.expand(observed_map.shape[0], -1, -1, -1)
+        # possibly adapt semantic image 
+        semantic_image = model.adapt_semantic(semantic_image)
 
         # forward 
         observed_map.requires_grad = False 

@@ -151,19 +151,20 @@ class AdapterLayer(nn.Conv2d):
 
 def get_conv2d(
     train_net, l, position, kernel_size, in_channels, 
-    out_channels=None, rank=None):
+    out_channels=None, rank=None, stride=1, padding=None):
     if out_channels is None: out_channels = in_channels
+    if padding is None: padding = kernel_size // 2
     if 'lora' in train_net and l in position:
         assert rank != 0 and rank is not None
         return lora.Conv2d(in_channels, out_channels, 
-            kernel_size=kernel_size, r=rank, stride=(1, 1), padding=(1, 1))
+            kernel_size=kernel_size, r=rank, stride=stride, padding=padding)
     elif 'Layer' in train_net and l in position:
         return AdapterLayer(adapter_name=train_net, 
             in_channels=in_channels, out_channels=out_channels,
-            kernel_size=kernel_size, stride=(1, 1), padding=(1, 1))
+            kernel_size=kernel_size, stride=stride, padding=padding)
     else:
         return nn.Conv2d(in_channels, out_channels, 
-            kernel_size=kernel_size, stride=(1, 1), padding=(1, 1))
+            kernel_size=kernel_size, stride=stride, padding=padding)
 
 
 class YNetEncoder(nn.Module):
@@ -376,6 +377,8 @@ class YNet(nn.Module):
         """
         super(YNet, self).__init__()
 
+        self.train_net = train_net 
+
         if segmentation_model_fp is not None:
             if torch.cuda.is_available():
                 self.semantic_segmentation = torch.load(segmentation_model_fp)
@@ -390,13 +393,23 @@ class YNet(nn.Module):
         else:
             self.semantic_segmentation = nn.Identity()
         
+        self.feature_channels = n_semantic_classes + obs_len
+
+        if 'semantic' in train_net:
+            kernel_size = int(train_net.split('_')[-1].split('x')[0])
+            self.semantic_adapter = get_conv2d(
+                train_net=train_net, l=None, position=None, kernel_size=kernel_size, 
+                in_channels=n_semantic_classes, out_channels=n_semantic_classes)
+            nn.init.zeros_(self.semantic_adapter.weight)
+            nn.init.zeros_(self.semantic_adapter.bias)
+        
         if 'lora' in train_net or 'Layer' in train_net:
             self.encoder = YNetEncoderL(
-                in_channels=n_semantic_classes + obs_len, channels=encoder_channels,
+                in_channels=self.feature_channels, channels=encoder_channels,
                 train_net=train_net, position=position)
         else:
             self.encoder = YNetEncoderB(
-                in_channels=n_semantic_classes + obs_len, channels=encoder_channels,
+                in_channels=self.feature_channels, channels=encoder_channels,
                 train_net=train_net, position=position)
 
         self.goal_decoder = YNetDecoder(encoder_channels, decoder_channels, output_len=pred_len)
@@ -411,6 +424,13 @@ class YNet(nn.Module):
 
     def segmentation(self, image):
         return self.semantic_segmentation(image)
+
+    def adapt_semantic(self, semantic_img):
+        if 'semantic' in self.train_net:
+            semantic_adapted = self.semantic_adapter(semantic_img)
+            return semantic_adapted + semantic_img
+        else:
+            return semantic_img
 
     # Forward pass for goal decoder
     def pred_goal(self, features):

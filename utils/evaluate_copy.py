@@ -86,6 +86,8 @@ def evaluate(
             # Get scene image and apply semantic segmentation
             scene_image = val_images[scene_id].to(device).unsqueeze(0)
             scene_image = model.segmentation(scene_image)
+            # possibly adapt semantic image 
+            scene_image = model.adapt_semantic(scene_image)
             meta_ids = df_batch[0].metaId.unique()
             n_data = trajectory.shape[0]
 

@@ -43,6 +43,9 @@ def train_epoch(
                 scene_image = train_images[scene].to(device).unsqueeze(0)
                 scene_image = model.segmentation(scene_image)
 
+            # possibly adapt semantic image 
+            semantic_img = model.adapt_semantic(scene_image)
+
             # Create Heatmaps for past and ground-truth future trajectories
             _, _, H, W = scene_image.shape  # image shape
 
@@ -64,7 +67,7 @@ def train_epoch(
                 [-1, gt_waypoints.shape[1], H, W])
 
             # Concatenate heatmap and semantic map
-            semantic_map = scene_image.expand(
+            semantic_map = semantic_img.expand(
                 observed_map.shape[0], -1, -1, -1)  # expand to match heatmap size
             feature_input = torch.cat([semantic_map, observed_map], dim=1)
 
