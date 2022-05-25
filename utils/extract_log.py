@@ -54,7 +54,7 @@ def extract_test_msg(test_msg):
             'pretrained_ckpt': pretrained_ckpt.group(1).split('/')[-1] if pretrained_ckpt is not None else None,
             'tuned_ckpt': tuned_ckpt.group(1).split('/')[-1] if tuned_ckpt is not None else None,
             'ade': metric.group(1) if metric is not None else None, 
-            'fde': metric.group(2) if metric is not None else None}, index=[0])], ignore_index=True)
+            'fde': metric.group(2) if metric is not None else None}, index=[0])], )
     df.seed = df.seed.astype(int)
     df.ade = df.ade.astype(float)
     df.fde = df.fde.astype(float)
@@ -68,6 +68,29 @@ def extract_test_msg(test_msg):
     reordered_cols = ['seed', 'train_net', 'n_train', 'position', 'lr', 'is_ynet_bias', 'is_augment', 'ade', 'fde', 'tuned_ckpt', 'pretrained_ckpt']
     df = df.reindex(columns=reordered_cols)
     return df
+
+
+def extract_imp_msg(imp_msg):
+    msg_split = re.split('save_every_n', imp_msg)[1:]
+    df = pd.DataFrame(columns=['seed', 'layer', 'ade', 'fde', 'tuned_ckpt', 'pretrained_ckpt'])
+    for msg in msg_split: 
+        seed = re.search("'seed': ([\d+]),", msg)
+        pretrained_ckpt = re.search("'pretrained_ckpt': '(.*?)',", msg)
+        tuned_ckpt = re.search("'tuned_ckpts': \['(.*?)'\],", msg)
+        layers = re.findall("Replacing (.*?)\n", msg)
+        metrics = re.findall("Round 0: \nTest ADE: ([\d\.]+) \nTest FDE: ([\d\.]+)", msg)
+        # temp
+        df_temp = pd.DataFrame()
+        df_temp['layer'] = layers 
+        df_temp['metric'] = metrics
+        df_temp['ade'] = df_temp.metric.apply(lambda x: x[0])
+        df_temp['fde'] = df_temp.metric.apply(lambda x: x[1])
+        df_temp['seed'] = seed.group(1) if seed is not None else None 
+        df_temp['tuned_ckpt'] = tuned_ckpt.group(1) if tuned_ckpt is not None else None 
+        df_temp['pretrained_ckpt'] = pretrained_ckpt.group(1) if pretrained_ckpt is not None else None 
+        df = pd.concat([df, df_temp], axis=0, ignore_index=True)
+        df.drop(columns=['metric'], inplace=True) 
+    return df 
 
 
 def get_train_net(ckpt_path):
@@ -110,8 +133,10 @@ def extract_file(file_path, out_dir):
         df = extract_test_msg(msgs)
     elif 'train' in file_path:
         df = extract_train_msg(msgs)
+    elif 'imp' in file_path:
+        df = extract_imp_msg(msgs)
     else:
-        raise ValueError('Unclear eval/train function to use')
+        raise NotImplementedError
     pathlib.Path(out_dir).mkdir(parents=True, exist_ok=True)
     if '/' in file_path:
         file_name = re.search('/([^/]+).out', file_path).group(1)
