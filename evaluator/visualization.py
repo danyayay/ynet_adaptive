@@ -179,8 +179,8 @@ def plot_activation_single(
                             axes[1].plot(df_meta.x.values[(obs_len-1):], df_meta.y.values[(obs_len-1):], 
                                 '.-', c='gold', linewidth=1, markersize=3, label='groundtruth prediction')
                             # plot map 
-                            if vmin > 0: vmin = 0
-                            if vmax < 0: vmax = 0
+                            if vmin > 0: vmin = -0.00001
+                            if vmax < 0: vmax = 0.00001
                             divnorm = mpl.colors.TwoSlopeNorm(vcenter=0, vmin=vmin, vmax=vmax)
                             if inhance_threshold is not None:
                                 cmap_div = get_hollow_cmap(inhance_threshold)
@@ -218,8 +218,8 @@ def plot_activation_single(
                             ax.plot(df_meta.x.values[(obs_len-1):], df_meta.y.values[(obs_len-1):], 
                                 '.-', c='gold', linewidth=1, markersize=3, label='groundtruth prediction')
                             # plot map 
-                            if vmin > 0: vmin = 0
-                            if vmax < 0: vmax = 0
+                            if vmin > 0: vmin = -0.00001
+                            if vmax < 0: vmax = 0.00001
                             divnorm = mpl.colors.TwoSlopeNorm(vcenter=0, vmin=vmin, vmax=vmax)
                             if inhance_threshold is not None:
                                 cmap_div = get_hollow_cmap(inhance_threshold)
@@ -244,8 +244,7 @@ def plot_activation(
     ckpts_hook_dict, index, 
     out_dir='figures/activation', format='png', 
     compare_raw=True, compare_diff=False, compare_overlay=False, compare_relative=False,
-    scene_imgs=None, semantic_imgs=None, scale_row=True, inhance_diff=True, 
-    single_output=False, zoom_in=False):
+    scene_imgs=None, semantic_imgs=None, scale_row=True, scale_col=False, inhance_diff=True):
     # semantic_map (class=0~5): 
     #     - channel 1: pavement
     #     - channel 2: terrain 
@@ -267,11 +266,19 @@ def plot_activation(
 
             if compare_raw:
                 fig, axes = plt.subplots(n_ckpt, n_channel, figsize=(width*n_channel+1, height*n_ckpt))
+                if scale_col:
+                    vmin, vmax = 0, 0
+                    for ckpt_name, hook_dict in ckpts_hook_dict.items():
+                        features = hook_dict[layer_name][i]
+                        if isinstance(features, torch.Tensor):
+                            features = features.cpu().detach().numpy()
+                        vmin, vmax = min(vmin, features.min()), max(vmax, features.max())
                 for r, (ckpt_name, hook_dict) in enumerate(ckpts_hook_dict.items()):
                     features = hook_dict[layer_name][i]
                     if isinstance(features, torch.Tensor):
                         features = features.cpu().detach().numpy()
-                    vmin, vmax = features.min(), features.max()
+                    if not scale_col:
+                        vmin, vmax = features.min(), features.max()
                     for c in range(n_channel):
                         if scale_row:
                             im = axes[r, c].imshow(features[c], vmin=vmin, vmax=vmax)
@@ -345,13 +352,13 @@ def plot_activation(
                     plt.close(fig)
                     print(f'Saved {out_path}')
 
-                if compare_diff and not single_output:
+                if compare_diff:
                     if semantic_imgs is not None:
                         fig, axes = plt.subplots(n_ckpt-1, n_channel+2, 
-                            figsize=(width*(n_channel+2)+1, height*(n_ckpt-1)))
+                            figsize=(width*(n_channel+2)+1, height*(n_ckpt-1)), squeeze=False)
                     else:
                         fig, axes = plt.subplots(n_ckpt-1, n_channel, 
-                            figsize=(width*n_channel+1, height*(n_ckpt-1)))
+                            figsize=(width*n_channel+1, height*(n_ckpt-1)), squeeze=False)
 
                     r = 0
                     for ckpt_name, hook_dict in ckpts_hook_dict.items():
@@ -377,66 +384,39 @@ def plot_activation(
                             diff = features - base_features
                             vmin, vmax = diff.min(), diff.max()
                             # plot 
-                            if n_ckpt - 1 != 1:
-                                # more than 1 row 
-                                for c in range(n_channel):
-                                    axes[r, c].imshow(scene_img)
-                                    if inhance_diff:
-                                        masked_array = np.ma.array(diff[c], mask=(-1 <= diff[c]) & (diff[c] <= 1))
-                                        cmap = mpl.cm.get_cmap(cmap_div)
-                                        cmap.set_bad('white', 0.1)
-                                        if not scale_row: 
-                                            vmin, vmax = diff[c].min(), diff[c].max()
-                                        divnorm = mpl.colors.TwoSlopeNorm(vcenter=vcenter, vmin=vmin, vmax=vmax)
-                                        im = axes[r, c].imshow(masked_array, cmap=cmap, norm=divnorm, alpha=0.5)
-                                        if not scale_row:
-                                            plt.colorbar(im, ax=axes[r, c], shrink=0.5)
-                                    else:
-                                        if not scale_row:
-                                            vmin, vmax = diff[c].min(), diff[c].max()
-                                        divnorm = mpl.colors.TwoSlopeNorm(vcenter=vcenter, vmin=vmin, vmax=vmax)
-                                        im = axes[r, c].imshow(diff[c], cmap=cmap_div, norm=divnorm, alpha=0.5)
-                                        if not scale_row:
-                                            plt.colorbar(im, ax=axes[r, c], shrink=0.5)
-                                    axes[r, c].set_xlabel(f'channel {c+1}')
-                                    if c == 0: 
-                                        axes[r, c].set_ylabel(ckpt_name)
-                                    else:
-                                        axes[r, c].set_yticklabels([])
-                                if scale_row:
-                                    plt.colorbar(im, ax=axes[r, :].ravel().tolist(), shrink=0.8)
-                                if semantic_img is not None:
-                                    base_img_plot(axes[r, -2], scene_img)
-                                    base_img_plot(axes[r, -1], scene_img, semantic_img)
-                            else:
-                                # only a single row 
-                                for c in range(n_channel):
-                                    base_img_plot(axes[c], scene_img, semantic_img)
-                                    if inhance_diff:
-                                        masked_array = np.ma.array(diff[c], mask=(-1 <= diff[c]) & (diff[c] <= 1))
-                                        cmap = mpl.cm.get_cmap(cmap_div)
-                                        cmap.set_bad('white', 0.1)
-                                        if not scale_row: 
-                                            vmin, vmax = diff[c].min(), diff[c].max()
-                                        divnorm = mpl.colors.TwoSlopeNorm(vcenter=vcenter, vmin=vmin, vmax=vmax)
-                                        im = axes[c].imshow(masked_array, cmap=cmap, norm=divnorm, alpha=0.5)
-                                        if not scale_row: 
-                                            plt.colorbar(im, ax=axes[c], shrink=0.5)
-                                    else:
-                                        if not scale_row: 
-                                            vmin, vmax = diff[c].min(), diff[c].max()
-                                        divnorm = mpl.colors.TwoSlopeNorm(vcenter=vcenter, vmin=vmin, vmax=vmax)
-                                        im = axes[c].imshow(diff[c], cmap=cmap_div, norm=divnorm, alpha=0.5)
-                                        if not scale_row: 
-                                            plt.colorbar(im, ax=axes[c], shrink=0.5)
-                                    axes[c].set_xlabel(f'channel {c+1}')
-                                    axes[c].set_yticklabels([])
-                                axes[n_channel//2].set_title(f'{ckpt_name} - OODG')
-                                if scale_row:
-                                    plt.colorbar(im, ax=axes[:].ravel().tolist(), shrink=0.8, location='right')
-                                if semantic_img is not None:
-                                    base_img_plot(axes[-2], scene_img)
-                                    base_img_plot(axes[-1], scene_img, semantic_img)
+                            for c in range(n_channel):
+                                axes[r, c].imshow(scene_img)
+                                if inhance_diff:
+                                    masked_array = np.ma.array(diff[c], mask=(-1 <= diff[c]) & (diff[c] <= 1))
+                                    cmap = mpl.cm.get_cmap(cmap_div)
+                                    cmap.set_bad('white', 0.1)
+                                    if not scale_row: 
+                                        vmin, vmax = diff[c].min(), diff[c].max()
+                                    if vmin == 0.0: vmin = -0.00001
+                                    if vmax == 0.0: vmax = 0.00001
+                                    divnorm = mpl.colors.TwoSlopeNorm(vcenter=vcenter, vmin=vmin, vmax=vmax)
+                                    im = axes[r, c].imshow(masked_array, cmap=cmap, norm=divnorm, alpha=0.5)
+                                    if not scale_row:
+                                        plt.colorbar(im, ax=axes[r, c], shrink=0.5)
+                                else:
+                                    if not scale_row:
+                                        vmin, vmax = diff[c].min(), diff[c].max()
+                                    if vmin == 0.0: vmin = -0.00001
+                                    if vmax == 0.0: vmax = 0.00001
+                                    divnorm = mpl.colors.TwoSlopeNorm(vcenter=vcenter, vmin=vmin, vmax=vmax)
+                                    im = axes[r, c].imshow(diff[c], cmap=cmap_div, norm=divnorm, alpha=0.5)
+                                    if not scale_row:
+                                        plt.colorbar(im, ax=axes[r, c], shrink=0.5)
+                                axes[r, c].set_xlabel(f'channel {c+1}')
+                                if c == 0: 
+                                    axes[r, c].set_ylabel(ckpt_name)
+                                else:
+                                    axes[r, c].set_yticklabels([])
+                            if scale_row:
+                                plt.colorbar(im, ax=axes[r, :].ravel().tolist(), shrink=0.8)
+                            if semantic_img is not None:
+                                base_img_plot(axes[r, -2], scene_img)
+                                base_img_plot(axes[r, -1], scene_img, semantic_img)
                             r += 1
                     plt.subplots_adjust(wspace=0.01, hspace=0.02, bottom=0.1, right=0.78, top=0.9)
                     out_name = f'{layer_name}__scaled' if scale_row else layer_name 
@@ -445,56 +425,15 @@ def plot_activation(
                     plt.savefig(out_path, bbox_inches='tight')
                     plt.close(fig)
                     print(f'Saved {out_path}')
-
-                if compare_diff and single_output:
-                    fig, axes = plt.subplots(n_ckpt-1, 1, 
-                        figsize=(width+1, height*(n_ckpt-1)), squeeze=False)
-                    r = 0
-                    for ckpt_name, hook_dict in ckpts_hook_dict.items():
-                        if ckpt_name != 'OODG':
-                            # prepare base 
-                            base_features = ckpts_hook_dict['OODG'][layer_name][i]
-                            if isinstance(base_features, torch.Tensor):
-                                base_features = base_features.cpu().detach().numpy()
-                            # other ckpt 
-                            features = hook_dict[layer_name][i]
-                            if isinstance(features, torch.Tensor):
-                                features = features.cpu().detach().numpy()
-                            if isinstance(scene_imgs, torch.Tensor):
-                                scene_imgs = scene_imgs.cpu().detach().numpy()
-                            if isinstance(semantic_imgs, torch.Tensor):
-                                semantic_imgs = semantic_imgs.cpu().detach().numpy()
-                            scene_img = get_correct_scene_img(scene_imgs[0]) if scene_imgs.shape[0] == 1 \
-                                else get_correct_scene_img(scene_imgs[i])
-                            if semantic_imgs is not None:
-                                semantic_img = semantic_imgs[0] if semantic_imgs.shape[0] == 1 else semantic_imgs[i]
-                            else:
-                                semantic_img = None
-                            diff = features - base_features
-                            diff_single = diff.mean(axis=0)
-                            vmin, vmax = diff_single.min(), diff_single.max()
-                            v_max = max(abs(vmin), vmax)
-                            print(vmin, vmax, diff_single.mean())
-                            # plot 
-                            axes[r, 0].imshow(scene_img)
-                            divnorm = mpl.colors.TwoSlopeNorm(vcenter=vcenter, vmin=-v_max, vmax=v_max)
-                            im = axes[r, 0].imshow(diff_single, cmap=cmap_div, norm=divnorm, alpha=0.5)
-                            plt.colorbar(im, ax=axes[r, 0], shrink=0.5)
-                            r += 1
-                    plt.subplots_adjust(wspace=0.01, hspace=0.02, bottom=0.1, right=0.78, top=0.9)
-                    out_name = f'{layer_name}__diff_single_on_seg.{format}' if semantic_img is not None else f'{layer_name}__diff_single_on_scene.{format}'
-                    out_path = os.path.join(new_out_dir, out_name)
-                    plt.savefig(out_path, bbox_inches='tight')
-                    plt.close(fig)
-                    print(f'Saved {out_path}')
+                
 
                 if compare_relative:
                     if semantic_imgs is not None:
                         fig, axes = plt.subplots(n_ckpt-1, n_channel+2, 
-                            figsize=(width*(n_channel+2)+1, height*(n_ckpt-1)))
+                            figsize=(width*(n_channel+2)+1, height*(n_ckpt-1)), squeeze=False)
                     else:
                         fig, axes = plt.subplots(n_ckpt-1, n_channel, 
-                            figsize=(width*n_channel+1, height*(n_ckpt-1)))
+                            figsize=(width*n_channel+1, height*(n_ckpt-1)), squeeze=False)
                     r = 0
                     for ckpt_name, hook_dict in ckpts_hook_dict.items():
                         if ckpt_name != 'OODG':
@@ -521,66 +460,39 @@ def plot_activation(
                             np.divide(features - base_features, np.abs(base_features), out=relative, where=base_features!=0)
                             vmin, vmax = np.nanmin(relative), np.nanmax(relative)
                             # plot 
-                            if n_ckpt - 1 != 1:
-                                # more than 1 row 
-                                for c in range(n_channel):
-                                    axes[r, c].imshow(scene_img)
-                                    if inhance_diff:
-                                        masked_array = np.ma.array(relative[c], mask=(-0.1 <= relative[c]) & (relative[c] <= 0.1))
-                                        cmap = mpl.cm.get_cmap(cmap_div)
-                                        cmap.set_bad('white', 0.1)
-                                        if not scale_row: 
-                                            vmin, vmax = np.min(relative[c]), np.max(relative[c])
-                                        divnorm = mpl.colors.TwoSlopeNorm(vcenter=vcenter, vmin=vmin, vmax=vmax)
-                                        im = axes[r, c].imshow(masked_array, cmap=cmap, norm=divnorm, alpha=0.5)
-                                        if not scale_row:
-                                            plt.colorbar(im, ax=axes[r, c], shrink=0.5)
-                                    else:
-                                        if not scale_row:
-                                            vmin, vmax = np.min(relative[c]), np.max(relative[c])
-                                        divnorm = mpl.colors.TwoSlopeNorm(vcenter=vcenter, vmin=vmin, vmax=vmax)
-                                        im = axes[r, c].imshow(relative[c], cmap=cmap_div, norm=divnorm, alpha=0.5)
-                                        if not scale_row:
-                                            plt.colorbar(im, ax=axes[r, c], shrink=0.5)
-                                    axes[r, c].set_xlabel(f'channel {c+1}')
-                                    if c == 0: 
-                                        axes[r, c].set_ylabel(ckpt_name)
-                                    else:
-                                        axes[r, c].set_yticklabels([])
-                                if scale_row:
-                                    plt.colorbar(im, ax=axes[r, :].ravel().tolist(), shrink=0.8)
-                                if semantic_img is not None:
-                                    base_img_plot(axes[r, -2], scene_img)
-                                    base_img_plot(axes[r, -1], scene_img, semantic_img)
-                            else:
-                                # only a single row 
-                                for c in range(n_channel):
-                                    base_img_plot(axes[c], scene_img, semantic_img)
-                                    if inhance_diff:
-                                        masked_array = np.ma.array(relative[c], mask=(-0.1 <= relative[c]) & (relative[c] <= 0.1))
-                                        cmap = mpl.cm.get_cmap(cmap_div)
-                                        cmap.set_bad('white', 0.1)
-                                        if not scale_row: 
-                                            vmin, vmax = np.min(relative[c]), np.max(relative[c])
-                                        divnorm = mpl.colors.TwoSlopeNorm(vcenter=vcenter, vmin=vmin, vmax=vmax)
-                                        im = axes[c].imshow(masked_array, cmap=cmap, norm=divnorm, alpha=0.5)
-                                        if not scale_row: 
-                                            plt.colorbar(im, ax=axes[c], shrink=0.5)
-                                    else:
-                                        if not scale_row: 
-                                            vmin, vmax = np.min(relative[c]), np.max(relative[c])
-                                        divnorm = mpl.colors.TwoSlopeNorm(vcenter=vcenter, vmin=vmin, vmax=vmax)
-                                        im = axes[c].imshow(relative[c], cmap=cmap_div, norm=divnorm, alpha=0.5)
-                                        if not scale_row: 
-                                            plt.colorbar(im, ax=axes[c], shrink=0.5)
-                                    axes[c].set_xlabel(f'channel {c+1}')
-                                    axes[c].set_yticklabels([])
-                                axes[n_channel//2].set_title(f'{ckpt_name} - OODG')
-                                if scale_row:
-                                    plt.colorbar(im, ax=axes[:].ravel().tolist(), shrink=0.8, location='right')
-                                if semantic_img is not None:
-                                    base_img_plot(axes[-2], scene_img)
-                                    base_img_plot(axes[-1], scene_img, semantic_img)
+                            for c in range(n_channel):
+                                axes[r, c].imshow(scene_img)
+                                if inhance_diff:
+                                    masked_array = np.ma.array(relative[c], mask=(-0.1 <= relative[c]) & (relative[c] <= 0.1))
+                                    cmap = mpl.cm.get_cmap(cmap_div)
+                                    cmap.set_bad('white', 0.1)
+                                    if not scale_row: 
+                                        vmin, vmax = np.min(relative[c]), np.max(relative[c])
+                                    if vmin == 0.0: vmin = -0.00001
+                                    if vmax == 0.0: vmax = 0.00001
+                                    divnorm = mpl.colors.TwoSlopeNorm(vcenter=vcenter, vmin=vmin, vmax=vmax)
+                                    im = axes[r, c].imshow(masked_array, cmap=cmap, norm=divnorm, alpha=0.5)
+                                    if not scale_row:
+                                        plt.colorbar(im, ax=axes[r, c], shrink=0.5)
+                                else:
+                                    if not scale_row:
+                                        vmin, vmax = np.min(relative[c]), np.max(relative[c])
+                                    if vmin == 0.0: vmin = -0.00001
+                                    if vmax == 0.0: vmax = 0.00001
+                                    divnorm = mpl.colors.TwoSlopeNorm(vcenter=vcenter, vmin=vmin, vmax=vmax)
+                                    im = axes[r, c].imshow(relative[c], cmap=cmap_div, norm=divnorm, alpha=0.5)
+                                    if not scale_row:
+                                        plt.colorbar(im, ax=axes[r, c], shrink=0.5)
+                                axes[r, c].set_xlabel(f'channel {c+1}')
+                                if c == 0: 
+                                    axes[r, c].set_ylabel(ckpt_name)
+                                else:
+                                    axes[r, c].set_yticklabels([])
+                            if scale_row:
+                                plt.colorbar(im, ax=axes[r, :].ravel().tolist(), shrink=0.8)
+                            if semantic_img is not None:
+                                base_img_plot(axes[r, -2], scene_img)
+                                base_img_plot(axes[r, -1], scene_img, semantic_img)
                             r += 1
                     plt.subplots_adjust(wspace=0.01, hspace=0.02, bottom=0.1, right=0.78, top=0.9)
                     out_name = f'{layer_name}__scaled' if scale_row else layer_name 
@@ -589,6 +501,61 @@ def plot_activation(
                     plt.savefig(out_path, bbox_inches='tight')
                     plt.close(fig)
                     print(f'Saved {out_path}') 
+
+            if compare_diff and 'decoder' not in layer_name: 
+                fig, axes = plt.subplots(n_ckpt-1, n_channel, 
+                    figsize=(width*n_channel+1, height*(n_ckpt-1)), squeeze=False)
+                r = 0
+                for ckpt_name, hook_dict in ckpts_hook_dict.items():
+                    if ckpt_name != 'OODG':
+                        # prepare base 
+                        base_features = ckpts_hook_dict['OODG'][layer_name][i]
+                        if isinstance(base_features, torch.Tensor):
+                            base_features = base_features.cpu().detach().numpy()
+                        # other ckpt 
+                        features = hook_dict[layer_name][i]
+                        if isinstance(features, torch.Tensor):
+                            features = features.cpu().detach().numpy()
+                        diff = features - base_features
+                        vmin, vmax = diff.min(), diff.max()
+                        # plot 
+                        for c in range(n_channel):
+                            if inhance_diff:
+                                masked_array = np.ma.array(diff[c], mask=(-1 <= diff[c]) & (diff[c] <= 1))
+                                cmap = mpl.cm.get_cmap(cmap_div)
+                                cmap.set_bad('white', 0.1)
+                                if not scale_row: 
+                                    vmin, vmax = diff[c].min(), diff[c].max()
+                                if vmin == 0.0: vmin = -0.00001
+                                if vmax == 0.0: vmax = 0.00001
+                                divnorm = mpl.colors.TwoSlopeNorm(vcenter=vcenter, vmin=vmin, vmax=vmax)
+                                im = axes[r, c].imshow(masked_array, cmap=cmap, norm=divnorm, alpha=0.5)
+                                if not scale_row:
+                                    plt.colorbar(im, ax=axes[r, c], shrink=0.5)
+                            else:
+                                if not scale_row:
+                                    vmin, vmax = diff[c].min(), diff[c].max()
+                                if vmin == 0.0: vmin = -0.00001
+                                if vmax == 0.0: vmax = 0.00001
+                                divnorm = mpl.colors.TwoSlopeNorm(vcenter=vcenter, vmin=vmin, vmax=vmax)
+                                im = axes[r, c].imshow(diff[c], cmap=cmap_div, norm=divnorm, alpha=0.5)
+                                if not scale_row:
+                                    plt.colorbar(im, ax=axes[r, c], shrink=0.5)
+                            axes[r, c].set_xlabel(f'channel {c+1}')
+                            if c == 0: 
+                                axes[r, c].set_ylabel(ckpt_name)
+                            else:
+                                axes[r, c].set_yticklabels([])
+                        if scale_row:
+                            plt.colorbar(im, ax=axes[r, :].ravel().tolist(), shrink=0.8)
+                        r += 1
+                plt.subplots_adjust(wspace=0.01, hspace=0.02, bottom=0.1, right=0.78, top=0.9)
+                out_name = f'{layer_name}__scaled' if scale_row else layer_name 
+                out_name = f'{out_name}__diff.{format}'
+                out_path = os.path.join(new_out_dir, out_name)
+                plt.savefig(out_path, bbox_inches='tight')
+                plt.close(fig)
+                print(f'Saved {out_path}') 
 
 
 def get_ordinary_cmap():
