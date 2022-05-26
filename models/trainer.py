@@ -1,10 +1,11 @@
-from collections import OrderedDict
+import re
+import numpy as np
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 from tqdm import tqdm
-import numpy as np
 from copy import deepcopy
+from collections import OrderedDict
 
 from models.ynet import YNet
 from utils.train import train_epoch
@@ -109,8 +110,9 @@ class YNetTrainer:
         for param in model.semantic_segmentation.parameters():
             param.requires_grad = False
 
-        if not (train_net != 'all' or train_net != 'train'):
+        if not (train_net == 'all' or train_net == 'train'):
             for param in model.parameters(): param.requires_grad = False
+
             # modulator 
             if train_net == "modulator":
                 for param in model.style_modulators.parameters():
@@ -147,6 +149,12 @@ class YNetTrainer:
                 model = mark_traj_bias_trainable(model)
             elif train_net == 'bias':
                 model = mark_ynet_bias_trainable(model)
+            elif 'segmentation' in train_net:
+                layer = train_net.split('_')[1]
+                for param_name, param in model.semantic_segmentation.named_parameters():
+                    if re.search(f'decoder.blocks.\d.{layer}', param_name) is not None:
+                    # if f'decoder.blocks.0.{layer}' in param_name or f'decoder.blocks.1.{layer}' in param_name:
+                        param.requires_grad = True 
             else:
                 raise NotImplementedError
             # tuning all bias or not 

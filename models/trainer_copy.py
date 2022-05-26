@@ -110,8 +110,9 @@ class YNetTrainer:
         for param in model.semantic_segmentation.parameters():
             param.requires_grad = False
 
-        if not (train_net != 'all' or train_net != 'train'):
+        if not (train_net == 'all' or train_net == 'train'):
             for param in model.parameters(): param.requires_grad = False
+
             # modulator 
             if train_net == "modulator":
                 for param in model.style_modulators.parameters():
@@ -151,7 +152,7 @@ class YNetTrainer:
             elif 'segmentation' in train_net:
                 layer = train_net.split('_')[1]
                 for param_name, param in model.semantic_segmentation.named_parameters():
-                    if re.search(f'decoder.blocks.\d.{layer}.weight', param_name) is not None:
+                    if re.search(f'decoder.blocks.\d.{layer}', param_name) is not None:
                     # if f'decoder.blocks.0.{layer}' in param_name or f'decoder.blocks.1.{layer}' in param_name:
                         param.requires_grad = True 
             else:
