@@ -129,7 +129,7 @@ def base_img_plot(ax, scene_img, semantic_img=None):
 def plot_activation_single(
     ckpts_hook_dict, index, df_test, image_path,
     out_dir='figures/activation', format='png', obs_len=8, resize_factor=0.25,
-    display_scene_img=True, inhance_threshold=None, zoom_in=False):
+    display_scene_img=True, inhance_threshold=None):
     # scene 
     unique_scene = np.unique(np.array([idx[1] for idx in index]))
     scene_images = create_images_dict(unique_scene, image_path, 'reference.jpg', True)
@@ -158,12 +158,12 @@ def plot_activation_single(
                         if isinstance(features, torch.Tensor):
                             features = features.cpu().detach().numpy()
                         scene_img = get_correct_scene_img(scene_images[scene_id], -1)
+                        black = np.zeros((scene_img.shape[0], scene_img.shape[1], 3))
                         diff = features - base_features
                         diff_single = diff.mean(axis=0)
                         diff_single = cv2.resize(
                             diff_single, (0, 0), fx=1/resize_factor, fy=1/resize_factor, interpolation=cv2.INTER_AREA)
                         diff_single = diff_single[:scene_img.shape[0], :scene_img.shape[1]]
-                        print('scene_img:', scene_img.shape, 'diff_single:', diff_single.shape)
                         vmin, vmax = diff_single.min(), diff_single.max()
                         print('vmin:', vmin, 'vmax:', vmax)
                         df_meta = df_test[df_test.metaId == meta_id]
@@ -186,7 +186,7 @@ def plot_activation_single(
                                 cmap_div = get_hollow_cmap(inhance_threshold)
                             else:
                                 cmap_div = get_ordinary_cmap()
-                            axes[1].imshow(diff_single, cmap=cmap_div, norm=divnorm, alpha=0.5)
+                            axes[1].imshow(diff_single, cmap=cmap_div, norm=divnorm)
                             axes[0].set_yticklabels([])
                             axes[0].set_xticklabels([])
                             axes[1].set_yticklabels([]) 
@@ -198,25 +198,26 @@ def plot_activation_single(
                             plt.legend()
                             plt.subplots_adjust(wspace=0.02, hspace=0.02, bottom=0.1, right=0.78, top=0.9)
                         else:
-                            fig, ax = plt.subplots(1, 1, figsize=(width, height))
-                            ax.imshow(scene_img)
-                            ax.set_yticklabels([])
-                            ax.set_xticklabels([])
-                            ax.set_xticks([])
-                            ax.set_yticks([])
-                            out_path = f'{new_out_dir}/{scene_id}.png'
-                            plt.savefig(out_path, bbox_inches='tight')
-                            plt.close(fig)
-                            print(f'Saved {out_path}')
+                            # fig, ax = plt.subplots(1, 1, figsize=(width, height))
+                            # ax.imshow(scene_img)
+                            # ax.set_yticklabels([])
+                            # ax.set_xticklabels([])
+                            # ax.set_xticks([])
+                            # ax.set_yticks([])
+                            # out_path = f'{new_out_dir}/{scene_id}.png'
+                            # plt.savefig(out_path, bbox_inches='tight')
+                            # plt.close(fig)
+                            # print(f'Saved {out_path}')
 
                             fig, ax = plt.subplots(1, 1, figsize=(width, height))
                             # plot background 
                             ax.imshow(scene_img)
+                            ax.imshow(black, cmap='Greys', alpha=0.4)
                             # plot groundtruth 
                             ax.plot(df_meta.x.values[:obs_len], df_meta.y.values[:obs_len], 
-                                '.-', c='lightgreen', linewidth=1, markersize=3, label='observation')
+                                '.-', c='lightgreen', linewidth=2, markersize=5, label='observation')
                             ax.plot(df_meta.x.values[(obs_len-1):], df_meta.y.values[(obs_len-1):], 
-                                '.-', c='gold', linewidth=1, markersize=3, label='groundtruth prediction')
+                                '.-', c='gold', linewidth=2, markersize=5, label='groundtruth prediction')
                             # plot map 
                             if vmin > 0: vmin = -0.00001
                             if vmax < 0: vmax = 0.00001
@@ -225,12 +226,12 @@ def plot_activation_single(
                                 cmap_div = get_hollow_cmap(inhance_threshold)
                             else:
                                 cmap_div = get_ordinary_cmap()
-                            ax.imshow(diff_single, cmap=cmap_div, norm=divnorm, alpha=0.5)
+                            ax.imshow(diff_single, cmap=cmap_div, norm=divnorm)
                             ax.set_yticklabels([])
                             ax.set_xticklabels([])
                             ax.set_xticks([])
                             ax.set_yticks([])
-                            plt.legend()
+                            plt.legend(fontsize=15)
                         out_name = f'{ckpt_name}__{layer_name}__diff_single'
                         if display_scene_img: out_name = out_name + '__scene'
                         out_name = out_name + f'__{inhance_threshold}.{format}' if inhance_threshold is not None else out_name + f'.{format}'
@@ -572,12 +573,15 @@ def get_hollow_cmap(threshold):
     cut = int(N * threshold)   
     n_color = N // 2 - cut
     decrease = mpl.cm.get_cmap('Blues_r', n_color)
-    increase = mpl.cm.get_cmap('Oranges', n_color)
+    increase = mpl.cm.get_cmap('Reds', n_color)
     transparent = np.array([[1, 1, 1, 0]])
-    my_colors = np.vstack((
-        decrease(np.linspace(0, 1, n_color)),
-        transparent.repeat(N-n_color*2, axis=0), 
-        increase(np.linspace(0, 1, n_color))))
+    # adjust transparency 
+    bottom = decrease(np.linspace(0, 0.7, n_color))
+    bottom[:, -1] = (np.arange(0+n_color*0.15, n_color*1.15) / (n_color*1.3))[::-1]
+    middle = transparent.repeat(N-n_color*2, axis=0)
+    top = increase(np.linspace(0.3, 1, n_color))
+    top[:, -1] = np.arange(0+n_color*0.15, n_color*1.15) / (n_color*1.3)
+    my_colors = np.vstack((bottom, middle, top))
     my_cmap = mpl.colors.ListedColormap(my_colors, name='my_cmap')
     return my_cmap 
 

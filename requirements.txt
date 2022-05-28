@@ -9,3 +9,4 @@ notebook
 ddf
 tensorboard
 seaborn==0.11.2
+scikit-image

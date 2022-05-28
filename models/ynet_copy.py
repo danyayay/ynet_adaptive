@@ -34,6 +34,7 @@ def conv2d(in_channels, out_channels=None, kernel_size=1, stride=1, padding=None
 class Adapter(nn.Module):
     def __init__(
         self, adapter_name, in_channels, out_channels=None, stride=1, is_bias=False):
+        super(Adapter, self).__init__()
         self.is_bias = is_bias
         self.adapter_name = adapter_name
         self.adapter_size = adapter_name.split('_')[1:]

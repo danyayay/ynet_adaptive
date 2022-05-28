@@ -83,11 +83,19 @@ def main(args):
     plot_activation_single(
         ckpts_hook_dict, index, df_test, IMAGE_PATH, 
         out_dir='figures/activation_yy', display_scene_img=False,
-        inhance_threshold=0.1, zoom_in=False)
-    # plot_activation_single(
-    #     ckpts_hook_dict, index, df_test, IMAGE_PATH, 
-    #     out_dir='figures/activation_yy', display_scene_img=False,
-    #     inhance_threshold=0.15, zoom_in=False)
+        inhance_threshold=0.1, format='png')
+    plot_activation_single(
+        ckpts_hook_dict, index, df_test, IMAGE_PATH, 
+        out_dir='figures/activation_yy', display_scene_img=False,
+        inhance_threshold=0.15, format='png')
+    plot_activation_single(
+        ckpts_hook_dict, index, df_test, IMAGE_PATH, 
+        out_dir='figures/activation_yy', display_scene_img=False,
+        inhance_threshold=0.1, format='pdf')
+    plot_activation_single(
+        ckpts_hook_dict, index, df_test, IMAGE_PATH, 
+        out_dir='figures/activation_yy', display_scene_img=False,
+        inhance_threshold=0.15, format='pdf')
     # plot_activation_single(
     #     ckpts_hook_dict, index, df_test, IMAGE_PATH, 
     #     out_dir='figures/activation_yy', display_scene_img=True,
@@ -132,7 +140,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
     main(args)
 
-# python -m pdb -m evaluator.visualize_activation --dataset_path filter/agent_type/deathCircle_0 --pretrained_ckpt ckpts/Seed_1__Tr_Pedestrian__Val_Pedestrian__ValRatio_0.1__filter_agent_type__train.pt --tuned_ckpts ckpts/Seed_1__Tr_Biker__Val_Biker__ValRatio_0.1__filter_agent_type_deathCircle_0__lora_1__Pos_0_1_2_3_4__TrN_20__lr_0.0005.pt --val_files Biker.pkl --n_leftouts 500 
+# python -m pdb -m evaluator.visualize_activation --dataset_path filter/agent_type/deathCircle_0 --pretrained_ckpt ckpts/Seed_1__Tr_Pedestrian__Val_Pedestrian__ValRatio_0.1__filter_agent_type__train.pt --tuned_ckpts ckpts/DC0__lora/Seed_1__Tr_Biker__Val_Biker__ValRatio_0.1__filter_agent_type_deathCircle_0__lora_1__Pos_0_1_2_3_4__TrN_20__lr_0.0005.pt --val_files Biker.pkl --n_leftouts 500 
 
 # --given_meta_ids 5358 5883 5982
 
