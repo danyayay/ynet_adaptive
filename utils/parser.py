@@ -53,6 +53,7 @@ def get_train_args(parser):
 
 def get_eval_args(parser):
     parser.add_argument("--config_filename", default='sdd_raw_eval.yaml', type=str)
+    parser.add_argument("--study_semantic", default=None, type=str)
     return parser
 
 

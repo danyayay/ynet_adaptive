@@ -41,12 +41,15 @@ def get_image_and_data_path(params):
 
 
 def get_position(ckpt_path, return_list=True):
-    if 'Pos' in ckpt_path:
-        position = [int(i) for i in ckpt_path.split('__')[6].split('_') if i != 'Pos']
-        if return_list:
-            return position
+    if ckpt_path is not None:
+        if 'Pos' in ckpt_path:
+            position = [int(i) for i in ckpt_path.split('__')[6].split('_') if i != 'Pos']
+            if return_list:
+                return position
+            else:
+                return '_'.join(map(str, position))
         else:
-            return '_'.join(map(str, position))
+            return None
     else:
         return None 
 

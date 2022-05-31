@@ -105,6 +105,9 @@ class YNetTrainer:
 
         # model 
         model = self.model.to(self.device)
+        # for n, p in model.named_parameters():
+        #     if p.requires_grad:
+        #         print(n, p.numel())
 
         # Freeze segmentation model
         for param in model.semantic_segmentation.parameters():
@@ -138,9 +141,11 @@ class YNetTrainer:
             elif 'lora' in train_net:
                 for param_name, param in model.encoder.named_parameters():
                     if 'lora' in param_name: param.requires_grad = True
+            # after semantic segmentation 
             elif 'semantic' in train_net:
                 for param_name, param in model.named_parameters():
                     if 'semantic_adapter' in param_name: param.requires_grad = True
+            # bias term 
             elif train_net == 'biasEncoder':
                 model = mark_encoder_bias_trainable(model)
             elif train_net == 'biasGoal':
@@ -149,17 +154,22 @@ class YNetTrainer:
                 model = mark_traj_bias_trainable(model)
             elif train_net == 'bias':
                 model = mark_ynet_bias_trainable(model)
+            # inside segmentation model 
             elif 'segmentation' in train_net:
                 layer = train_net.split('_')[1]
-                for param_name, param in model.semantic_segmentation.named_parameters():
-                    if re.search(f'decoder.blocks.\d.{layer}', param_name) is not None:
-                    # if f'decoder.blocks.0.{layer}' in param_name or f'decoder.blocks.1.{layer}' in param_name:
-                        param.requires_grad = True 
+                if layer in ['head', 'bias', 'bn']:
+                    for param_name, param in model.semantic_segmentation.named_parameters():
+                        if layer in param_name: param.requires_grad = True
+                else:
+                    for param_name, param in model.semantic_segmentation.named_parameters():
+                        if re.search(f'decoder.blocks.\d.{layer}', param_name) is not None:
+                            param.requires_grad = True 
             else:
                 raise NotImplementedError
             # tuning all bias or not 
             if ynet_bias: 
                 model = mark_ynet_bias_trainable(model)
+
         optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
         lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=steps, gamma=lr_decay_ratio)
@@ -231,7 +241,7 @@ class YNetTrainer:
         batch_size, n_round, obs_len, pred_len, 
         waypoints, n_goal, n_traj, temperature, rel_threshold, 
         use_TTST, use_CWS, CWS_params, use_raw_data=False, with_style=False, 
-        return_preds=False, return_samples=False, **kwargs):
+        return_preds=False, return_samples=False, study_semantic=None, **kwargs):
         """
         Val function
         :param df_test: pd.df, val data
@@ -267,7 +277,7 @@ class YNetTrainer:
                 dataset_name, self.homo_mat, input_template, waypoints, 'test',
                 n_goal, n_traj, obs_len, batch_size, resize_factor, with_style,
                 temperature, use_TTST, use_CWS, rel_threshold, CWS_params,
-                return_preds, return_samples)
+                return_preds, return_samples, study_semantic)
             list_metrics.append(df_metrics)
             list_trajs.append(trajs_dict)
             print(f'Round {e}: \nTest ADE: {test_ADE} \nTest FDE: {test_FDE}')

@@ -33,8 +33,7 @@ def main(args):
     print(f"df_train: {df_train.shape}; #={df_train.shape[0]/(params['obs_len']+params['pred_len'])}")
     if df_val is not None: print(f"df_val: {df_val.shape}; #={df_val.shape[0]/(params['obs_len']+params['pred_len'])}")
     if df_test is not None: print(f"df_test: {df_test.shape}; #={df_test.shape[0]/(params['obs_len']+params['pred_len'])}")
-    folder_name = f"{args.seed}__{'_'.join(args.dataset_path.split('/'))}__{'_'.join(args.train_files).rstrip('.pkl')}" 
-    plot_given_trajectories_scenes_overlay(IMAGE_PATH, df_train, f'figures/scene_with_trajs_given/{folder_name}')
+    folder_name = f"{args.seed}__{'_'.join(args.dataset_path.split('/'))}__{'_'.join(args.train_files).rstrip('.pkl')}"
 
     # experiment name 
     EXPERIMENT_NAME = get_experiment_name(args, df_train.shape[0])

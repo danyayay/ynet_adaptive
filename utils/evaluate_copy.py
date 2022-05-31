@@ -39,7 +39,7 @@ def evaluate(
     dataset_name, homo_mat, input_template, waypoints, mode, 
     n_goal, n_traj, obs_len, batch_size, resize_factor=0.25, with_style=False, 
     temperature=1, use_TTST=False, use_CWS=False, rel_thresh=0.002, CWS_params=None, 
-    return_preds=False, return_samples=False):
+    return_preds=False, return_samples=False, study_semantic=None):
     """
 
     :param model: torch model
@@ -78,7 +78,6 @@ def evaluate(
             trajs_dict = {'groundtruth': [], 'prediction': []} 
     else:
         trajs_dict = None 
-    
 
     with torch.no_grad():
         # outer loop, for loop over each scene as scenes have different image size and to calculate segmentation only once
@@ -86,6 +85,19 @@ def evaluate(
             # Get scene image and apply semantic segmentation
             scene_image = val_images[scene_id].to(device).unsqueeze(0)
             scene_image = model.segmentation(scene_image)
+            # possibly replace one semantic layer by others (all zeros or another layer)
+            if study_semantic is not None:
+                semantic_dict = {'others': 0, 'pavement': 1, 'terrain': 2}
+                layer_cur, layer_rep = study_semantic.split('_')
+                layer_cur = semantic_dict[layer_cur] 
+                if layer_rep in semantic_dict.keys():
+                    layer_rep = semantic_dict[layer_rep]
+                    img_rep = scene_image[:, layer_rep]
+                elif layer_rep == 'zero':
+                    img_rep = torch.zeros(scene_image[0, 0].shape)
+                else:
+                    raise NotImplementedError
+                scene_image[:, layer_cur] = img_rep
             # possibly adapt semantic image 
             scene_image = model.adapt_semantic(scene_image)
             meta_ids = df_batch[0].metaId.unique()

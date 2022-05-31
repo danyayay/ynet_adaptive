@@ -981,12 +981,12 @@ if __name__ == "__main__":
                 df.loc[out[idx_1st].index, 'dist'] = out[idx_1st].values
             print(f'Added a column of distance with neighbors to df')
         # save
-        out_path = os.path.join(args.raw_data_dir, f"data.pkl")
+        out_path = os.path.join(args.raw_data_dir, f"data_.pkl")
         df.to_pickle(out_path)
         print(f'Saved data to {out_path}')
     else:  # reload = True
         # ## or load from stored pickle
-        df = pd.read_pickle(os.path.join(args.raw_data_dir, "data.pkl"))
+        df = pd.read_pickle(os.path.join(args.raw_data_dir, "data_.pkl"))
         print('Reloaded raw dataset')
 
 

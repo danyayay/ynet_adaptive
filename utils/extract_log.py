@@ -94,36 +94,51 @@ def extract_imp_msg(imp_msg):
 
 
 def get_train_net(ckpt_path):
-    return ckpt_path.split('__')[5]
+    if ckpt_path is not None:
+        return ckpt_path.split('__')[5]
+    else:
+        None 
 
 
 def get_n_train(ckpt_path):
-    if 'Pos' in ckpt_path: 
-        n_train = int(ckpt_path.split('__')[7].split('_')[1])
+    if ckpt_path is not None:
+        if 'Pos' in ckpt_path: 
+            n_train = int(ckpt_path.split('__')[7].split('_')[1])
+        else:
+            n_train = int(ckpt_path.split('__')[6].split('_')[1])
+        return n_train
     else:
-        n_train = int(ckpt_path.split('__')[6].split('_')[1])
-    return n_train
+        return None 
 
 
 def get_lr(ckpt_path):
-    if 'lr' in ckpt_path: 
-        return ckpt_path.split('lr_')[1].split('_')[0].split('.pt')[0]
+    if ckpt_path is not None:
+        if 'lr' in ckpt_path: 
+            return ckpt_path.split('lr_')[1].split('_')[0].split('.pt')[0]
+        else:
+            return 0.00005
     else:
-        return 0.00005
+        return None 
 
 
 def get_bool_bias(ckpt_path):
-    if 'bias' in ckpt_path.split('TrN')[-1]:
-        return True
+    if ckpt_path is not None:
+        if 'bias' in ckpt_path.split('TrN')[-1]:
+            return True
+        else:
+            return False 
     else:
-        return False 
+        return None 
 
 
 def get_bool_aug(ckpt_path):
-    if 'AUG' in ckpt_path:
-        return True 
+    if ckpt_path is not None:
+        if 'AUG' in ckpt_path:
+            return True 
+        else:
+            return False 
     else:
-        return False 
+        return None 
 
 
 def extract_file(file_path, out_dir):

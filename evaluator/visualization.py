@@ -1494,7 +1494,7 @@ def plot_importance_analysis(
                 )
 
 
-def get_correct_scene_img(input, c_place=-1):
+def get_correct_scene_img(input, c_place=0):
     if c_place == -1:
         height, width, _ = input.shape
         blue, green, red = input[:,:,0], input[:,:,1], input[:,:,2]
@@ -1526,7 +1526,7 @@ def plot_saliency_maps(
         grad_input = grad_input.cpu().detach().numpy()
     
     # prepare input and switch channels
-    scene_img = get_correct_scene_img(input[0])
+    scene_img = get_correct_scene_img(input[0], c_place=0)
 
     # prepare grad 
     grad_img = grad_input.sum(axis=(0, 1))
@@ -1553,10 +1553,10 @@ def plot_saliency_maps(
     # plot overlay
     fig, ax = plt.subplots(1, 1, figsize=(width/100, height/100))
     ax.imshow(scene_img) # num of y, num of x
-    print(grad_img.min(), grad_img.max())
     im = ax.imshow(grad_img, cmap='hot', vmin=0, alpha=0.65)
     plt.colorbar(im, ax=ax, shrink=0.5)
     if best_point is not None:
+        
         plt.scatter(best_point[0], best_point[1], c='r', s=4, marker='*') 
     ax.set_title(saliency_name)
     # save 
@@ -1564,11 +1564,6 @@ def plot_saliency_maps(
     plt.savefig(out_path, bbox_inches='tight')
     plt.close(fig)
     print(f'Saved {out_path}') 
-
-
-def plot_saliency_maps_side_by_side():
-    pass 
-
 
 
 if __name__ == "__main__":
