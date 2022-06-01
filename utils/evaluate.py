@@ -88,16 +88,24 @@ def evaluate(
             # possibly replace one semantic layer by others (all zeros or another layer)
             if study_semantic is not None:
                 semantic_dict = {'others': 0, 'pavement': 1, 'terrain': 2}
-                layer_cur, layer_rep = study_semantic.split('_')
-                layer_cur = semantic_dict[layer_cur] 
-                if layer_rep in semantic_dict.keys():
-                    layer_rep = semantic_dict[layer_rep]
-                    img_rep = scene_image[:, layer_rep]
-                elif layer_rep == 'zero':
-                    img_rep = torch.zeros(scene_image[0, 0].shape)
+                if 'exchange' in study_semantic:
+                    _, layer_cur, layer_rep = study_semantic.split('_')
+                    layer_cur = semantic_dict[layer_cur] 
+                    layer_rep = semantic_dict[layer_rep] 
+                    img_tmp = scene_image[:, layer_rep].clone()
+                    scene_image[:, layer_rep] = scene_image[:, layer_cur]
+                    scene_image[:, layer_cur] = img_tmp
                 else:
-                    raise NotImplementedError
-                scene_image[:, layer_cur] = img_rep
+                    layer_cur, layer_rep = study_semantic.split('_')
+                    layer_cur = semantic_dict[layer_cur] 
+                    if layer_rep in semantic_dict.keys():
+                        layer_rep = semantic_dict[layer_rep]
+                        img_rep = scene_image[:, layer_rep]
+                    elif layer_rep == 'zero':
+                        img_rep = torch.zeros(scene_image[0, 0].shape)
+                    else:
+                        raise NotImplementedError
+                    scene_image[:, layer_cur] = img_rep
             # possibly adapt semantic image 
             scene_image = model.adapt_semantic(scene_image)
             meta_ids = df_batch[0].metaId.unique()
