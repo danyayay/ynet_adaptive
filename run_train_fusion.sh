@@ -1,11 +1,9 @@
-list_seed=(1) # Train the model on different seeds
-batch_size=8
-n_epoch=100
+list_seed=(1) 
+batch_size=10
+n_epoch=300
 
-dataset_name=sdd
-out_csv_dir=csv # /path/to/csv where the output results are written to
-val_ratio=0.1 # Split train dataset into a train and val split in case the domains are the same
-train_net=all # Train either all parameters, only the encoder or the modulator: (all encoder modulator)
+val_ratio=0.1
+train_net=train 
 
 declare -A A=( ["dataset_path"]="filter/avg_vel/Pedestrian/" ["filename"]="0.1_0.3.pkl" ["n_test"]=100)
 declare -A B=( ["dataset_path"]="filter/avg_vel/Pedestrian/" ["filename"]="0.5_1.5.pkl" ["n_test"]=990) 
@@ -16,11 +14,11 @@ declare -A E=( ["dataset_path"]="filter/agent_type/" ["filename"]="Pedestrian.pk
 declare -A F=( ["dataset_path"]="filter/agent_type/" ["filename"]="Biker.pkl" ["n_test"]=500)
 declare -A AB=( ["dataset_path"]="filter/avg_vel/Pedestrian/" ["filename"]="0.1_0.3.pkl 0.5_1.5.pkl" ["n_test"]="100 990")
 
-dataset_path=${B_["dataset_path"]}
-train_files=${B_["filename"]}
-val_files=${B_["filename"]}
-n_leftouts=${B_["n_test"]}
+dataset_path=${E["dataset_path"]}
+train_files=${E["filename"]}
+val_files=${E["filename"]}
+n_leftouts=${E["n_test"]}
 
 for seed in ${list_seed[@]}; do
-    python train.py --seed $seed --batch_size $batch_size --n_epoch $n_epoch --dataset_name $dataset_name --dataset_path $dataset_path --train_files $train_files --val_files $val_files --out_csv_dir $out_csv_dir --val_ratio $val_ratio --n_leftouts $n_leftouts --train_net $train_net
+    python train.py --seed $seed --batch_size $batch_size --n_epoch $n_epoch --dataset_path $dataset_path --train_files $train_files --val_files $val_files --val_ratio $val_ratio --n_leftouts $n_leftouts --train_net $train_net
 done
