@@ -68,7 +68,8 @@ class YNetTrainer:
             decoder_channels=params['decoder_channels'],
             n_waypoints=len(params['waypoints']),
             train_net=params['train_net'], 
-            position=params['position']
+            position=params['position'],
+            add_embedding=params['add_embedding']
         )
     
     def train(self, df_train, df_val, train_image_path, val_image_path, experiment_name):
@@ -81,7 +82,7 @@ class YNetTrainer:
         use_raw_data=False, save_every_n=10, train_net="all", position=[], 
         fine_tune=False, is_augment_data=False, ynet_bias=False, 
         use_CWS=False, resl_thresh=0.002, CWS_params=None, n_early_stop=5, 
-        steps=[20], lr_decay_ratio=0.1, **kwargs):
+        steps=[20], lr_decay_ratio=0.1, add_embedding=False, **kwargs):
         """
         Train function
         :param df_train: pd.df, train data
@@ -192,14 +193,14 @@ class YNetTrainer:
             train_ADE, train_FDE, train_loss = train_epoch(
                 model, train_loader, train_images, optimizer, criterion, loss_scale, self.device, 
                 dataset_name, self.homo_mat, gt_template, input_template, waypoints,
-                e, obs_len, pred_len, batch_size, e_unfreeze, resize_factor, with_style)
+                e, obs_len, pred_len, batch_size, e_unfreeze, resize_factor, with_style, add_embedding)
 
             # For faster inference, we don't use TTST and CWS here, only for the test set evaluation
             val_ADE, val_FDE, _, _ = evaluate(
                 model, val_loader, val_images, self.device, 
                 dataset_name, self.homo_mat, input_template, waypoints, 'val', 
                 n_goal, n_traj, obs_len, batch_size, resize_factor, with_style,
-                temperature, False, use_CWS, resl_thresh, CWS_params)
+                temperature, False, use_CWS, resl_thresh, CWS_params, add_embedding)
 
             
             print(

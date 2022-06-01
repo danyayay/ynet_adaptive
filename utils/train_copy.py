@@ -6,7 +6,8 @@ from utils.image_utils import get_patch
 def train_epoch(
     model, train_loader, train_images, optimizer, criterion, loss_scale, device, 
     dataset_name, homo_mat, gt_template, input_template, waypoints, 
-    epoch, obs_len, pred_len, batch_size, e_unfreeze, resize_factor, with_style=False):
+    epoch, obs_len, pred_len, batch_size, e_unfreeze, resize_factor, 
+    with_style=False, add_embedding=False):
     """
     Run training for one epoch
 
@@ -65,6 +66,11 @@ def train_epoch(
                 input_template, gt_waypoints.reshape(-1, 2).cpu().numpy(), H, W)
             gt_waypoint_map = torch.stack(gt_waypoint_map).reshape(
                 [-1, gt_waypoints.shape[1], H, W])
+            
+            # add embedding 
+            if add_embedding:
+                semantic_img = model.scene_embedding(semantic_img)
+                observed_map = model.motion_embedding(observed_map)
 
             # Concatenate heatmap and semantic map
             semantic_map = semantic_img.expand(

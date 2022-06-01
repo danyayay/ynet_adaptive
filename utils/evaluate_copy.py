@@ -39,7 +39,7 @@ def evaluate(
     dataset_name, homo_mat, input_template, waypoints, mode, 
     n_goal, n_traj, obs_len, batch_size, resize_factor=0.25, with_style=False, 
     temperature=1, use_TTST=False, use_CWS=False, rel_thresh=0.002, CWS_params=None, 
-    return_preds=False, return_samples=False, study_semantic=None):
+    return_preds=False, return_samples=False, study_semantic=None, add_embedding=False):
     """
 
     :param model: torch model
@@ -108,6 +108,9 @@ def evaluate(
                     scene_image[:, layer_cur] = img_rep
             # possibly adapt semantic image 
             scene_image = model.adapt_semantic(scene_image)
+            # add scene embedding
+            if add_embedding:
+                scene_image = model.scene_embedding(scene_image)
             meta_ids = df_batch[0].metaId.unique()
             n_data = trajectory.shape[0]
 
@@ -127,6 +130,10 @@ def evaluate(
 
                 gt_future = trajectory[b:b+batch_size, obs_len:].to(device)  # (batch_size, pred_len)
                 semantic_image = scene_image.expand(observed_map.shape[0], -1, -1, -1)  # (batch_size, n_class, height, width)
+
+                # add embedding 
+                if add_embedding:
+                    observed_map = self.motion_embedding(observed_map)
 
                 # Forward pass
                 feature_input = torch.cat([semantic_image, observed_map], dim=1)  # (batch_size, n_class+obs_len, height, width)

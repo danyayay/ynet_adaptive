@@ -169,6 +169,22 @@ def get_conv2d(
             kernel_size=kernel_size, stride=stride, padding=padding)
 
 
+class Embedding(nn.Module):
+    def __init__(self, channels):
+        super().__init__()
+        self.conv = nn.Sequential(
+            nn.Conv2d(channels, channels, kernel_size=3, stride=1, padding=1),
+            nn.ReLU(inplace=False),
+            nn.Conv2d(channels, channels, kernel_size=3, stride=1, padding=1),
+            nn.ReLU(inplace=False),
+            nn.Conv2d(channels, channels, kernel_size=3, stride=1, padding=1),
+            nn.ReLU(inplace=False)
+        )
+    
+    def forward(self, x):
+        return self.conv(x)
+
+
 class YNetEncoder(nn.Module):
     def __init__(
         self, in_channels, channels=(64, 128, 256, 512, 512), 
@@ -365,7 +381,7 @@ class YNet(nn.Module):
         self, obs_len, pred_len, segmentation_model_fp, 
         use_features_only=False, n_semantic_classes=6,
         encoder_channels=[], decoder_channels=[], n_waypoints=1, 
-        train_net=None, position=[]):
+        train_net=None, position=[], add_embedding=False):
         """
         Complete Y-net Architecture including semantic segmentation backbone, heatmap embedding and ConvPredictor
         :param obs_len: int, observed timesteps
@@ -397,6 +413,7 @@ class YNet(nn.Module):
         
         self.feature_channels = n_semantic_classes + obs_len
 
+        # semantic tuning 
         if 'semantic' in train_net:
             kernel_size = int(train_net.split('_')[-1].split('x')[0])
             self.semantic_adapter = get_conv2d(
@@ -405,6 +422,11 @@ class YNet(nn.Module):
             nn.init.zeros_(self.semantic_adapter.weight)
             nn.init.zeros_(self.semantic_adapter.bias)
         
+        # adding embedding layer before concatenation
+        if add_embedding:
+            self.scene_embedding = Embedding(n_semantic_classes)
+            self.motion_embedding = Embedding(obs_len)
+
         if 'lora' in train_net or 'Layer' in train_net:
             self.encoder = YNetEncoderL(
                 in_channels=self.feature_channels, channels=encoder_channels,
