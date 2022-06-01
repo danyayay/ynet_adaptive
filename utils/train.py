@@ -69,11 +69,10 @@ def train_epoch(
             # Concatenate heatmap and semantic map
             semantic_map = semantic_img.expand(
                 observed_map.shape[0], -1, -1, -1)  # expand to match heatmap size
-            feature_input = torch.cat([semantic_map, observed_map], dim=1)
 
             # Forward pass
             # Calculate features
-            features = model.pred_features(feature_input)
+            features = model.pred_features(semantic_map, observed_map)
 
             # Style integrator
             if with_style:

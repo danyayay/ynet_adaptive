@@ -22,6 +22,7 @@ def get_model_args(parser):
     parser.add_argument('--tuned_ckpts', default=None, type=str, nargs='+')
     
     # added net 
+    parser.add_argument('--add_embedding', action='store_true')
     parser.add_argument('--position', default=[], type=int, nargs='+')
     parser.add_argument('--ynet_bias', action='store_true')
     parser.add_argument("--train_net", default="all", type=str, 

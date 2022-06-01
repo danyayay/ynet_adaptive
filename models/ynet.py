@@ -1,3 +1,4 @@
+from turtle import forward
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -217,6 +218,117 @@ class YNetEncoder(nn.Module):
             nn.MaxPool2d(kernel_size=2, stride=2, padding=0, dilation=1, ceil_mode=False)))
 
 
+class YNetEncoderTwo(nn.Module):
+    def __init__(
+        self, scene_channel, motion_channel, channels,
+        train_net=None, position=[], n_fusion=2):
+        super().__init__()
+        self.scene_channel = scene_channel
+        self.motion_channel = motion_channel
+        self.channels = channels
+        self.train_net = train_net
+        self.position = position
+        
+        if 'lora' in self.train_net: 
+            self.rank = int(self.train_net.split('_')[1]) if len(self.train_net.split('_')) > 1 else 1
+        else:
+            self.rank = None 
+
+        # check channels are even 
+        assert not any([i%2 for i in channels]), f'Odd value in channels={channels}'
+
+        self.scene_stages = nn.ModuleList([
+            nn.Sequential(
+                get_conv2d(
+                    train_net=train_net, l=0, position=position, kernel_size=3, 
+                    in_channels=scene_channel, out_channels=channels[0]//2, rank=self.rank),
+                nn.ReLU(inplace=False))
+        ])
+        self.motion_stages = nn.ModuleList([
+            nn.Sequential(
+                get_conv2d(
+                    train_net=train_net, l=0, position=position, kernel_size=3, 
+                    in_channels=motion_channel, out_channels=channels[0]//2, rank=self.rank),
+                nn.ReLU(inplace=False))
+        ])
+        self.fusion_stages = nn.ModuleList()
+
+        n_sep = len(channels) - n_fusion - 1
+        # scene part 
+        for i in range(n_sep):
+            modules = [
+                nn.MaxPool2d(kernel_size=2, stride=2, padding=0, dilation=1, ceil_mode=False), 
+                get_conv2d(
+                    train_net=train_net, l=i+1, position=position, 
+                    kernel_size=3, in_channels=channels[i]//2, out_channels=channels[i+1]//2, rank=self.rank), 
+                nn.ReLU(inplace=False), 
+                get_conv2d(
+                    train_net=train_net, l=i+1, position=position, 
+                    kernel_size=3, in_channels=channels[i+1]//2, out_channels=channels[i+1]//2, rank=self.rank), 
+                nn.ReLU(inplace=False)]
+            self.scene_stages.append(nn.Sequential(*modules))
+
+        # motion part 
+        for i in range(n_sep):
+            modules = [
+                nn.MaxPool2d(kernel_size=2, stride=2, padding=0, dilation=1, ceil_mode=False), 
+                get_conv2d(
+                    train_net=train_net, l=i+1, position=position, 
+                    kernel_size=3, in_channels=channels[i]//2, out_channels=channels[i+1]//2, rank=self.rank), 
+                nn.ReLU(inplace=False), 
+                get_conv2d(
+                    train_net=train_net, l=i+1, position=position, 
+                    kernel_size=3, in_channels=channels[i+1]//2, out_channels=channels[i+1]//2, rank=self.rank), 
+                nn.ReLU(inplace=False)]
+            self.motion_stages.append(nn.Sequential(*modules))
+        
+        # fusion part
+        for i in range(n_sep, len(channels) - 1):
+            modules = [
+                nn.MaxPool2d(kernel_size=2, stride=2, padding=0, dilation=1, ceil_mode=False), 
+                get_conv2d(
+                    train_net=train_net, l=i+1, position=position, 
+                    kernel_size=3, in_channels=channels[i], out_channels=channels[i+1], rank=self.rank), 
+                nn.ReLU(inplace=False), 
+                get_conv2d(
+                    train_net=train_net, l=i+1, position=position, 
+                    kernel_size=3, in_channels=channels[i+1], out_channels=channels[i+1], rank=self.rank), 
+                nn.ReLU(inplace=False)]
+            self.fusion_stages.append(nn.Sequential(*modules))
+
+        # Last MaxPool layer before passing the features into decoder
+        self.fusion_stages.append(nn.Sequential(
+            nn.MaxPool2d(kernel_size=2, stride=2, padding=0, dilation=1, ceil_mode=False)))
+
+    def forward(self, scene_map, motion_map):
+        # scene part
+        scene_features = []
+        x = scene_map
+        for stage in self.scene_stages:
+            x = stage(x)
+            scene_features.append(x)
+        
+        # motion part
+        motion_features = []
+        x = motion_map 
+        for stage in self.motion_stages:
+            x = stage(x)
+            motion_features.append(x)
+
+        # concatenate scene and motion 
+        features = []
+        for scene_feature, motion_feature in zip(scene_features, motion_features):
+            features.append(torch.cat([scene_feature, motion_feature], axis=1))
+
+        # fusion part
+        x = features[-1]
+        for stage in self.fusion_stages:
+            x = stage(x)
+            features.append(x)
+        
+        return features 
+
+
 class YNetEncoderL(YNetEncoder):
     def __init__(
         self, in_channels, channels=(64, 128, 256, 512, 512), 
@@ -405,14 +517,18 @@ class YNet(nn.Module):
             nn.init.zeros_(self.semantic_adapter.weight)
             nn.init.zeros_(self.semantic_adapter.bias)
         
-        if 'lora' in train_net or 'Layer' in train_net:
-            self.encoder = YNetEncoderL(
-                in_channels=self.feature_channels, channels=encoder_channels,
-                train_net=train_net, position=position)
-        else:
-            self.encoder = YNetEncoderB(
-                in_channels=self.feature_channels, channels=encoder_channels,
-                train_net=train_net, position=position)
+        # if 'lora' in train_net or 'Layer' in train_net:
+        #     self.encoder = YNetEncoderL(
+        #         in_channels=self.feature_channels, channels=encoder_channels,
+        #         train_net=train_net, position=position)
+        # else:
+        #     self.encoder = YNetEncoderB(
+        #         in_channels=self.feature_channels, channels=encoder_channels,
+        #         train_net=train_net, position=position)
+        self.encoder = YNetEncoderTwo(
+            scene_channel=n_semantic_classes, motion_channel=obs_len, channels=encoder_channels,
+            train_net=train_net, position=position, n_fusion=2
+        )
 
         self.goal_decoder = YNetDecoder(encoder_channels, decoder_channels, output_len=pred_len)
         self.traj_decoder = YNetDecoder(encoder_channels, decoder_channels, output_len=pred_len, traj=n_waypoints)
@@ -443,8 +559,8 @@ class YNet(nn.Module):
         return self.traj_decoder(features)
 
     # Forward pass for feature encoder, returns list of feature maps
-    def pred_features(self, x):
-        return self.encoder(x)
+    def pred_features(self, scene_map, motion_map):
+        return self.encoder(scene_map, motion_map)
 
     # Used for style encoding
     def stylize_features(self, x, style_class):

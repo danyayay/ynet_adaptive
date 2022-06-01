@@ -129,8 +129,7 @@ def evaluate(
                 semantic_image = scene_image.expand(observed_map.shape[0], -1, -1, -1)  # (batch_size, n_class, height, width)
 
                 # Forward pass
-                feature_input = torch.cat([semantic_image, observed_map], dim=1)  # (batch_size, n_class+obs_len, height, width)
-                features = model.pred_features(feature_input)  # n_layer=6 list of (batch_size, n_channel, height, width)       
+                features = model.pred_features(semantic_image, observed_map)  # n_layer=6 list of (batch_size, n_channel, height, width)       
 
                 # Style integrator
                 if with_style:
