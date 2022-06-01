@@ -1,4 +1,5 @@
 import re
+import pathlib
 import numpy as np
 import torch
 import torch.nn as nn
@@ -68,14 +69,15 @@ class YNetTrainer:
             decoder_channels=params['decoder_channels'],
             n_waypoints=len(params['waypoints']),
             train_net=params['train_net'], 
-            position=params['position']
+            position=params['position'],
+            n_fusion=params['n_fusion']
         )
     
     def train(self, df_train, df_val, train_image_path, val_image_path, experiment_name):
         return self._train(df_train, df_val, train_image_path, val_image_path, experiment_name, **self.params)
 
     def _train(
-        self, df_train, df_val, train_image_path, val_image_path, experiment_name, 
+        self, df_train, df_val, train_image_path, val_image_path, experiment_name, ckpt_path, 
         dataset_name, resize_factor, obs_len, pred_len, batch_size, lr, n_epoch, 
         waypoints, n_goal, n_traj, kernlen, nsig, e_unfreeze, loss_scale, temperature,
         use_raw_data=False, save_every_n=10, train_net="all", position=[], 
@@ -216,7 +218,8 @@ class YNetTrainer:
                 best_state_dict = deepcopy(model.state_dict())
 
             if e % save_every_n == 0 and not fine_tune:
-                self.save_params(f'ckpts/{experiment_name}_epoch_{e}.pt', train_net)
+                pathlib.Path(ckpt_path).mkdir(parents=True, exist_ok=True)
+                self.save_params(f'{ckpt_path}/{experiment_name}_epoch_{e}.pt', train_net)
 
             # early stop in case of clear overfitting
             if best_val_ADE < min(self.val_ADE[-n_early_stop:]):
@@ -227,7 +230,8 @@ class YNetTrainer:
         model.load_state_dict(best_state_dict, strict=True)
 
         # Save the best model
-        pt_path = f'ckpts/{experiment_name}.pt'
+        pathlib.Path(ckpt_path).mkdir(parents=True, exist_ok=True)
+        pt_path = f'{ckpt_path}/{experiment_name}.pt'
         self.save_params(pt_path, train_net)
 
         return self.val_ADE, self.val_FDE

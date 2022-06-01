@@ -477,7 +477,7 @@ class YNet(nn.Module):
         self, obs_len, pred_len, segmentation_model_fp, 
         use_features_only=False, n_semantic_classes=6,
         encoder_channels=[], decoder_channels=[], n_waypoints=1, 
-        train_net=None, position=[]):
+        train_net=None, position=[], n_fusion=2):
         """
         Complete Y-net Architecture including semantic segmentation backbone, heatmap embedding and ConvPredictor
         :param obs_len: int, observed timesteps
@@ -517,17 +517,9 @@ class YNet(nn.Module):
             nn.init.zeros_(self.semantic_adapter.weight)
             nn.init.zeros_(self.semantic_adapter.bias)
         
-        # if 'lora' in train_net or 'Layer' in train_net:
-        #     self.encoder = YNetEncoderL(
-        #         in_channels=self.feature_channels, channels=encoder_channels,
-        #         train_net=train_net, position=position)
-        # else:
-        #     self.encoder = YNetEncoderB(
-        #         in_channels=self.feature_channels, channels=encoder_channels,
-        #         train_net=train_net, position=position)
         self.encoder = YNetEncoderTwo(
             scene_channel=n_semantic_classes, motion_channel=obs_len, channels=encoder_channels,
-            train_net=train_net, position=position, n_fusion=2
+            train_net=train_net, position=position, n_fusion=n_fusion
         )
 
         self.goal_decoder = YNetDecoder(encoder_channels, decoder_channels, output_len=pred_len)

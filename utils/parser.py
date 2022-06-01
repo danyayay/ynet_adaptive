@@ -24,6 +24,7 @@ def get_model_args(parser):
     
     # added net 
     parser.add_argument('--add_embedding', action='store_true')
+    parser.add_argument('--n_fusion', default=2, type=int)
     parser.add_argument('--swap_semantic', action='store_true')
     parser.add_argument('--position', default=[], type=int, nargs='+')
     parser.add_argument('--ynet_bias', action='store_true')
