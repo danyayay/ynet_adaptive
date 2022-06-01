@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import numpy as np
 import pandas as pd
-from utils.image_utils import get_patch, sampling, image2world
+from utils.image_utils import get_patch, sampling, image2world, swap_pavement_terrain
 from utils.kmeans import kmeans
 
 
@@ -39,7 +39,7 @@ def evaluate(
     dataset_name, homo_mat, input_template, waypoints, mode, 
     n_goal, n_traj, obs_len, batch_size, resize_factor=0.25, with_style=False, 
     temperature=1, use_TTST=False, use_CWS=False, rel_thresh=0.002, CWS_params=None, 
-    return_preds=False, return_samples=False, study_semantic=None, add_embedding=False):
+    return_preds=False, return_samples=False, add_embedding=False, swap_semantic=False):
     """
 
     :param model: torch model
@@ -85,32 +85,18 @@ def evaluate(
             # Get scene image and apply semantic segmentation
             scene_image = val_images[scene_id].to(device).unsqueeze(0)
             scene_image = model.segmentation(scene_image)
-            # possibly replace one semantic layer by others (all zeros or another layer)
-            if study_semantic is not None:
-                semantic_dict = {'others': 0, 'pavement': 1, 'terrain': 2}
-                if 'exchange' in study_semantic:
-                    _, layer_cur, layer_rep = study_semantic.split('_')
-                    layer_cur = semantic_dict[layer_cur] 
-                    layer_rep = semantic_dict[layer_rep] 
-                    img_tmp = scene_image[:, layer_rep].clone()
-                    scene_image[:, layer_rep] = scene_image[:, layer_cur]
-                    scene_image[:, layer_cur] = img_tmp
-                else:
-                    layer_cur, layer_rep = study_semantic.split('_')
-                    layer_cur = semantic_dict[layer_cur] 
-                    if layer_rep in semantic_dict.keys():
-                        layer_rep = semantic_dict[layer_rep]
-                        img_rep = scene_image[:, layer_rep]
-                    elif layer_rep == 'zero':
-                        img_rep = torch.zeros(scene_image[0, 0].shape)
-                    else:
-                        raise NotImplementedError
-                    scene_image[:, layer_cur] = img_rep
+
             # possibly adapt semantic image 
             scene_image = model.adapt_semantic(scene_image)
+
+            # swap semantic layers if needed
+            if swap_semantic:
+                scene_image = swap_pavement_terrain(scene_image)
+
             # add scene embedding
             if add_embedding:
                 scene_image = model.scene_embedding(scene_image)
+                
             meta_ids = df_batch[0].metaId.unique()
             n_data = trajectory.shape[0]
 
@@ -133,7 +119,7 @@ def evaluate(
 
                 # add embedding 
                 if add_embedding:
-                    observed_map = self.motion_embedding(observed_map)
+                    observed_map = model.motion_embedding(observed_map)
 
                 # Forward pass
                 feature_input = torch.cat([semantic_image, observed_map], dim=1)  # (batch_size, n_class+obs_len, height, width)

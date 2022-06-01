@@ -241,7 +241,7 @@ class YNetTrainer:
         batch_size, n_round, obs_len, pred_len, 
         waypoints, n_goal, n_traj, temperature, rel_threshold, 
         use_TTST, use_CWS, CWS_params, use_raw_data=False, with_style=False, 
-        return_preds=False, return_samples=False, study_semantic=None, **kwargs):
+        return_preds=False, return_samples=False, **kwargs):
         """
         Val function
         :param df_test: pd.df, val data
@@ -277,7 +277,7 @@ class YNetTrainer:
                 dataset_name, self.homo_mat, input_template, waypoints, 'test',
                 n_goal, n_traj, obs_len, batch_size, resize_factor, with_style,
                 temperature, use_TTST, use_CWS, rel_threshold, CWS_params,
-                return_preds, return_samples, study_semantic)
+                return_preds, return_samples)
             list_metrics.append(df_metrics)
             list_trajs.append(trajs_dict)
             print(f'Round {e}: \nTest ADE: {test_ADE} \nTest FDE: {test_FDE}')

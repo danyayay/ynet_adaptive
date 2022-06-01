@@ -84,4 +84,4 @@ if __name__ == '__main__':
 
     main(args)
 
-# python -m pdb train_copy.py --seed 1 --n_epoch 3 --batch_size 8 --dataset_path filter/agent_type/deathCircle_0/ --train_files Pedestrian.pkl --val_files Pedestrian.pkl --val_ratio 0.1 --n_leftouts 50 --lr 0.005 --train_net train --add_embedding
+# CUDA_VISIBLE_DEVICES=1 python -m pdb train_copy.py --fine_tune --seed 1 --n_epoch 3 --batch_size 8 --dataset_path filter/agent_type/deathCircle_0/ --pretrained_ckpt ckpts/Seed_1__Tr_Pedestrian__Val_Pedestrian__ValRatio_0.1__filter_agent_type__train_pretrained.pt --train_files Biker.pkl --val_files Biker.pkl --val_ratio 0.1 --n_leftouts 50 --lr 0.0005 --train_net lora_1 --position 0 1 2 3 4 --swap_semantic

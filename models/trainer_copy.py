@@ -1,4 +1,5 @@
 import re
+import pathlib
 import numpy as np
 import torch
 import torch.nn as nn
@@ -76,13 +77,13 @@ class YNetTrainer:
         return self._train(df_train, df_val, train_image_path, val_image_path, experiment_name, **self.params)
 
     def _train(
-        self, df_train, df_val, train_image_path, val_image_path, experiment_name, 
+        self, df_train, df_val, train_image_path, val_image_path, experiment_name, ckpt_path, 
         dataset_name, resize_factor, obs_len, pred_len, batch_size, lr, n_epoch, 
         waypoints, n_goal, n_traj, kernlen, nsig, e_unfreeze, loss_scale, temperature,
         use_raw_data=False, save_every_n=10, train_net="all", position=[], 
         fine_tune=False, is_augment_data=False, ynet_bias=False, 
         use_CWS=False, resl_thresh=0.002, CWS_params=None, n_early_stop=5, 
-        steps=[20], lr_decay_ratio=0.1, add_embedding=False, **kwargs):
+        steps=[20], lr_decay_ratio=0.1, add_embedding=False, swap_semantic=False, **kwargs):
         """
         Train function
         :param df_train: pd.df, train data
@@ -193,15 +194,16 @@ class YNetTrainer:
             train_ADE, train_FDE, train_loss = train_epoch(
                 model, train_loader, train_images, optimizer, criterion, loss_scale, self.device, 
                 dataset_name, self.homo_mat, gt_template, input_template, waypoints,
-                e, obs_len, pred_len, batch_size, e_unfreeze, resize_factor, with_style, add_embedding)
+                e, obs_len, pred_len, batch_size, e_unfreeze, resize_factor, 
+                with_style, add_embedding, swap_semantic)
 
             # For faster inference, we don't use TTST and CWS here, only for the test set evaluation
             val_ADE, val_FDE, _, _ = evaluate(
                 model, val_loader, val_images, self.device, 
                 dataset_name, self.homo_mat, input_template, waypoints, 'val', 
                 n_goal, n_traj, obs_len, batch_size, resize_factor, with_style,
-                temperature, False, use_CWS, resl_thresh, CWS_params, add_embedding)
-
+                temperature, False, use_CWS, resl_thresh, CWS_params, 
+                add_embedding=add_embedding, swap_semantic=swap_semantic)
             
             print(
                 f'Epoch {e}: 	Train (Top-1) ADE: {train_ADE:.2f} FDE: {train_FDE:.2f} 		Val (Top-k) ADE: {val_ADE:.2f} FDE: {val_FDE:.2f}   lr={lr_scheduler.get_last_lr()[0]}')
@@ -214,7 +216,8 @@ class YNetTrainer:
                 best_state_dict = deepcopy(model.state_dict())
 
             if e % save_every_n == 0 and not fine_tune:
-                self.save_params(f'ckpts/{experiment_name}_epoch_{e}.pt', train_net)
+                pathlib.Path(ckpt_path).mkdir(parents=True, exist_ok=True)
+                self.save_params(f'{ckpt_path}/{experiment_name}_epoch_{e}.pt', train_net)
 
             # early stop in case of clear overfitting
             if best_val_ADE < min(self.val_ADE[-n_early_stop:]):
@@ -225,7 +228,8 @@ class YNetTrainer:
         model.load_state_dict(best_state_dict, strict=True)
 
         # Save the best model
-        pt_path = f'ckpts/{experiment_name}.pt'
+        pathlib.Path(ckpt_path).mkdir(parents=True, exist_ok=True)
+        pt_path = f'{ckpt_path}/{experiment_name}.pt'
         self.save_params(pt_path, train_net)
 
         return self.val_ADE, self.val_FDE
@@ -239,7 +243,7 @@ class YNetTrainer:
         batch_size, n_round, obs_len, pred_len, 
         waypoints, n_goal, n_traj, temperature, rel_threshold, 
         use_TTST, use_CWS, CWS_params, use_raw_data=False, with_style=False, 
-        return_preds=False, return_samples=False, study_semantic=None, **kwargs):
+        return_preds=False, return_samples=False, add_embedding=False, swap_semantic=False, **kwargs):
         """
         Val function
         :param df_test: pd.df, val data
@@ -275,7 +279,8 @@ class YNetTrainer:
                 dataset_name, self.homo_mat, input_template, waypoints, 'test',
                 n_goal, n_traj, obs_len, batch_size, resize_factor, with_style,
                 temperature, use_TTST, use_CWS, rel_threshold, CWS_params,
-                return_preds, return_samples, study_semantic)
+                return_preds=return_preds, return_samples=return_samples, 
+                add_embedding=add_embedding, swap_semantic=swap_semantic)
             list_metrics.append(df_metrics)
             list_trajs.append(trajs_dict)
             print(f'Round {e}: \nTest ADE: {test_ADE} \nTest FDE: {test_FDE}')

@@ -5,6 +5,7 @@ __all__ = ['get_parser']
 
 def get_data_args(parser):
     parser.add_argument("--dataset_path", default='sherwin/dataset_ped_biker/gap', type=str)
+    parser.add_argument('--ckpt_path', default='ckpts')
     parser.add_argument("--val_files", default=["0.25_0.75.pkl", "1.25_1.75.pkl", "2.25_2.75.pkl"], type=str, nargs="+")
     parser.add_argument("--val_ratio", default=0.1, type=float)
     parser.add_argument("--n_leftouts", default=None, type=int, nargs='+', help='The number of data left for testing')
@@ -23,6 +24,7 @@ def get_model_args(parser):
     
     # added net 
     parser.add_argument('--add_embedding', action='store_true')
+    parser.add_argument('--swap_semantic', action='store_true')
     parser.add_argument('--position', default=[], type=int, nargs='+')
     parser.add_argument('--ynet_bias', action='store_true')
     parser.add_argument("--train_net", default="all", type=str, 
@@ -54,7 +56,6 @@ def get_train_args(parser):
 
 def get_eval_args(parser):
     parser.add_argument("--config_filename", default='sdd_raw_eval.yaml', type=str)
-    parser.add_argument("--study_semantic", default=None, type=str)
     return parser
 
 

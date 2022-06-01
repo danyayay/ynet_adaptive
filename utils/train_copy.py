@@ -1,13 +1,13 @@
 import torch
 import torch.nn as nn
-from utils.image_utils import get_patch
+from utils.image_utils import get_patch, swap_pavement_terrain
 
 
 def train_epoch(
     model, train_loader, train_images, optimizer, criterion, loss_scale, device, 
     dataset_name, homo_mat, gt_template, input_template, waypoints, 
     epoch, obs_len, pred_len, batch_size, e_unfreeze, resize_factor, 
-    with_style=False, add_embedding=False):
+    with_style=False, add_embedding=False, swap_semantic=False):
     """
     Run training for one epoch
 
@@ -46,6 +46,10 @@ def train_epoch(
 
             # possibly adapt semantic image 
             semantic_img = model.adapt_semantic(scene_image)
+
+            # swap semantic layers if needed
+            if swap_semantic:
+                semantic_img = swap_pavement_terrain(semantic_img)
 
             # Create Heatmaps for past and ground-truth future trajectories
             _, _, H, W = scene_image.shape  # image shape

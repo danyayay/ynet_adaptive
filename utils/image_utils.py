@@ -160,3 +160,14 @@ def image2world(image_coords, scene, homo_mat, resize):
     traj_image2world = traj_image2world[:, :2]
     traj_image2world = traj_image2world.view_as(image_coords)
     return traj_image2world
+
+
+def swap_pavement_terrain(semantic_img):
+    if len(semantic_img.shape) == 4:
+        # by default (batch_size, channel, height, width)
+        temp = semantic_img[:, 2].clone()
+        semantic_img[:, 2] = semantic_img[:, 1]
+        semantic_img[:, 1] = temp
+        return semantic_img
+    else:
+        raise ValueError(f'semanctic image has shape {semantic_img.shape} but should have 4 dimensions')
