@@ -8,7 +8,7 @@ import pandas as pd
 
 from utils.dataset import set_random_seeds, dataset_split, get_meta_ids_focus
 from utils.parser import get_parser
-from utils.util import get_params, get_image_and_data_path, restore_model, get_ckpts_and_names
+from utils.util_fusion import get_params, get_image_and_data_path, restore_model, get_ckpts_and_names
 from evaluator.visualization import plot_prediction, plot_multiple_predictions, plot_goal_map_with_samples
 
 

@@ -8,13 +8,13 @@ from tqdm import tqdm
 from copy import deepcopy
 from collections import OrderedDict
 
-from models.ynet import YNet
-from utils.train import train_epoch
+from models.ynet_fusion import YNet
+from utils.train_fusion import train_epoch
 from utils.dataset import augment_data, create_images_dict
 from utils.image_utils import create_gaussian_heatmap_template, create_dist_mat, get_patch, \
     preprocess_image_for_segmentation, pad, resize
 from utils.dataloader import SceneDataset, scene_collate
-from utils.evaluate import evaluate
+from utils.evaluate_fusion import evaluate
 
 
 def mark_encoder_bias_trainable(model):

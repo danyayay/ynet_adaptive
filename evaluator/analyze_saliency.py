@@ -5,7 +5,7 @@ import torch.nn.functional as F
 from utils.parser import get_parser
 from utils.dataset import get_meta_ids_focus, set_random_seeds, dataset_split, limit_samples
 from evaluator.visualization import plot_saliency_maps, plot_prediction, plot_given_trajectories_scenes_overlay
-from utils.util import get_image_and_data_path, get_params, restore_model, get_ckpts_and_names
+from utils.util_fusion import get_image_and_data_path, get_params, restore_model, get_ckpts_and_names
 
 
 def main(args):
