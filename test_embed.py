@@ -1,3 +1,4 @@
+from builtins import breakpoint
 import time 
 from utils.parser import get_parser
 from utils.dataset import set_random_seeds, dataset_split
@@ -29,7 +30,6 @@ def main(args):
                 model = restore_model(params, is_file_separated, 
                     ckpt if not is_file_separated else args.pretrained_ckpt, 
                     None if not is_file_separated else ckpt)
-    
     # test
     print('############ Test model ##############')
     set_random_seeds(args.seed)

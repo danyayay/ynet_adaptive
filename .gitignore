@@ -4,6 +4,7 @@ figures/
 ckpts/
 data/
 logs/
+logs_original/
 
 run_try.sh
 pretrained_models

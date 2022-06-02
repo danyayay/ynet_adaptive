@@ -59,7 +59,7 @@ def extract_test_msg(test_msg):
     df.ade = df.ade.astype(float)
     df.fde = df.fde.astype(float)
     df['train_net'] = df['tuned_ckpt'].apply(lambda x: get_train_net(x))
-    df['n_train'] = df['tuned_ckpt'].apply(lambda x: get_n_train(x)).astype(int)
+    df['n_train'] = df['tuned_ckpt'].apply(lambda x: get_n_train(x))#.astype(int)
     df['position'] = df['tuned_ckpt'].apply(lambda x: get_position(x, return_list=False))
     df['lr'] = df['tuned_ckpt'].apply(lambda x: get_lr(x))
     df['is_ynet_bias'] = df['tuned_ckpt'].apply(lambda x: get_bool_bias(x))
