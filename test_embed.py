@@ -2,7 +2,7 @@ from builtins import breakpoint
 import time 
 from utils.parser import get_parser
 from utils.dataset import set_random_seeds, dataset_split
-from utils.util_copy import get_params, get_image_and_data_path, restore_model, get_ckpts_and_names
+from utils.util_embed import get_params, get_image_and_data_path, restore_model, get_ckpts_and_names
 
 
 def main(args):

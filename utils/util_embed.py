@@ -1,7 +1,7 @@
 import os 
 import yaml 
 import numpy as np 
-from models.trainer_copy import YNetTrainer
+from models.trainer_embed import YNetTrainer
 
 
 def get_experiment_name(args, n_train):

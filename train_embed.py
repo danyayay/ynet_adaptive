@@ -2,9 +2,9 @@ import os
 import time
 import pandas as pd
 
-from models.trainer_copy import YNetTrainer
+from models.trainer_embed import YNetTrainer
 from utils.parser import get_parser
-from utils.util_copy import get_experiment_name, get_params, get_image_and_data_path
+from utils.util_embed import get_experiment_name, get_params, get_image_and_data_path
 from utils.dataset import set_random_seeds, limit_samples, dataset_split
 from evaluator.visualization import plot_given_trajectories_scenes_overlay
 
