@@ -155,7 +155,7 @@ def get_conv2d(
     out_channels=None, rank=None, stride=1, padding=None):
     if out_channels is None: out_channels = in_channels
     if padding is None: padding = kernel_size // 2
-    
+    l = str(l)
     if 'lora' in train_net and l in position:
         assert rank != 0 and rank is not None
         return lora.Conv2d(in_channels, out_channels, 

@@ -17,6 +17,9 @@ def get_experiment_name(args, n_train):
     if args.fine_tune: experiment += f'__lr_{np.format_float_positional(args.lr, trim="-")}'
     if args.is_augment_data: experiment += '__AUG'
     if args.ynet_bias: experiment += '__bias'
+    if 'original' not in args.pretrained_ckpt: 
+        base_arch = args.pretrained_ckpt.split('__')[-1].split('.')[0]
+        experiment += f'__{base_arch}' 
     return experiment
 
 
@@ -43,11 +46,12 @@ def get_image_and_data_path(params):
 def get_position(ckpt_path, return_list=True):
     if ckpt_path is not None:
         if 'Pos' in ckpt_path:
-            position = [int(i) for i in ckpt_path.split('__')[6].split('_') if i != 'Pos']
-            if return_list:
-                return position
+            pos = ckpt_path.split('__')[6].replace('Pos_', '')
+            if not return_list:
+                return pos
             else:
-                return '_'.join(map(str, position))
+                pos_list = [i for i in pos.split('_')]
+                return pos_list
         else:
             return None
     else:
@@ -69,9 +73,17 @@ def get_ckpt_name(ckpt_path):
 
 def update_params(ckpt_path, params):
     ckpt_path = ckpt_path.split('/')[-1]
-    train_net = ckpt_path.split('__')[5].split('.')[0]
     updated_params = params.copy()
+    # train net
+    train_net = ckpt_path.split('__')[5].split('.')[0]
     updated_params.update({'train_net': train_net})
+    # base 
+    base_arch = params['pretrained_ckpt'].split('_')[-1].split('.')[0]
+    if base_arch == 'embed':
+        updated_params.update({'add_embedding': True})
+    elif 'fusion' in base_arch:
+        update_params.update({'n_fusion': int(base_arch.split('_')[-1])}) 
+    # position     
     if 'Pos' in ckpt_path:
         position = get_position(ckpt_path)
         updated_params.update({'position': position})

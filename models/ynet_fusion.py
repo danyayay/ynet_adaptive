@@ -1,4 +1,3 @@
-from turtle import forward
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -156,7 +155,7 @@ def get_conv2d(
     out_channels=None, rank=None, stride=1, padding=None):
     if out_channels is None: out_channels = in_channels
     if padding is None: padding = kernel_size // 2
-    
+    l = str(l)
     if 'lora' in train_net and l in position:
         assert rank != 0 and rank is not None
         return lora.Conv2d(in_channels, out_channels, 
@@ -170,55 +169,7 @@ def get_conv2d(
             kernel_size=kernel_size, stride=stride, padding=padding)
 
 
-class YNetEncoder(nn.Module):
-    def __init__(
-        self, in_channels, channels=(64, 128, 256, 512, 512), 
-        train_net=None, position=[]):
-        """
-        Encoder model
-        :param in_channels: int, n_semantic_classes + obs_len
-        :param channels: list, hidden layer channels
-        """
-        super(YNetEncoder, self).__init__()
-
-        self.in_channels = in_channels
-        self.out_channels = channels
-        self.train_net = train_net
-        self.position = position
-        self.stages = nn.ModuleList()
-        if 'lora' in self.train_net: 
-            self.rank = int(self.train_net.split('_')[1]) if len(self.train_net.split('_')) > 1 else 1
-        else:
-            self.rank = None 
-        
-        # First block
-        modules = [
-            get_conv2d(
-                train_net=train_net, l=0, position=position, kernel_size=3, 
-                in_channels=in_channels, out_channels=channels[0], rank=self.rank),
-            nn.ReLU(inplace=False)]
-        self.stages.append(nn.Sequential(*modules))
-
-        # Subsequent blocks, each starts with MaxPool
-        for i in range(len(channels) - 1):
-            modules = [
-                nn.MaxPool2d(kernel_size=2, stride=2, padding=0, dilation=1, ceil_mode=False), 
-                get_conv2d(
-                    train_net=train_net, l=i+1, position=position, 
-                    kernel_size=3, in_channels=channels[i], out_channels=channels[i+1], rank=self.rank), 
-                nn.ReLU(inplace=False), 
-                get_conv2d(
-                    train_net=train_net, l=i+1, position=position, 
-                    kernel_size=3, in_channels=channels[i+1], out_channels=channels[i+1], rank=self.rank), 
-                nn.ReLU(inplace=False)]
-            self.stages.append(nn.Sequential(*modules))
-        
-        # Last MaxPool layer before passing the features into decoder
-        self.stages.append(nn.Sequential(
-            nn.MaxPool2d(kernel_size=2, stride=2, padding=0, dilation=1, ceil_mode=False)))
-
-
-class YNetEncoderTwo(nn.Module):
+class YNetEncoderFusion(nn.Module):
     def __init__(
         self, scene_channel, motion_channel, channels,
         train_net=None, position=[], n_fusion=2):
@@ -236,18 +187,19 @@ class YNetEncoderTwo(nn.Module):
 
         # check channels are even 
         assert not any([i%2 for i in channels]), f'Odd value in channels={channels}'
+        assert n_fusion <= len(channels) - 1, f'The number of fusion exceeds the total number of layer in encoder'
 
         self.scene_stages = nn.ModuleList([
             nn.Sequential(
                 get_conv2d(
-                    train_net=train_net, l=0, position=position, kernel_size=3, 
+                    train_net=train_net, l='scene', position=position, kernel_size=3, 
                     in_channels=scene_channel, out_channels=channels[0]//2, rank=self.rank),
                 nn.ReLU(inplace=False))
         ])
         self.motion_stages = nn.ModuleList([
             nn.Sequential(
                 get_conv2d(
-                    train_net=train_net, l=0, position=position, kernel_size=3, 
+                    train_net=train_net, l='motion', position=position, kernel_size=3, 
                     in_channels=motion_channel, out_channels=channels[0]//2, rank=self.rank),
                 nn.ReLU(inplace=False))
         ])
@@ -259,11 +211,11 @@ class YNetEncoderTwo(nn.Module):
             modules = [
                 nn.MaxPool2d(kernel_size=2, stride=2, padding=0, dilation=1, ceil_mode=False), 
                 get_conv2d(
-                    train_net=train_net, l=i+1, position=position, 
+                    train_net=train_net, l='scene', position=position, 
                     kernel_size=3, in_channels=channels[i]//2, out_channels=channels[i+1]//2, rank=self.rank), 
                 nn.ReLU(inplace=False), 
                 get_conv2d(
-                    train_net=train_net, l=i+1, position=position, 
+                    train_net=train_net, l='scene', position=position, 
                     kernel_size=3, in_channels=channels[i+1]//2, out_channels=channels[i+1]//2, rank=self.rank), 
                 nn.ReLU(inplace=False)]
             self.scene_stages.append(nn.Sequential(*modules))
@@ -273,11 +225,11 @@ class YNetEncoderTwo(nn.Module):
             modules = [
                 nn.MaxPool2d(kernel_size=2, stride=2, padding=0, dilation=1, ceil_mode=False), 
                 get_conv2d(
-                    train_net=train_net, l=i+1, position=position, 
+                    train_net=train_net, l='motion', position=position, 
                     kernel_size=3, in_channels=channels[i]//2, out_channels=channels[i+1]//2, rank=self.rank), 
                 nn.ReLU(inplace=False), 
                 get_conv2d(
-                    train_net=train_net, l=i+1, position=position, 
+                    train_net=train_net, l='motion', position=position, 
                     kernel_size=3, in_channels=channels[i+1]//2, out_channels=channels[i+1]//2, rank=self.rank), 
                 nn.ReLU(inplace=False)]
             self.motion_stages.append(nn.Sequential(*modules))
@@ -287,11 +239,11 @@ class YNetEncoderTwo(nn.Module):
             modules = [
                 nn.MaxPool2d(kernel_size=2, stride=2, padding=0, dilation=1, ceil_mode=False), 
                 get_conv2d(
-                    train_net=train_net, l=i+1, position=position, 
+                    train_net=train_net, l='fusion', position=position, 
                     kernel_size=3, in_channels=channels[i], out_channels=channels[i+1], rank=self.rank), 
                 nn.ReLU(inplace=False), 
                 get_conv2d(
-                    train_net=train_net, l=i+1, position=position, 
+                    train_net=train_net, l='fusion', position=position, 
                     kernel_size=3, in_channels=channels[i+1], out_channels=channels[i+1], rank=self.rank), 
                 nn.ReLU(inplace=False)]
             self.fusion_stages.append(nn.Sequential(*modules))
@@ -326,73 +278,6 @@ class YNetEncoderTwo(nn.Module):
             x = stage(x)
             features.append(x)
         
-        return features 
-
-
-class YNetEncoderL(YNetEncoder):
-    def __init__(
-        self, in_channels, channels=(64, 128, 256, 512, 512), 
-        train_net=None, position=[]):
-        """
-        Encoder model
-        :param in_channels: int, n_semantic_classes + obs_len
-        :param channels: list, hidden layer channels
-        """
-        super(YNetEncoderL, self).__init__(in_channels, channels, train_net, position)
-
-    def forward(self, x):
-        features = []
-        for stage in self.stages:
-            x = stage(x)
-            features.append(x)
-        return features 
-
-
-class YNetEncoderB(YNetEncoder):
-    def __init__(
-        self, in_channels, channels=(64, 128, 256, 512, 512), 
-        train_net=None, position=[]):
-        """
-        Encoder model
-        :param in_channels: int, n_semantic_classes + obs_len
-        :param channels: list, hidden layer channels
-        """
-        super(YNetEncoderB, self).__init__(in_channels, channels, train_net, position)
-
-        # adapter
-        par_channels_in = [in_channels] + channels[:-1]
-        if 'serial' in self.train_net:
-            self.adapters = nn.ModuleList([
-                AdapterBlock(train_net, channels[i]) for i in position])
-        elif 'parallel' in self.train_net:
-            self.adapters = nn.ModuleList([
-                AdapterBlock(train_net, par_channels_in[i], channels[i]) for i in position])
-
-    def forward(self, x):
-        features = []
-        j = 0
-        for i, stage in enumerate(self.stages):
-            if 'serial' in self.train_net:
-                x = stage(x) 
-                if i in self.position:
-                    x = self.adapters[j](x)
-                    j += 1
-            elif 'parallel' in self.train_net:
-                if isinstance(stage[0], nn.MaxPool2d):
-                    y = stage[0](x)
-                    x = stage(x)
-                    if i in self.position:
-                        x = x + self.adapters[j](y)
-                        j += 1
-                else:
-                    y = stage(x)
-                    if i in self.position:
-                        y = y + self.adapters[j](x)
-                        j += 1
-                    x = y
-            else:
-                x = stage(x)
-            features.append(x)
         return features 
 
 
@@ -509,6 +394,7 @@ class YNet(nn.Module):
         
         self.feature_channels = n_semantic_classes + obs_len
 
+        # semantic tuning 
         if 'semantic' in train_net:
             kernel_size = int(train_net.split('_')[-1].split('x')[0])
             self.semantic_adapter = get_conv2d(
@@ -517,7 +403,8 @@ class YNet(nn.Module):
             nn.init.zeros_(self.semantic_adapter.weight)
             nn.init.zeros_(self.semantic_adapter.bias)
         
-        self.encoder = YNetEncoderTwo(
+        # use split+fusion model 
+        self.encoder = YNetEncoderFusion(
             scene_channel=n_semantic_classes, motion_channel=obs_len, channels=encoder_channels,
             train_net=train_net, position=position, n_fusion=n_fusion
         )
