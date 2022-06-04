@@ -1,0 +1,28 @@
+list_seed=(1) 
+n_epoch=100
+batch_size=10
+val_ratio=0.1
+
+dataset_path=filter/agent_type/deathCircle_0/
+pretrained_ckpt=ckpts/Seed_1__Tr_Pedestrian__Val_Pedestrian__ValRatio_0.1__filter_agent_type__train__original.pt
+train_files=Biker.pkl
+val_files=Biker.pkl
+n_leftouts=500
+
+# list_position=("0" "0 1" "0 1 2" "0 1 2 3" "0 1 2 3 4" "1" "1 2" "1 2 3" "1 2 3 4" "2" "2 3" "2 3 4" "3" "3 4" "4")
+
+ckpt_path=ckpts_swap/
+list_n_train_batch=(2 4 8 16)
+list_lr=(0.005)
+train_net='lora_1'
+position="0 1 2 3 4"
+for seed in ${list_seed[@]}; do
+    for n_train_batch in ${list_n_train_batch[@]}; do
+        for lr in ${list_lr[@]}; do
+            python train_embed.py --fine_tune --seed $seed --batch_size $batch_size --n_epoch $n_epoch --dataset_path $dataset_path --train_files $train_files --val_files $val_files --val_ratio $val_ratio --n_leftouts $n_leftouts --train_net $train_net --position $position --pretrained_ckpt $pretrained_ckpt --lr $lr --n_train_batch $n_train_batch --swap_semantic --ckpt_path $ckpt_path
+        done 
+    done 
+done
+
+
+# python train_embed.py --fine_tune --seed 1 --batch_size 8 --n_epoch 3 --dataset_path filter/agent_type/deathCircle_0/ --train_files Biker.pkl --val_files Biker.pkl --val_ratio 0.1 --n_leftouts 500 --train_net adapter --pretrained_ckpt ckpts/Seed_1__Tr_Pedestrian__Val_Pedestrian__ValRatio_0.1__filter_agent_type__train.pt --lr 0.00005 --adapter_type parallel_3x3 --adapter_position 0 --n_train_batch 1

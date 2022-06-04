@@ -21,57 +21,31 @@ declare -A F=( ["dataset_path"]="filter/agent_type/" ["filename"]="Biker.pkl" ["
 # list_adapter_position=("0" "0_1" "0_1_2" "0_1_2_3" "0_1_2_3_4" "1" "1_2" "1_2_3" "1_2_3_4" "2" "2_3" "2_3_4" "3" "3_4" "4")
 
 
-
-dataset_path=filter/agent_type/
-
-# ############ fusion model (n_fusion=3)
-ckpts=ckpts/Seed_1__Tr_Pedestrian__Val_Pedestrian__ValRatio_0.1__filter_agent_type__train__fusion3.pt
-ckpts_name=OODG
-# evaluate on ped
-val_files=Pedestrian.pkl
-n_leftouts=1500
-for seed in ${list_seed[@]}; do
-    python test.py --seed $seed --batch_size $batch_size --dataset_path $dataset_path --val_files $val_files --val_ratio $val_ratio --ckpts $ckpts --ckpts_name $ckpts_name --n_leftouts $n_leftouts --n_fusion 3
-done 
-# evaluate on biker 
+dataset_path=filter/agent_type/deathCircle_0/
 val_files=Biker.pkl
 n_leftouts=500
-for seed in ${list_seed[@]}; do
-    python test.py --seed $seed --batch_size $batch_size --dataset_path $dataset_path --val_files $val_files --val_ratio $val_ratio --ckpts $ckpts --ckpts_name $ckpts_name --n_leftouts $n_leftouts --n_fusion 3
-done 
 
+n_fusion=2
+pretrained_ckpt=ckpts_fusion/Seed_2__Tr_Pedestrian__Val_Pedestrian__ValRatio_0.1__filter_agent_type__train__fusion_${n_fusion}.pt
 
-# ############ fusion model (n_fusion=4)
-ckpts=ckpts/Seed_1__Tr_Pedestrian__Val_Pedestrian__ValRatio_0.1__filter_agent_type__train__fusion4.pt
-ckpts_name=OODG
-# evaluate on ped
-val_files=Pedestrian.pkl
-n_leftouts=1500
-for seed in ${list_seed[@]}; do
-    python test.py --seed $seed --batch_size $batch_size --dataset_path $dataset_path --val_files $val_files --val_ratio $val_ratio --ckpts $ckpts --ckpts_name $ckpts_name --n_leftouts $n_leftouts --n_fusion 4
-done 
-# evaluate on biker 
-val_files=Biker.pkl
-n_leftouts=500
-for seed in ${list_seed[@]}; do
-    python test.py --seed $seed --batch_size $batch_size --dataset_path $dataset_path --val_files $val_files --val_ratio $val_ratio --ckpts $ckpts --ckpts_name $ckpts_name --n_leftouts $n_leftouts --n_fusion 4
-done 
+list_n_train=(40 160)
+list_lr=(0.005)
+list_train_net=(lora_2 lora_4)
+list_position=("scene" "scene_fusion" "motion" "motion_fusion" "scene_motion_fusion")
+list_tuned_ckpt=()
+for n_train in ${list_n_train[@]}; do
+    for lr in ${list_lr[@]}; do
+        for train_net in ${list_train_net[@]}; do 
+            for position in ${list_position[@]}; do
+                list_tuned_ckpt+=("ckpts_fusion/Seed_1__Tr_Biker__Val_Biker__ValRatio_0.1__filter_agent_type_deathCircle_0__${train_net}__Pos_${position}__TrN_${n_train}__lr_${lr}__fusion_${n_fusion}.pt")
+            done 
+        done 
+    done
+done
 
-
-# ############ fusion model (n_fusion=4)
-ckpts=ckpts/Seed_1__Tr_Pedestrian__Val_Pedestrian__ValRatio_0.1__filter_agent_type__train__fusion2.pt
-ckpts_name=OODG
-# evaluate on ped
-val_files=Pedestrian.pkl
-n_leftouts=1500
 for seed in ${list_seed[@]}; do
-    python test.py --seed $seed --batch_size $batch_size --dataset_path $dataset_path --val_files $val_files --val_ratio $val_ratio --ckpts $ckpts --ckpts_name $ckpts_name --n_leftouts $n_leftouts --n_fusion 2
+    for tuned_ckpt in ${list_tuned_ckpt[@]}; do
+        python test_fusion.py --seed $seed --batch_size $batch_size --dataset_path $dataset_path --val_files $val_files --val_ratio $val_ratio --pretrained_ckpt $pretrained_ckpt --tuned_ckpt $tuned_ckpt --n_leftouts $n_leftouts --n_fusion $n_fusion
+    done 
 done 
-# evaluate on biker 
-val_files=Biker.pkl
-n_leftouts=500
-for seed in ${list_seed[@]}; do
-    python test.py --seed $seed --batch_size $batch_size --dataset_path $dataset_path --val_files $val_files --val_ratio $val_ratio --ckpts $ckpts --ckpts_name $ckpts_name --n_leftouts $n_leftouts --n_fusion 2
-done 
-
 

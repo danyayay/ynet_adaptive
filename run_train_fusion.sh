@@ -1,4 +1,4 @@
-list_seed=(1) 
+list_seed=(3) 
 batch_size=10
 n_epoch=150
 
@@ -18,8 +18,8 @@ dataset_path=${E["dataset_path"]}
 train_files=${E["filename"]}
 val_files=${E["filename"]}
 n_leftouts=${E["n_test"]}
-ckpt_path=ckpts_fusion2
+ckpt_path=ckpts_fusion4_seed3
 
 for seed in ${list_seed[@]}; do
-    python train.py --seed $seed --batch_size $batch_size --n_epoch $n_epoch --dataset_path $dataset_path --train_files $train_files --val_files $val_files --val_ratio $val_ratio --n_leftouts $n_leftouts --train_net $train_net --ckpt_path $ckpt_path --n_fusion 2
+    python train_fusion.py --seed $seed --batch_size $batch_size --n_epoch $n_epoch --dataset_path $dataset_path --train_files $train_files --val_files $val_files --val_ratio $val_ratio --n_leftouts $n_leftouts --train_net $train_net --ckpt_path $ckpt_path --n_fusion 4
 done

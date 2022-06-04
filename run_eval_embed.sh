@@ -21,22 +21,21 @@ declare -A F=( ["dataset_path"]="filter/agent_type/" ["filename"]="Biker.pkl" ["
 # list_adapter_position=("0" "0_1" "0_1_2" "0_1_2_3" "0_1_2_3_4" "1" "1_2" "1_2_3" "1_2_3_4" "2" "2_3" "2_3_4" "3" "3_4" "4")
 
 
-dataset_path=filter/agent_type/
-
-# ############ embedding model 
-ckpts=ckpts/Seed_1__Tr_Pedestrian__Val_Pedestrian__ValRatio_0.1__filter_agent_type__train__embed.pt
-ckpts_name=OODG
-# evaluate on ped
-val_files=Pedestrian.pkl
-n_leftouts=1500
-for seed in ${list_seed[@]}; do
-    python test_embed.py --seed $seed --batch_size $batch_size --dataset_path $dataset_path --val_files $val_files --val_ratio $val_ratio --ckpts $ckpts --ckpts_name $ckpts_name --n_leftouts $n_leftouts --add_embedding
-done 
-# evaluate on biker 
+dataset_path=filter/agent_type/deathCircle_0/
+pretrained_ckpt=ckpts/Seed_1__Tr_Pedestrian__Val_Pedestrian__ValRatio_0.1__filter_agent_type__train__original.pt
 val_files=Biker.pkl
 n_leftouts=500
+
+list_n_train=(20 40 80 160)
+list_tuned_ckpt=()
+for n_train in ${list_n_train[@]}; do
+    list_tuned_ckpt+=("ckpts_swap/Seed_1__Tr_Biker__Val_Biker__ValRatio_0.1__filter_agent_type_deathCircle_0__lora_1__Pos_0_1_2_3_4__TrN_${n_train}__lr_0.005.pt")
+done
+
 for seed in ${list_seed[@]}; do
-    python test_embed.py --seed $seed --batch_size $batch_size --dataset_path $dataset_path --val_files $val_files --val_ratio $val_ratio --ckpts $ckpts --ckpts_name $ckpts_name --n_leftouts $n_leftouts --add_embedding
+    for tuned_ckpt in ${list_tuned_ckpt[@]}; do
+        python test_embed.py --seed $seed --batch_size $batch_size --dataset_path $dataset_path --val_files $val_files --val_ratio $val_ratio --pretrained_ckpt $pretrained_ckpt --tuned_ckpt $tuned_ckpt --n_leftouts $n_leftouts --swap_semantic
+    done 
 done 
 
 

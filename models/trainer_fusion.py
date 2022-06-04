@@ -131,6 +131,27 @@ class YNetTrainer:
                 for param_name, param in model.encoder.named_parameters():
                     param_layer = int(param_name.split('.')[1])
                     if param_layer in position: param.requires_grad = True
+            # tuned modified part 
+            elif train_net == 'scene':
+                for param in model.encoder.scene_stages.parameters():
+                    param.requires_grad = True
+            elif train_net == 'motion':
+                for param in model.encoder.motion_stages.parameters():
+                    param.requires_grad = True
+            elif train_net == 'scene_fusion':
+                for param in model.encoder.scene_stages.parameters():
+                    param.requires_grad = True
+                for param in model.encoder.fusion_stages.parameters():
+                    param.requires_grad = True
+            elif train_net == 'motion_fusion':
+                for param in model.encoder.motion_stages.parameters():
+                    param.requires_grad = True
+                for param in model.encoder.fusion_stages.parameters():
+                    param.requires_grad = True
+            elif train_net == 'scene_motion_fusion':
+                for param in model.encoder.parameters():
+                    param.requires_grad = True
+            # tune partial encoder 
             # serial adapter
             elif 'serial' in train_net:
                 for param_name, param in model.encoder.named_parameters():
@@ -329,7 +350,7 @@ class YNetTrainer:
                             noisy_scene_img, traj, input_template, gt_template, criterion, 
                             obs_len, pred_len, waypoints, loss_scale, self.device, False)
                     elif decision == 'map':
-                        pred_goal_map, pred_traj_map, feature_input = self._forward_batch(
+                        pred_goal_map, pred_traj_map = self._forward_batch(
                             noisy_scene_img, traj, input_template, gt_template, criterion, 
                             obs_len, pred_len, waypoints, loss_scale, self.device, 
                             set_input, True)
@@ -342,7 +363,7 @@ class YNetTrainer:
                             noisy_scene_img, traj, input_template, gt_template, criterion, 
                             obs_len, pred_len, waypoints, loss_scale, self.device, False)
                     elif decision == 'map':
-                        pred_goal_map, pred_traj_map, semantic_input_cat, feature_input = self._forward_batch(
+                        pred_goal_map, pred_traj_map, semantic_input_cat = self._forward_batch(
                             scene_raw_img, traj, input_template, gt_template, criterion, 
                             obs_len, pred_len, waypoints, loss_scale, self.device, 
                             set_input, noisy_std_frac, True)
@@ -358,7 +379,7 @@ class YNetTrainer:
                             scene_raw_img, traj, input_template, gt_template, criterion, 
                             obs_len, pred_len, waypoints, loss_scale, self.device, False)
                     elif decision == 'map':
-                        pred_goal_map, pred_traj_map, feature_input = self._forward_batch(
+                        pred_goal_map, pred_traj_map = self._forward_batch(
                             scene_raw_img, traj, input_template, gt_template, criterion, 
                             obs_len, pred_len, waypoints, loss_scale, self.device, 
                             set_input, noisy_std_frac, True)
@@ -377,9 +398,9 @@ class YNetTrainer:
                 return goal_loss, traj_loss, scene_raw_img 
         elif decision == 'map':
             if noisy_std_frac is not None:
-                return pred_goal_map, pred_traj_map, scene_raw_img, noisy_scene_img, semantic_input_cat, feature_input
+                return pred_goal_map, pred_traj_map, scene_raw_img, noisy_scene_img, semantic_input_cat
             else:
-                return pred_goal_map, pred_traj_map, scene_raw_img, feature_input
+                return pred_goal_map, pred_traj_map, scene_raw_img
 
     def _forward_batch(
         self, scene_raw_img, traj, input_template, gt_template, criterion, 
@@ -427,14 +448,13 @@ class YNetTrainer:
         
         # feature input 
         if noisy_semantic and noisy_traj:
-            feature_input = torch.cat([noisy_semantic_image, noisy_observed_map], dim=1)
+            features = model.pred_features(noisy_semantic_image, noisy_semantic_image)
         elif noisy_semantic and not noisy_traj:
-            feature_input = torch.cat([noisy_semantic_image, observed_map], dim=1)
+            features = model.pred_features(noisy_semantic_image, observed_map)
         elif not noisy_semantic and noisy_traj:
-            feature_input = torch.cat([semantic_image, noisy_observed_map], dim=1)
+            features = model.pred_features(semantic_image, noisy_observed_map)
         else:
-            feature_input = torch.cat([semantic_image, observed_map], dim=1) 
-        features = model.pred_features(feature_input)
+            features = model.pred_features(semantic_image, observed_map)
         pred_goal_map = model.pred_goal(features)
 
         # goal loss 
@@ -454,9 +474,9 @@ class YNetTrainer:
         
         if return_pred_map:
             if noisy_semantic or noisy_traj:
-                return pred_goal_map, pred_traj_map, torch.cat([semantic_image, observed_map], dim=1), feature_input
+                return pred_goal_map, pred_traj_map, torch.cat([semantic_image, observed_map], dim=1)
             else:
-                return pred_goal_map, pred_traj_map, feature_input
+                return pred_goal_map, pred_traj_map
         return goal_loss, traj_loss
 
     def prepare_data(

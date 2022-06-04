@@ -17,9 +17,10 @@ def get_experiment_name(args, n_train):
     if args.fine_tune: experiment += f'__lr_{np.format_float_positional(args.lr, trim="-")}'
     if args.is_augment_data: experiment += '__AUG'
     if args.ynet_bias: experiment += '__bias'
-    if 'original' not in args.pretrained_ckpt: 
-        base_arch = args.pretrained_ckpt.split('__')[-1].split('.')[0]
-        experiment += f'__{base_arch}' 
+    if args.pretrained_ckpt is not None:
+        if 'original' not in args.pretrained_ckpt: 
+            base_arch = args.pretrained_ckpt.split('__')[-1].split('.')[0]
+            experiment += f'__{base_arch}' 
     return experiment
 
 

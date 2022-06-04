@@ -49,7 +49,7 @@ def get_train_args(parser):
     parser.add_argument("--is_augment_data", action='store_true')
     # learning rate 
     parser.add_argument("--lr", default=0.0001, type=float)
-    parser.add_argument("--steps", default=[20], type=int, nargs='+')
+    parser.add_argument("--steps", default=[], type=int, nargs='+')
     parser.add_argument("--lr_decay_ratio", default=0.1)
     parser.add_argument("--config_filename", default='sdd_raw_train.yaml', type=str)
     return parser

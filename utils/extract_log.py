@@ -15,7 +15,8 @@ def extract_train_msg(test_msg):
         experiment = re.search("Experiment (.*?) has started", msg)
         n_param = re.search("The number of trainable parameters: ([\d]+)", msg)
         n_epoch = re.search("Early stop at epoch ([\d]+)", msg)
-        metric = re.search("Round 0: \nTest ADE: ([\d\.]+) \nTest FDE: ([\d\.]+)", msg)
+        # metric = re.search("Round 0: \nTest ADE: ([\d\.]+) \nTest FDE: ([\d\.]+)", msg)
+        metric = re.search('Average performance \(by [\d]+\): \nTest ADE: ([\d\.]+) \nTest FDE: ([\d\.]+)', msg)
         df = pd.concat([df, pd.DataFrame({
             'seed': seed.group(1) if seed is not None else None,
             'pretrained_ckpt': pretrained_ckpt.group(1).split('/')[-1] if pretrained_ckpt is not None else None,
@@ -45,7 +46,8 @@ def extract_test_msg(test_msg):
     msg_split = re.split('save_every_n', test_msg)[1:]
     df = pd.DataFrame(columns=['seed', 'pretrained_ckpt', 'tuned_ckpt', 'ade', 'fde'])
     for msg in msg_split: 
-        metric = re.search("Round 0: \nTest ADE: ([\d\.]+) \nTest FDE: ([\d\.]+)", msg)
+        # metric = re.search("Round 0: \nTest ADE: ([\d\.]+) \nTest FDE: ([\d\.]+)", msg)
+        metric = re.search('Average performance \(by [\d]+\): \nTest ADE: ([\d\.]+) \nTest FDE: ([\d\.]+)', msg)
         seed = re.search("'seed': ([\d+]),", msg)
         pretrained_ckpt = re.search("'pretrained_ckpt': '(.*?)',", msg)
         tuned_ckpt = re.search("'tuned_ckpt': '(.*?)',", msg)
@@ -78,7 +80,8 @@ def extract_imp_msg(imp_msg):
         pretrained_ckpt = re.search("'pretrained_ckpt': '(.*?)',", msg)
         tuned_ckpt = re.search("'tuned_ckpts': \['(.*?)'\],", msg)
         layers = re.findall("Replacing (.*?)\n", msg)
-        metrics = re.findall("Round 0: \nTest ADE: ([\d\.]+) \nTest FDE: ([\d\.]+)", msg)
+        # metrics = re.findall("Round 0: \nTest ADE: ([\d\.]+) \nTest FDE: ([\d\.]+)", msg)
+        metrics = re.findall('Average performance \(by [\d]+\): \nTest ADE: ([\d\.]+) \nTest FDE: ([\d\.]+)', msg)
         # temp
         df_temp = pd.DataFrame()
         df_temp['layer'] = layers 
