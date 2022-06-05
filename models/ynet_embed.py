@@ -156,6 +156,7 @@ def get_conv2d(
     if out_channels is None: out_channels = in_channels
     if padding is None: padding = kernel_size // 2
     l = str(l)
+    position = [str(i) for i in position]
     if 'lora' in train_net and l in position:
         assert rank != 0 and rank is not None
         return lora.Conv2d(in_channels, out_channels, 
@@ -261,16 +262,17 @@ class YNetEncoderB(YNetEncoder):
         :param in_channels: int, n_semantic_classes + obs_len
         :param channels: list, hidden layer channels
         """
-        super(YNetEncoderB, self).__init__(in_channels, channels, train_net, position)
+        self.position = [int(i) for i in position]
+        super(YNetEncoderB, self).__init__(in_channels, channels, train_net, self.position)
 
         # adapter
         par_channels_in = [in_channels] + channels[:-1]
         if 'serial' in self.train_net:
             self.adapters = nn.ModuleList([
-                AdapterBlock(train_net, channels[i]) for i in position])
+                AdapterBlock(train_net, channels[i]) for i in self.position])
         elif 'parallel' in self.train_net:
             self.adapters = nn.ModuleList([
-                AdapterBlock(train_net, par_channels_in[i], channels[i]) for i in position])
+                AdapterBlock(train_net, par_channels_in[i], channels[i]) for i in self.position])
 
     def forward(self, x):
         features = []

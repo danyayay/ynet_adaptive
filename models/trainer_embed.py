@@ -126,7 +126,7 @@ class YNetTrainer:
             # tune partial encoder 
             elif train_net == 'encoder' and len(position) > 0:
                 for param_name, param in model.encoder.named_parameters():
-                    param_layer = int(param_name.split('.')[1])
+                    param_layer = param_name.split('.')[1]
                     if param_layer in position: param.requires_grad = True
             # serial adapter
             elif 'serial' in train_net:
