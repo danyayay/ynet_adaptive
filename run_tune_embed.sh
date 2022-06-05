@@ -1,4 +1,4 @@
-list_seed=(1) 
+list_train_seed=(2 3) 
 n_epoch=100
 batch_size=10
 val_ratio=0.1
@@ -11,15 +11,15 @@ n_leftouts=500
 
 # list_position=("0" "0 1" "0 1 2" "0 1 2 3" "0 1 2 3 4" "1" "1 2" "1 2 3" "1 2 3 4" "2" "2 3" "2 3 4" "3" "3 4" "4")
 
-ckpt_path=ckpts_swap/
+ckpt_path=ckpts/
 list_n_train_batch=(2 4 8 16)
 list_lr=(0.005)
 train_net='lora_1'
 position="0 1 2 3 4"
-for seed in ${list_seed[@]}; do
+for seed in ${list_train_seed[@]}; do
     for n_train_batch in ${list_n_train_batch[@]}; do
         for lr in ${list_lr[@]}; do
-            python train_embed.py --fine_tune --seed $seed --batch_size $batch_size --n_epoch $n_epoch --dataset_path $dataset_path --train_files $train_files --val_files $val_files --val_ratio $val_ratio --n_leftouts $n_leftouts --train_net $train_net --position $position --pretrained_ckpt $pretrained_ckpt --lr $lr --n_train_batch $n_train_batch --swap_semantic --ckpt_path $ckpt_path
+            python train_embed.py --fine_tune --seed $seed --batch_size $batch_size --n_epoch $n_epoch --dataset_path $dataset_path --train_files $train_files --val_files $val_files --val_ratio $val_ratio --n_leftouts $n_leftouts --train_net $train_net --position $position --pretrained_ckpt $pretrained_ckpt --lr $lr --n_train_batch $n_train_batch --ckpt_path $ckpt_path
         done 
     done 
 done
