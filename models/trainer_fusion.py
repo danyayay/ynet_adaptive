@@ -148,6 +148,14 @@ class YNetTrainer:
                     param.requires_grad = True
                 for param in model.encoder.fusion_stages.parameters():
                     param.requires_grad = True
+            elif train_net == 'scene_motion':
+                for param in model.encoder.scene_stages.parameters():
+                    param.requires_grad = True
+                for param in model.encoder.motion_stages.parameters():
+                    param.requires_grad = True
+            elif train_net == 'fusion':
+                for param in model.encoder.fusion_stages.parameters():
+                    param.requires_grad = True
             elif train_net == 'scene_motion_fusion':
                 for param in model.encoder.parameters():
                     param.requires_grad = True

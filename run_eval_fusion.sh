@@ -26,18 +26,18 @@ val_files=Biker.pkl
 n_leftouts=500
 
 n_fusion=2
-pretrained_ckpt=ckpts_fusion/Seed_2__Tr_Pedestrian__Val_Pedestrian__ValRatio_0.1__filter_agent_type__train__fusion_${n_fusion}.pt
+pretrained_ckpt=ckpts_fusion/Seed_1__Tr_Pedestrian__Val_Pedestrian__ValRatio_0.1__filter_agent_type__train__fusion_${n_fusion}.pt
 
-list_n_train=(40 160)
+list_n_train=(20 40 80 160)
 list_lr=(0.005)
-list_train_net=(lora_2 lora_4)
+list_train_net=(lora_1)
 list_position=("scene" "scene_fusion" "motion" "motion_fusion" "scene_motion_fusion")
 list_tuned_ckpt=()
 for n_train in ${list_n_train[@]}; do
     for lr in ${list_lr[@]}; do
         for train_net in ${list_train_net[@]}; do 
             for position in ${list_position[@]}; do
-                list_tuned_ckpt+=("ckpts_fusion/Seed_1__Tr_Biker__Val_Biker__ValRatio_0.1__filter_agent_type_deathCircle_0__${train_net}__Pos_${position}__TrN_${n_train}__lr_${lr}__fusion_${n_fusion}.pt")
+                list_tuned_ckpt+=("ckpts_fusion/lora/position_seed1_fusion2/Seed_1__Tr_Biker__Val_Biker__ValRatio_0.1__filter_agent_type_deathCircle_0__${train_net}__Pos_${position}__TrN_${n_train}__lr_${lr}__fusion_${n_fusion}.pt")
             done 
         done 
     done
