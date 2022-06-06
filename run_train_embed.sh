@@ -2,7 +2,7 @@ list_seed=(1)
 batch_size=10
 n_epoch=300
 
-val_ratio=0.1
+val_split=0.1
 train_net=train 
 
 declare -A A=( ["dataset_path"]="filter/avg_vel/Pedestrian/" ["filename"]="0.1_0.3.pkl" ["n_test"]=100)
@@ -21,5 +21,5 @@ n_leftouts=${E["n_test"]}
 ckpt_path=ckpts_embed
 
 for seed in ${list_seed[@]}; do
-    python train_embed.py --seed $seed --batch_size $batch_size --n_epoch $n_epoch --dataset_path $dataset_path --train_files $train_files --val_files $val_files --val_ratio $val_ratio --n_leftouts $n_leftouts --train_net $train_net --add_embedding --ckpt_path $ckpt_path
+    python train_embed.py --seed $seed --batch_size $batch_size --n_epoch $n_epoch --dataset_path $dataset_path --train_files $train_files --val_files $val_files --val_split $val_split --n_leftouts $n_leftouts --train_net $train_net --add_embedding --ckpt_path $ckpt_path
 done
