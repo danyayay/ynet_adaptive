@@ -780,11 +780,11 @@ def filter_long_tail_df(df_varfs, varf_list, n=3):
 
 
 def dataset_split(
-    data_path, train_files, val_ratio=0.1, n_leftouts=None, 
+    data_path, train_files, val_split=0.1, n_leftouts=None, 
     by_order=True, share_val_test=False, given_scenes=None):
     if n_leftouts:
         df_train, df_val, df_test = dataset_split_given_ratio_and_leftout(
-            data_path, train_files, val_ratio, n_leftouts, 
+            data_path, train_files, val_split, n_leftouts, 
             by_order, share_val_test)
     elif given_scenes:
         df_test = dataset_split_given_scenes(
@@ -797,16 +797,16 @@ def dataset_split(
 
 
 def dataset_split_given_ratio_and_leftout(
-    data_path, train_files, val_ratio, n_leftouts=None, by_order=True, share_val_test=False):
-    print(f"Split {train_files} given val_ratio={val_ratio}, n_leftout={n_leftouts}")
+    data_path, train_files, val_split, n_leftouts=None, by_order=True, share_val_test=False):
+    print(f"Split {train_files} given val_split={val_split}, n_leftout={n_leftouts}")
     df_train, df_val, df_test = pd.DataFrame([]), pd.DataFrame([]), pd.DataFrame([])
     for train_file, n_leftout in zip(train_files, n_leftouts):
         df_train_ = pd.read_pickle(os.path.join(data_path, train_file))
         if by_order:
             df_train_, df_val_, df_test_ = split_df_by_order(
-                df_train_, val_ratio, n_leftout, share_val_test)
+                df_train_, val_split, n_leftout, share_val_test)
         else:
-            df_train_, df_val_, df_test_ = split_df(df_train_, val_ratio, n_leftout)
+            df_train_, df_val_, df_test_ = split_df(df_train_, val_split, n_leftout)
         df_train = pd.concat([df_train, df_train_])
         df_val = pd.concat([df_val, df_val_])
         if df_test_ is not None:
@@ -815,6 +815,7 @@ def dataset_split_given_ratio_and_leftout(
 
 
 def split_df(df, val_ratio, n_test=None, shuffle=False):
+    # TODO: change val_ratio to val_split
     # idx
     unique_meta_ids = np.unique(df["metaId"])
     if shuffle:
@@ -835,14 +836,14 @@ def split_df(df, val_ratio, n_test=None, shuffle=False):
     return df_train, df_val, df_test
 
 
-def split_df_by_order(df, val_ratio, n_test=None, share_val_test=False, shuffle=False):
+def split_df_by_order(df, val_split, n_test=None, share_val_test=False, shuffle=False):
     # idx
     unique_meta_ids = np.unique(df["metaId"])
     if shuffle:
         print('Shuffling raw data')
         np.random.shuffle(unique_meta_ids)
     n_metaId = unique_meta_ids.shape[0]
-    n_val = int(val_ratio * n_metaId)
+    n_val = int(val_split) if val_split > 1 else int(val_split * n_metaId)
     # split
     if n_test:
         if share_val_test:

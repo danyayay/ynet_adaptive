@@ -21,7 +21,7 @@ def main(args):
     if args.train_files == args.val_files:
         # train_files and val_files are fully overlapped 
         df_train, df_val, df_test = dataset_split(
-            DATA_PATH, args.train_files, args.val_ratio, args.n_leftouts, 
+            DATA_PATH, args.train_files, args.val_split, args.n_leftouts, 
             share_val_test=params['share_val_test'])
     else:
         # train_files and val_files are not fully overlapped
@@ -84,4 +84,4 @@ if __name__ == '__main__':
 
     main(args)
 
-# python -m pdb train_fusion.py --fine_tune --seed 1 --n_epoch 3 --batch_size 8 --dataset_path filter/agent_type/deathCircle_0/ --train_files Biker.pkl --val_files Biker.pkl --val_ratio 0.1 --n_leftouts 10 --pretrained_ckpt ckpts/Seed_1__Tr_Pedestrian__Val_Pedestrian__ValRatio_0.1__filter_agent_type__train__fusion_2.pt --lr 0.00005 --n_train_batch 1 --position scene
+# python -m pdb train_fusion.py --fine_tune --seed 1 --n_epoch 3 --batch_size 8 --dataset_path filter/agent_type/ --train_files Biker.pkl --val_files Biker.pkl --val_split 0.1 --n_leftouts 1500 --train_net train --lr 0.00005 --n_fusion 1

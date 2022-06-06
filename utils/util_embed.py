@@ -9,7 +9,7 @@ def get_experiment_name(args, n_train):
     experiment += f"Seed_{args.seed}_"
     experiment += f"_Tr{'_'.join(['_'+f.split('.pkl')[0] for f in args.train_files])}_"
     experiment += f"_Val{'_'.join(['_'+f.split('.pkl')[0] for f in args.val_files])}_"
-    experiment += f"_ValRatio_{args.val_ratio}_"
+    experiment += f"_ValRatio_{args.val_split}_"
     experiment += f"_{(args.dataset_path).replace('/', '_')}"
     experiment += f"_{args.train_net}"
     if args.position != []: experiment += f'__Pos_{"_".join(map(str, args.position))}' 
