@@ -30,8 +30,20 @@ for seed in ${list_train_seed[@]}; do
     done 
 done
 
+#### finetuning (encoder) with different position
+list_train_net=("scene" "motion" "scene_motion" "fusion" "scene_motion_fusion")  
+for seed in ${list_train_seed[@]}; do
+    for n_train_batch in ${list_n_train_batch[@]}; do
+        for lr in ${list_lr[@]}; do
+            for train_net in ${list_train_net[@]}; do
+                python train_fusion.py --fine_tune --seed $seed --batch_size $batch_size --n_epoch $n_epoch --dataset_path $dataset_path --train_files $train_files --val_files $val_files --val_split $val_split --n_leftouts $n_leftouts --train_net $train_net --pretrained_ckpt $pretrained_ckpt --lr $lr --n_train_batch $n_train_batch --ckpt_path $ckpt_path --n_fusion $n_fusion --steps 20
+            done 
+        done 
+    done 
+done
 
-##### finetune lora 
+
+##### finetune lora with different position
 list_train_net=(lora_1)
 list_position=("scene" "motion" "scene motion" "fusion" "scene motion fusion")  
 for seed in ${list_train_seed[@]}; do
