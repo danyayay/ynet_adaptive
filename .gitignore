@@ -2,8 +2,12 @@
 *.out
 figures/
 ckpts/
+ckpts_fusion/
 data/
 logs/
+logs_plot/
+logs_fusion/
+logs_fusion_share/
 logs_original/
 
 run_try.sh
