@@ -129,7 +129,7 @@ class YNetTrainer:
             # tune partial encoder 
             elif train_net == 'encoder' and len(position) > 0:
                 for param_name, param in model.encoder.named_parameters():
-                    param_layer = int(param_name.split('.')[1])
+                    param_layer = param_name.split('.')[1]
                     if param_layer in position: param.requires_grad = True
             # tuned modified part 
             elif train_net == 'scene':
@@ -246,9 +246,9 @@ class YNetTrainer:
                 best_val_ADE = val_ADE
                 best_state_dict = deepcopy(model.state_dict())
 
-            if e % save_every_n == 0 and not fine_tune:
+            if e % save_every_n == 0:
                 pathlib.Path(ckpt_path).mkdir(parents=True, exist_ok=True)
-                self.save_params(f'{ckpt_path}/{experiment_name}_epoch_{e}.pt', train_net)
+                self.save_params(f'{ckpt_path}/{experiment_name}__epoch_{e}.pt', train_net)
 
             # early stop in case of clear overfitting
             if best_val_ADE < min(self.val_ADE[-n_early_stop:]):
