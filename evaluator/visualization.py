@@ -920,7 +920,7 @@ def plot_given_trajectories_scenes_overlay(image_path, df, out_dir='figures/scen
         height, width = scene_images[scene_id].shape[0], scene_images[scene_id].shape[1]
         fig = plt.figure(figsize=(height/50, width/50))
         plt.imshow(scene_images[scene_id])
-        ms = 2
+        ms = 4
         
         colors = {'Pedestrian': 'b', 'Biker': 'r'}
         for agent in ['Pedestrian', 'Biker']:

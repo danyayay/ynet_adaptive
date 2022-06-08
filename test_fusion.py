@@ -2,6 +2,7 @@ import time
 from utils.parser import get_parser
 from utils.dataset import set_random_seeds, dataset_split
 from utils.util_fusion import get_params, get_image_and_data_path, restore_model, get_ckpts_and_names
+from evaluator.visualization import plot_given_trajectories_scenes_overlay
 
 
 def main(args):
@@ -14,6 +15,11 @@ def main(args):
     # prepare data 
     _, _, df_test = dataset_split(DATA_PATH, args.val_files, 0, args.n_leftouts)
     print(f"df_test: {df_test.shape}; #={df_test.shape[0]/(params['obs_len']+params['pred_len'])}")
+
+    if args.pretrained_ckpt is not None:
+        plot_given_trajectories_scenes_overlay(IMAGE_PATH, df_test, f'figures/traj_check/{args.tuned_ckpt}/test')
+    else:
+        plot_given_trajectories_scenes_overlay(IMAGE_PATH, df_test, f'figures/traj_check/{args.ckpts}/test')
 
     # ckpts
     ckpts, ckpts_name, is_file_separated = get_ckpts_and_names(

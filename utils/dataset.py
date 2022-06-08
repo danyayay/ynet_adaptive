@@ -913,6 +913,7 @@ def limit_samples(df, num, batch_size, random_ids=True):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--raw_data_dir", default='data/sdd/raw', type=str)
+    parser.add_argument("--raw_data_name", default='data.pkl', type=Str)
     parser.add_argument("--filter_data_dir", default='data/sdd/filter', type=str)
     parser.add_argument("--reload", action='store_true')
     parser.add_argument("--statistic_only", action="store_true", 
@@ -928,7 +929,7 @@ if __name__ == "__main__":
                             "'avg_acc', 'max_acc', 'abs+max_acc', 'abs+avg_acc', "+\
                             "'min_dist', 'avg_den50', 'avg_den100', 'agent_type'")
     parser.add_argument("--varf_ranges", help='range of varation factor to take',
-                        default=[(0.1, 0.3), (0.7, 1.3)])
+                        default=[(0.25, 0.7), (1, 3)])
                         # default=[(0.1, 0.3), (0.5, 1.5)])  # small gap 
                         # default=[(0.1, 0.2), (0.6, 1.4)])  # big gap 
                         # default=[(0, 1.3), (1.7, 4.3)])  # small gap, two groups
@@ -963,7 +964,7 @@ if __name__ == "__main__":
         print(f'Saved data to {out_path}')
     else:  # reload = True
         # ## or load from stored pickle
-        df = pd.read_pickle(os.path.join(args.raw_data_dir, "data_.pkl"))
+        df = pd.read_pickle(os.path.join(args.raw_data_dir, args.raw_data_name))
         print('Reloaded raw dataset')
 
 
@@ -979,12 +980,12 @@ if __name__ == "__main__":
             df_varfs = df_varfs.merge(
                 df_varfs_com.drop(['label', 'sceneId', 'scene'], axis=1), 
                 on='metaId', suffixes=('', '_com'))
-            out_path = os.path.join(args.raw_data_dir, f"df_varfs.pkl")
+            out_path = os.path.join('data/sdd/raw', "df_varfs.pkl")
             df_varfs.to_pickle(out_path)
             print(f'Saved df_varfs to {out_path}')
         else:
             # ## or load from stored one
-            df_varfs = pd.read_pickle(os.path.join(args.raw_data_dir, "df_varfs.pkl"))
+            df_varfs = pd.read_pickle(os.path.join(args.raw_data_dir, "raw/df_varfs.pkl"))
             print('Loaded df_varfs')
 
         for varf in varf_list:

@@ -3,7 +3,10 @@
 figures/
 ckpts/
 ckpts_fusion/
+ckpts_fusion_share/
+
 data/
+
 logs/
 logs_plot/
 logs_fusion/
