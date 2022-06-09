@@ -863,6 +863,21 @@ def dataset_split_given_scenes(data_path, files, scenes):
     return df_selected
 
 
+def load_train_val_test(data_path, n_sample=None, shuffle=False):
+    df_train = pd.read_pickle(f'{data_path}/train.pkl')
+    df_val = pd.read_pickle(f'{data_path}/val.pkl')
+    df_test = pd.read_pickle(f'{data_path}/test.pkl')
+    if n_sample is not None: 
+        unique_train_ids = df_train.metaId.unique()
+        n_train = unique_train_ids.shape[0]
+        assert n_sample < n_train, \
+            f'Training set size ({n_train}) < Sample size ({n_sample})'
+        if shuffle:
+            np.random.shuffle(unique_train_ids)
+        df_train = reduce_df_meta_ids(df_train, unique_train_ids[:n_sample])
+    return df_train, df_val, df_test 
+
+
 def get_meta_ids_focus(df=None, given_meta_ids=None, given_csv=None, random_n=None):
     if given_meta_ids is not None:
         if isinstance(given_meta_ids, int):
@@ -917,8 +932,16 @@ def limit_samples(df, num, batch_size, random_ids=True):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
+    parser.add_argument("--image_dir", default='data/sdd/raw', type=str)
+    parser.add_argument("--varf_file_dir", default=None, type=str)
+
+
+
+    # if args.varf_file_dir is None:
+    #     args.varf_file_dir = args.image_dir
+
     parser.add_argument("--raw_data_dir", default='data/sdd/raw', type=str)
-    parser.add_argument("--raw_data_name", default='data.pkl', type=Str)
+    parser.add_argument("--raw_data_name", default='data.pkl', type=str)
     parser.add_argument("--filter_data_dir", default='data/sdd/filter', type=str)
     parser.add_argument("--reload", action='store_true')
     parser.add_argument("--statistic_only", action="store_true", 

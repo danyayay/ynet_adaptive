@@ -4,23 +4,25 @@ import numpy as np
 from models.trainer_fusion import YNetTrainer
 
 
-def get_experiment_name(args, n_train):
+def get_experiment_name(args, n_data):
     experiment = ""
-    experiment += f"Seed_{args.seed}_"
-    experiment += f"_Tr{'_'.join(['_'+f.split('.pkl')[0] for f in args.train_files])}_"
-    experiment += f"_Val{'_'.join(['_'+f.split('.pkl')[0] for f in args.val_files])}_"
-    experiment += f"_ValRatio_{int(args.val_split)}_" if args.val_split > 1 else f"_ValRatio_{args.val_split}_"
-    experiment += f"_{(args.dataset_path).replace('/', '_')}"
-    experiment += f"_{args.train_net}"
+    experiment += f"Seed_{args.seed}"
+    experiment += f"__{(args.dataset_path).replace('/', '_')}"
+    experiment += f"__{args.train_net}"
+
     if args.position != []: experiment += f'__Pos_{"_".join(map(str, args.position))}' 
-    experiment += f'__TrN_{str(int(n_train/20))}'
-    if args.fine_tune: experiment += f'__lr_{np.format_float_positional(args.lr, trim="-")}'
-    if args.is_augment_data: experiment += '__AUG'
-    if args.ynet_bias: experiment += '__bias'
+    if args.fine_tune: 
+        experiment += f'__TrN_{n_data}'
+        experiment += f'__lr_{np.format_float_positional(args.lr, trim="-")}'
+        if args.is_augment_data: experiment += '__AUG'
+        if args.ynet_bias: experiment += '__bias'
+
     if args.pretrained_ckpt is not None:
         if 'original' not in args.pretrained_ckpt: 
             base_arch = args.pretrained_ckpt.split('__')[-1].split('.')[0]
             experiment += f'__{base_arch}' 
+    else:
+        experiment += f'__fusion_{args.n_fusion}'
     return experiment
 
 
