@@ -18,7 +18,6 @@ def moving_average(x, window, mode='same'):
         data[n-i-1] = np.mean(x[(n-i-adjust-1):])
     return data 
 
-
 def extract_training_score(text):
     df = pd.DataFrame()
     for row in re.findall('Epoch ([\d]+): 	Train \(Top-1\) ADE: ([\d\.]+) FDE: ([\d\.]+) 		Val \(Top-k\) ADE: ([\d\.]+) FDE: ([\d\.]+)', text):
@@ -32,9 +31,12 @@ def extract_training_score(text):
     return df
 
 
-def extract_curve(train_msgs, test_msgs=None, window=9, out_path='figures/training_curve/curve.png'):
+def extract_curve(
+    train_msgs, test_msgs=None, val_window=9, test_window=9, show_raw_val=False, show_raw_test=False,
+    out_path='figures/training_curve/curve.png'):
     if test_msgs is not None:
-        extract_test_score(test_msgs)
+        df_test = extract_test_score(test_msgs)
+
     train_msgs_list = re.split('save_every_n', train_msgs)[1:]
     df = pd.DataFrame(columns=['seed', 'pretrained_ckpt', 'experiment', 'n_param', 'n_epoch', 'ade', 'fde'])
     fig, axes = plt.subplots(1, 2, figsize=(13, 4))
@@ -42,35 +44,74 @@ def extract_curve(train_msgs, test_msgs=None, window=9, out_path='figures/traini
         df_curve = extract_training_score(msg)
 
         experiment = re.search("Experiment (.*?) has started", msg).group(1)
-        train_seed = re.search("'seed': ([\d+]),", msg).group(1)
+        train_seed = int(re.search("'seed': ([\d+]),", msg).group(1))
         n_epoch = re.search("Early stop at epoch ([\d]+)", msg)
-        n_epoch = n_epoch.group(1) if n_epoch is not None else 99
+        n_epoch = int(n_epoch.group(1)) - 30 if n_epoch is not None else df_curve.val_ade.argmin()
         metric = re.search('Average performance \(by [\d]+\): \nTest ADE: ([\d\.]+) \nTest FDE: ([\d\.]+)', msg)
         ade = round(float(metric.group(1)), 2)
         fde = round(float(metric.group(2)), 2)
         train_net = get_train_net(experiment)
-        n_train = get_n_train(experiment)
+        n_train = int(get_n_train(experiment))
         position = get_position(experiment, return_list=False)
+        
+        if test_msgs is not None:
+            df_test_seed = df_test[df_test.train_seed == train_seed]
         
         if position is not None:    
             label_name = f'TrS{train_seed}_{train_net}[{position}]({n_train})_{ade}/{fde}'
         
-        if window is not None:
-            val_ade = moving_average(df_curve.val_ade, window)
-            val_fde = moving_average(df_curve.val_fde, window)
-        else:
-            val_ade = df_curve.val_ade
-            val_fde = df_curve.val_fde
+        val_ade = df_curve.val_ade
+        val_fde = df_curve.val_fde
+        if test_msgs is not None:
+            test_ade = df_test_seed.ade 
+            test_fde = df_test_seed.fde 
+            test_ready = True if test_ade.shape[0] != 0 else False 
+        if val_window is not None:
+            val_ade = moving_average(df_curve.val_ade, val_window)
+            val_fde = moving_average(df_curve.val_fde, val_window)
+            if test_msgs is not None and test_ready:
+                test_ade = moving_average(test_ade, test_window)
+                test_fde = moving_average(test_fde, test_window)            
 
         start = 5
         # ade 
-        p = axes[0].plot(df_curve.epoch[start:], df_curve.val_ade[start:], linewidth=0.5, alpha=0.5)
-        axes[0].scatter(df_curve.epoch[start:], df_curve.val_ade[start:], c=p[-1].get_color(), s=1)
-        axes[0].plot(df_curve.epoch[start:], val_ade[start:], c=p[-1].get_color())
+        # validation
+        p = axes[0].plot(df_curve.epoch[start:], val_ade[start:], linewidth=1)
+        axes[0].scatter(n_epoch, val_ade[n_epoch], c=p[-1].get_color(), marker='*')
+        print(f'Train_seed={train_seed}, epoch_stop={n_epoch}')
+        if show_raw_val:
+            axes[0].plot(df_curve.epoch[start:], df_curve.val_ade[start:], 
+                linewidth=0.5, alpha=0.5, c=p[-1].get_color())
+            axes[0].scatter(df_curve.epoch[start:], df_curve.val_ade[start:], c=p[-1].get_color(), s=1)
+        # test 
+        if test_ready:
+            if show_raw_test:
+                axes[0].plot(df_test_seed.epoch[start:], df_test_seed.ade[start:], 
+                    linewidth=0.5, alpha=0.5, c=p[-1].get_color())
+                axes[0].scatter(df_test_seed.epoch[start:], df_test_seed.ade[start:], 
+                    c=p[-1].get_color(), s=1)
+            axes[0].plot(df_test_seed.epoch[start:], test_ade[start:], 
+                c=p[-1].get_color(), linewidth=2.5)
+
         # fde 
-        p = axes[1].plot(df_curve.epoch[start:], df_curve.val_fde[start:], linewidth=0.5, alpha=0.5)
-        axes[1].scatter(df_curve.epoch[start:], df_curve.val_fde[start:], c=p[-1].get_color(), s=1)
-        axes[1].plot(df_curve.epoch[start:], val_fde[start:], c=p[-1].get_color(), label=label_name)
+        # validation 
+        p = axes[1].plot(df_curve.epoch[start:], val_fde[start:], 
+            label=label_name, linewidth=1)
+        axes[1].scatter(n_epoch, val_fde[n_epoch], c=p[-1].get_color(), marker='*')
+        if show_raw_val:
+            axes[1].plot(df_curve.epoch[start:], df_curve.val_fde[start:], 
+                linewidth=0.5, alpha=0.5, c=p[-1].get_color())
+            axes[1].scatter(df_curve.epoch[start:], df_curve.val_fde[start:], 
+                c=p[-1].get_color(), s=1)
+        # test 
+        if test_ready:
+            if show_raw_test:
+                axes[1].plot(df_test_seed.epoch[start:], df_test_seed.fde[start:], 
+                    linewidth=0.5, alpha=0.5, c=p[-1].get_color())
+                axes[1].scatter(df_test_seed.epoch[start:], df_test_seed.fde[start:], 
+                    c=p[-1].get_color(), s=1)
+            axes[1].plot(df_test_seed.epoch[start:], test_fde[start:], 
+                c=p[-1].get_color(), linewidth=2.5)
 
     axes[0].set_ylabel('ADE')
     axes[1].set_ylabel('FDE')
@@ -84,39 +125,39 @@ def extract_curve(train_msgs, test_msgs=None, window=9, out_path='figures/traini
 
 
 def extract_test_score(test_msg):
-    msg_split = re.split('save_every_n', test_msg)[1:]
-    df = pd.DataFrame(columns=['seed', 'pretrained_ckpt', 'tuned_ckpt', 'ade', 'fde'])
-    for msg in msg_split: 
-        # metric = re.search("Round 0: \nTest ADE: ([\d\.]+) \nTest FDE: ([\d\.]+)", msg)
+    msg_list = re.split('save_every_n', test_msg)[1:]
+    df = pd.DataFrame(columns=['eval_seed', 'tuned_ckpt', 'ade', 'fde'])
+    for msg in msg_list: 
+        eval_seed = re.search("'seed': ([\d+]),", msg)
         metric = re.search('Average performance \(by [\d]+\): \nTest ADE: ([\d\.]+) \nTest FDE: ([\d\.]+)', msg)
-        seed = re.search("'seed': ([\d+]),", msg)
-        pretrained_ckpt = re.search("'pretrained_ckpt': '(.*?)',", msg)
         tuned_ckpt = re.search("'tuned_ckpt': '(.*?)',", msg)
 
         df = pd.concat([df, pd.DataFrame({
-            'seed': seed.group(1) if seed is not None else None,
-            'pretrained_ckpt': pretrained_ckpt.group(1).split('/')[-1] if pretrained_ckpt is not None else None,
+            'eval_seed': eval_seed.group(1) if eval_seed is not None else None,
             'tuned_ckpt': tuned_ckpt.group(1).split('/')[-1] if tuned_ckpt is not None else None,
             'ade': metric.group(1) if metric is not None else None, 
             'fde': metric.group(2) if metric is not None else None}, index=[0])], )
-    df.seed = df.seed.astype(int)
+    df.eval_seed = df.eval_seed.astype(int)
     df.ade = df.ade.astype(float)
     df.fde = df.fde.astype(float)
-    df['train_net'] = df['tuned_ckpt'].apply(lambda x: get_train_net(x))
-    df['n_train'] = df['tuned_ckpt'].apply(lambda x: get_n_train(x))#.astype(int)
-    df['position'] = df['tuned_ckpt'].apply(lambda x: get_position(x, return_list=False))
-    df['lr'] = df['tuned_ckpt'].apply(lambda x: get_lr(x))
-    df['is_ynet_bias'] = df['tuned_ckpt'].apply(lambda x: get_bool_bias(x))
-    df['is_augment'] = df['tuned_ckpt'].apply(lambda x: get_bool_aug(x))
+    df['train_seed'] = df['tuned_ckpt'].apply(lambda x: get_train_seed(x)).astype(int)
+    df['epoch'] = df['tuned_ckpt'].apply(lambda x: get_epoch_number(x)).astype(int)
     # reorder columns 
-    reordered_cols = ['seed', 'train_net', 'n_train', 'position', 'lr', 'is_ynet_bias', 'is_augment', 'ade', 'fde', 'tuned_ckpt', 'pretrained_ckpt']
+    reordered_cols = ['train_seed', 'eval_seed', 'epoch', 'ade', 'fde', 'tuned_ckpt']
     df = df.reindex(columns=reordered_cols)
     return df
 
 
-def get_seed_number(ckpt_path):
+def get_epoch_number(ckpt_path):
     if ckpt_path is not None:
-        return int(ckpt_path.split('__')[0].split('_')[-1])
+        return int(ckpt_path.split('__')[-1].split('.')[0].split('_')[-1])
+    else:
+        return None 
+
+
+def get_train_seed(ckpt_path):
+    if ckpt_path is not None:
+        return int(ckpt_path.split('/')[-1].split('__')[0].split('_')[-1])
     else:
         return None 
 
@@ -169,7 +210,7 @@ def get_bool_aug(ckpt_path):
         return None 
 
 
-def extract_file(file_path, test_file_path, out_dir, window):
+def extract_file(file_path, test_file_path, out_dir, val_window, test_window):
     with open(file_path, 'r') as f:
         msgs = f.read()
     if test_file_path is not None:
@@ -184,15 +225,17 @@ def extract_file(file_path, test_file_path, out_dir, window):
     else:
         file_name = file_path.replace('.out', '')
     
-    extract_curve(msgs, test_msgs, window, f'{out_dir}/{file_name}_{window}.png')
+    out_path = f'{out_dir}/{file_name}_{val_window}_{test_window}.png' if test_file_path is None else f'{out_dir}/{file_name}_test_{val_window}_{test_window}.png'
+    extract_curve(train_msgs=msgs, test_msgs=test_msgs, val_window=val_window, test_window=test_window, out_path=out_path)
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--file_path', default=None, type=str)
     parser.add_argument('--test_file_path', default=None, type=str)
-    parser.add_argument('--window', default=9, type=int)
+    parser.add_argument('--val_window', default=9, type=int)
+    parser.add_argument('--test_window', default=9, type=int)
     parser.add_argument('--out_dir', default='csv/log', type=str)
     args = parser.parse_args()
     
-    extract_file(args.file_path, args.test_file_path, args.out_dir, args.window)
+    extract_file(args.file_path, args.test_file_path, args.out_dir, args.val_window, args.test_window)
