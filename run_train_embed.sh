@@ -1,25 +1,18 @@
-list_seed=(1) 
+list_train_seed=(1) 
 batch_size=10
-n_epoch=300
+n_epoch=100
+n_round=3
 
 val_split=0.1
 train_net=train 
 
-declare -A A=( ["dataset_path"]="filter/avg_vel/Pedestrian/" ["filename"]="0.1_0.3.pkl" ["n_test"]=100)
-declare -A B=( ["dataset_path"]="filter/avg_vel/Pedestrian/" ["filename"]="0.5_1.5.pkl" ["n_test"]=990) 
-declare -A B_=( ["dataset_path"]="filter/avg_vel/Pedestrian/" ["filename"]="0.7_1.3.pkl" ["n_test"]=650) # 6670
-declare -A C=( ["dataset_path"]="filter/avg_den100/Pedestrian/" ["filename"]="0_1.3.pkl" ["n_test"]=1000)
-declare -A D=( ["dataset_path"]="filter/avg_den100/Pedestrian/" ["filename"]="1.7_4.3.pkl" ["n_test"]=350)
-declare -A E=( ["dataset_path"]="filter/agent_type/" ["filename"]="Pedestrian.pkl" ["n_test"]=1500)
-declare -A F=( ["dataset_path"]="filter/agent_type/" ["filename"]="Biker.pkl" ["n_test"]=500)
-declare -A AB=( ["dataset_path"]="filter/avg_vel/Pedestrian/" ["filename"]="0.1_0.3.pkl 0.5_1.5.pkl" ["n_test"]="100 990")
+dataset_path="filter/agent_type/hyang_0145/"
+train_files="Pedestrian.pkl"
+val_files="Pedestrian.pkl"
+n_leftouts=500
 
-dataset_path=${E["dataset_path"]}
-train_files=${E["filename"]}
-val_files=${E["filename"]}
-n_leftouts=${E["n_test"]}
-ckpt_path=ckpts_embed
+ckpt_path=ckpts_hyang0145_original
 
-for seed in ${list_seed[@]}; do
-    python train_embed.py --seed $seed --batch_size $batch_size --n_epoch $n_epoch --dataset_path $dataset_path --train_files $train_files --val_files $val_files --val_split $val_split --n_leftouts $n_leftouts --train_net $train_net --add_embedding --ckpt_path $ckpt_path
-done
+for seed in ${list_train_seed[@]}; do
+    python train_embed.py --seed $seed --batch_size $batch_size --n_epoch $n_epoch --dataset_path $dataset_path --train_files $train_files --val_files $val_files --val_split $val_split --n_leftouts $n_leftouts --train_net $train_net --ckpt_path $ckpt_path --is_augment_data --shuffle_data --n_round $n_round --config_filename sdd_raw_pretrain.yaml
+done 

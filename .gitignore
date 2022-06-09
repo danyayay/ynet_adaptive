@@ -8,10 +8,11 @@ ckpts_fusion_share/
 data/
 
 logs/
-logs_plot/
 logs_fusion/
 logs_fusion_share/
 logs_original/
+noearly_shuffle/
+testset/
 
 run_try.sh
 pretrained_models

@@ -13,7 +13,7 @@ ckpt_path=ckpts_fusion/lora/rank1
 
 # list_position=("0" "0 1" "0 1 2" "0 1 2 3" "0 1 2 3 4" "1" "1 2" "1 2 3" "1 2 3 4" "2" "2 3" "2 3 4" "3" "3 4" "4")
 
-list_n_train_batch=(2 4 8 16)
+list_n_train_batch=(2)
 list_lr=(0.005)
 list_train_net=(lora_1)
 list_position=("scene motion fusion" "scene motion" "fusion")

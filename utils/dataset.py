@@ -781,10 +781,10 @@ def filter_long_tail_df(df_varfs, varf_list, n=3):
 
 def dataset_split(
     data_path, train_files, val_split=0.1, n_leftouts=None, 
-    shuffle_data=False, share_val_test=False, given_scenes=None):
+    shuffle_data=False, share_val_test=False, given_scenes=None, given_test_meta_ids=None):
     if n_leftouts:
         df_train, df_val, df_test = dataset_split_given_ratio_and_leftout(
-            data_path, train_files, val_split, n_leftouts, shuffle_data, share_val_test)
+            data_path, train_files, val_split, n_leftouts, shuffle_data, share_val_test, given_test_meta_ids)
     elif given_scenes:
         df_test = dataset_split_given_scenes(
             data_path, train_files, given_scenes)
@@ -796,13 +796,14 @@ def dataset_split(
 
 
 def dataset_split_given_ratio_and_leftout(
-    data_path, train_files, val_split, n_leftouts=None, shuffle_data=False, share_val_test=False):
+    data_path, train_files, val_split, n_leftouts=None, 
+    shuffle_data=False, share_val_test=False, given_test_meta_ids=None):
     print(f"Split {train_files} given val_split={val_split}, n_leftout={n_leftouts}")
     df_train, df_val, df_test = pd.DataFrame([]), pd.DataFrame([]), pd.DataFrame([])
     for train_file, n_leftout in zip(train_files, n_leftouts):
         df_train_ = pd.read_pickle(os.path.join(data_path, train_file))
         df_train_, df_val_, df_test_ = split_train_val_test(
-            df_train_, val_split, n_leftout, share_val_test, shuffle_data)
+            df_train_, val_split, n_leftout, share_val_test, shuffle_data, given_test_meta_ids)
         df_train = pd.concat([df_train, df_train_])
         df_val = pd.concat([df_val, df_val_])
         if df_test_ is not None:
@@ -810,7 +811,8 @@ def dataset_split_given_ratio_and_leftout(
     return df_train, df_val, df_test
 
 
-def split_train_val_test(df, val_split, n_test=None, share_val_test=False, shuffle_data=False):
+def split_train_val_test(
+    df, val_split, n_test=None, share_val_test=False, shuffle_data=False, given_test_meta_ids=None):
     # idx
     unique_meta_ids = np.unique(df["metaId"])
     if shuffle_data:
@@ -835,6 +837,9 @@ def split_train_val_test(df, val_split, n_test=None, share_val_test=False, shuff
             print('Validation and test sets are independent')
             n_train = n_metaId - n_val - n_test 
             train_meta_ids, val_meta_ids, test_meta_ids = np.split(unique_meta_ids, [n_train, n_train + n_val])
+            if given_test_meta_ids is not None:
+                test_meta_ids = given_test_meta_ids
+                print('Replaced test set by given test meta ids')
             df_test = reduce_df_meta_ids(df, test_meta_ids)
             df_val = reduce_df_meta_ids(df, val_meta_ids)
     else:

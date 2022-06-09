@@ -185,6 +185,7 @@ class YNetTrainer:
 
         # train 
         best_val_ADE = 99999999999999
+        best_epoch = 0
         self.val_ADE = []
         self.val_FDE = []
 
@@ -213,6 +214,7 @@ class YNetTrainer:
 
             if val_ADE < best_val_ADE:
                 best_val_ADE = val_ADE
+                best_epoch = e
                 best_state_dict = deepcopy(model.state_dict())
 
             if e % save_every_n == 0:
@@ -225,6 +227,7 @@ class YNetTrainer:
                 break
 
         # Load the best model
+        print(f'Best epoch at {best_epoch}')
         model.load_state_dict(best_state_dict, strict=True)
 
         # Save the best model
