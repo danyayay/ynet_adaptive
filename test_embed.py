@@ -3,6 +3,7 @@ import numpy as np
 from utils.parser import get_parser
 from utils.dataset import set_random_seeds, dataset_split
 from utils.util_embed import get_params, get_image_and_data_path, restore_model, get_ckpts_and_names
+from evaluator.visualization import plot_given_trajectories_scenes_overlay
 
 
 def main(args):
@@ -19,6 +20,11 @@ def main(args):
     print(f"df_test: {df_test.shape}; #={df_test.shape[0]/(params['obs_len']+params['pred_len'])}")
     print(df_test.metaId.unique())
 
+    if args.pretrained_ckpt is not None:
+        plot_given_trajectories_scenes_overlay(IMAGE_PATH, df_test, f'figures/traj_check/{args.tuned_ckpt}/test')
+    else:
+        plot_given_trajectories_scenes_overlay(IMAGE_PATH, df_test, f'figures/traj_check/{args.ckpts}/test')
+
     # ckpts
     ckpts, ckpts_name, is_file_separated = get_ckpts_and_names(
         args.ckpts, args.ckpts_name, args.pretrained_ckpt, [args.tuned_ckpt])
@@ -33,6 +39,7 @@ def main(args):
                 model = restore_model(params, is_file_separated, 
                     ckpt if not is_file_separated else args.pretrained_ckpt, 
                     None if not is_file_separated else ckpt)
+    
     # test
     print('############ Test model ##############')
     set_random_seeds(args.seed)

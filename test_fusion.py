@@ -1,4 +1,5 @@
 import time 
+import numpy as np
 from utils.parser import get_parser
 from utils.dataset import set_random_seeds, dataset_split
 from utils.util_fusion import get_params, get_image_and_data_path, restore_model, get_ckpts_and_names
@@ -13,9 +14,12 @@ def main(args):
     IMAGE_PATH, DATA_PATH = get_image_and_data_path(params)
 
     # prepare data 
-    _, _, df_test = dataset_split(DATA_PATH, args.val_files, 0, args.n_leftouts)
+    given_test_meta_ids = np.loadtxt(args.given_test_file, delimiter=',').astype(int)
+    _, _, df_test = dataset_split(
+        DATA_PATH, args.val_files, args.val_split, args.n_leftouts, given_test_meta_ids=given_test_meta_ids)
     print(f"df_test: {df_test.shape}; #={df_test.shape[0]/(params['obs_len']+params['pred_len'])}")
-
+    print(df_test.metaId.unique())
+    
     if args.pretrained_ckpt is not None:
         plot_given_trajectories_scenes_overlay(IMAGE_PATH, df_test, f'figures/traj_check/{args.tuned_ckpt}/test')
     else:

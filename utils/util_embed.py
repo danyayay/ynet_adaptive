@@ -37,10 +37,10 @@ def get_params(args):
 def get_image_and_data_path(params):
     # image path 
     image_path = os.path.join(params['data_dir'], params['dataset_name'], 'raw', 'annotations')
-    assert os.path.isdir(image_path), 'image dir error'
+    assert os.path.isdir(image_path), f'image dir error: {image_path}'
     # data path 
     data_path = os.path.join(params['data_dir'], params['dataset_name'], params['dataset_path'])
-    assert os.path.isdir(data_path), f'data dir error'
+    assert os.path.isdir(data_path), f'data dir error: {data_path}'
     return image_path, data_path 
 
 

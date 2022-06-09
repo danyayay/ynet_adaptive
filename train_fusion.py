@@ -1,5 +1,6 @@
 import os
 import time
+import numpy as np 
 import pandas as pd
 
 from models.trainer_fusion import YNetTrainer
@@ -30,6 +31,8 @@ def main(args):
         df_val = pd.concat([pd.read_pickle(os.path.join(DATA_PATH, val_file)) for val_file in args.val_files])
     df_train = limit_samples(df_train, args.n_train_batch, args.batch_size)
     print(df_train.metaId.unique())
+    print(df_val.metaId.unique())
+    print(df_test.metaId.unique())
     print(f"df_train: {df_train.shape}; #={df_train.shape[0]/(params['obs_len']+params['pred_len'])}")
     if df_val is not None: print(f"df_val: {df_val.shape}; #={df_val.shape[0]/(params['obs_len']+params['pred_len'])}")
     if df_test is not None: print(f"df_test: {df_test.shape}; #={df_test.shape[0]/(params['obs_len']+params['pred_len'])}")
@@ -38,6 +41,8 @@ def main(args):
     # experiment name 
     EXPERIMENT_NAME = get_experiment_name(args, df_train.shape[0])
     print(f"Experiment {EXPERIMENT_NAME} has started")
+    print('Saved testset!')
+    np.savetxt(f'testset/{EXPERIMENT_NAME}.csv', df_test.metaId.unique(), delimiter=',')
 
     # plot
     plot_given_trajectories_scenes_overlay(IMAGE_PATH, df_train, f'figures/traj_check/{EXPERIMENT_NAME}/train')
