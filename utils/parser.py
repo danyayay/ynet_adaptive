@@ -8,7 +8,7 @@ def get_data_args(parser):
     parser.add_argument('--ckpt_path', default='ckpts')
     parser.add_argument("--shuffle", action='store_true')
     parser.add_argument("--augment", action='store_true')
-    parser.add_argument('--load_data', default='sequential', choices=['sequenatial', 'predefined'])
+    parser.add_argument('--load_data', default='sequential', choices=['sequential', 'predefined'])
     parser.add_argument('--hide_data_details', action='store_true')
 
     # Arguments work for load_data == 'sequential'
