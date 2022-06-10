@@ -1,7 +1,7 @@
 import time 
 import numpy as np
 from utils.parser import get_parser
-from utils.dataset import set_random_seeds, dataset_split
+from utils.dataset import set_random_seeds, load_train_val_test
 from utils.util_embed import get_params, get_image_and_data_path, restore_model, get_ckpts_and_names
 from evaluator.visualization import plot_given_trajectories_scenes_overlay
 
@@ -14,16 +14,13 @@ def main(args):
     IMAGE_PATH, DATA_PATH = get_image_and_data_path(params)
 
     # prepare data 
-    given_test_meta_ids = np.loadtxt(args.given_test_file, delimiter=',').astype(int)
-    _, _, df_test = dataset_split(
-        DATA_PATH, args.val_files, args.val_split, args.n_leftouts, given_test_meta_ids=given_test_meta_ids)
-    print(f"df_test: {df_test.shape}; #={df_test.shape[0]/(params['obs_len']+params['pred_len'])}")
+    df_train, df_val, df_test = load_train_val_test(DATA_PATH, n_sample=None, shuffle=args.shuffle)
     print(df_test.metaId.unique())
 
-    if args.pretrained_ckpt is not None:
-        plot_given_trajectories_scenes_overlay(IMAGE_PATH, df_test, f'figures/traj_check/{args.tuned_ckpt}/test')
-    else:
-        plot_given_trajectories_scenes_overlay(IMAGE_PATH, df_test, f'figures/traj_check/{args.ckpts}/test')
+    # if args.pretrained_ckpt is not None:
+    #     plot_given_trajectories_scenes_overlay(IMAGE_PATH, df_test, f'figures/traj_check/{args.tuned_ckpt}/test')
+    # else:
+    #     plot_given_trajectories_scenes_overlay(IMAGE_PATH, df_test, f'figures/traj_check/{args.ckpts}/test')
 
     # ckpts
     ckpts, ckpts_name, is_file_separated = get_ckpts_and_names(
@@ -53,6 +50,3 @@ if __name__ == '__main__':
     parser = get_parser(False)
     args = parser.parse_args()
     main(args)
-
-
-# CUDA_VISIBLE_DEVICES=1 python -m pdb test_embed.py --seed 1 --batch_size 10 --dataset_path filter/agent_type/deathCircle_0/ --val_files Biker.pkl --val_split 0.1 --n_leftouts 500 --pretrained_ckpt ckpts/Seed_1__Tr_Pedestrian__Val_Pedestrian__ValRatio_0.1__filter_agent_type__train_pretrained.pt --tuned_ckpt ckpts/DC0__lora/Seed_1__Tr_Biker__Val_Biker__ValRatio_0.1__filter_agent_type_deathCircle_0__lora_1__Pos_0_1_2_3_4__TrN_20__lr_0.0005.pt 

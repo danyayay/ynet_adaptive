@@ -41,7 +41,6 @@ def get_general_args(parser):
 
 def get_train_args(parser):
     parser.add_argument("--fine_tune", action="store_true")
-    parser.add_argument("--train_files", default=["0.25_0.75.pkl", "1.25_1.75.pkl", "2.25_2.75.pkl"], type=str, nargs="+")
     parser.add_argument("--n_epoch", default=1, type=int)
     parser.add_argument("--n_train_batch", default=None, type=int, help="Limited number of batches for each training agent (fine-tuning), None means no limit (training)")
     # learning rate 
@@ -54,7 +53,6 @@ def get_train_args(parser):
 
 def get_eval_args(parser):
     parser.add_argument("--config_filename", default='sdd_raw_eval.yaml', type=str)
-    parser.add_argument('--given_test_file', default=None, type=str)
     return parser
 
 

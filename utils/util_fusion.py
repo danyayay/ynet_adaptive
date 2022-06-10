@@ -9,12 +9,12 @@ def get_experiment_name(args, n_data):
     experiment += f"Seed_{args.seed}"
     experiment += f"__{(args.dataset_path).replace('/', '_')}"
     experiment += f"__{args.train_net}"
-
+    
     if args.position != []: experiment += f'__Pos_{"_".join(map(str, args.position))}' 
     if args.fine_tune: 
         experiment += f'__TrN_{n_data}'
         experiment += f'__lr_{np.format_float_positional(args.lr, trim="-")}'
-        if args.is_augment_data: experiment += '__AUG'
+        if args.augment: experiment += '__AUG'
         if args.ynet_bias: experiment += '__bias'
 
     if args.pretrained_ckpt is not None:
@@ -49,7 +49,7 @@ def get_image_and_data_path(params):
 def get_position(ckpt_path, return_list=True):
     if ckpt_path is not None:
         if 'Pos' in ckpt_path:
-            pos = ckpt_path.split('__')[6].replace('Pos_', '')
+            pos = ckpt_path.split('Pos_')[-1].split('__')[0]
             if not return_list:
                 return pos
             else:
@@ -63,13 +63,13 @@ def get_position(ckpt_path, return_list=True):
 
 def get_ckpt_name(ckpt_path):
     ckpt_path = ckpt_path.split('/')[-1]
-    train_net = ckpt_path.split('__')[5]
+    train_net = ckpt_path.split('__')[2]
     if 'Pos' in ckpt_path:
         position = get_position(ckpt_path, return_list=False)
-        n_train = ckpt_path.split('__')[7].split('_')[1]
+        n_train = int(ckpt_path.split('TrN_')[-1].split('_')[0])
         ckpt_name = f'{train_net}[{position}]({n_train})'
     else:
-        n_train = ckpt_path.split('__')[6].split('_')[1]
+        n_train = int(ckpt_path.split('TrN_')[-1].split('_')[0])
         ckpt_name = f'{train_net}({n_train})'
     return ckpt_name 
 
@@ -78,7 +78,7 @@ def update_params(ckpt_path, params):
     ckpt_path = ckpt_path.split('/')[-1]
     updated_params = params.copy()
     # train net
-    train_net = ckpt_path.split('__')[5].split('.')[0]
+    train_net = ckpt_path.split('__')[2].split('.')[0]
     updated_params.update({'train_net': train_net})
     # base 
     base_arch = params['pretrained_ckpt'].split('_')[-1].split('.')[0]

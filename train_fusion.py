@@ -6,7 +6,7 @@ import pandas as pd
 from models.trainer_fusion import YNetTrainer
 from utils.parser import get_parser
 from utils.util_fusion import get_experiment_name, get_params, get_image_and_data_path
-from utils.dataset import set_random_seeds, limit_samples, dataset_split, load_train_val_test
+from utils.dataset import set_random_seeds, load_train_val_test
 from evaluator.visualization import plot_given_trajectories_scenes_overlay
 
 
@@ -34,9 +34,9 @@ def main(args):
     print(f"Experiment {EXPERIMENT_NAME} has started")
 
     # plot
-    plot_given_trajectories_scenes_overlay(IMAGE_PATH, df_train, f'figures/traj_check/{EXPERIMENT_NAME}/train')
-    plot_given_trajectories_scenes_overlay(IMAGE_PATH, df_val, f'figures/traj_check/{EXPERIMENT_NAME}/val')
-    plot_given_trajectories_scenes_overlay(IMAGE_PATH, df_test, f'figures/traj_check/{EXPERIMENT_NAME}/test')
+    # plot_given_trajectories_scenes_overlay(IMAGE_PATH, df_train, f'figures/traj_check/{EXPERIMENT_NAME}/train')
+    # plot_given_trajectories_scenes_overlay(IMAGE_PATH, df_val, f'figures/traj_check/{EXPERIMENT_NAME}/val')
+    # plot_given_trajectories_scenes_overlay(IMAGE_PATH, df_test, f'figures/traj_check/{EXPERIMENT_NAME}/test')
 
     # model
     model = YNetTrainer(params=params)
@@ -67,10 +67,9 @@ def main(args):
     val_ade, val_fde = model.train(df_train, df_val, IMAGE_PATH, IMAGE_PATH, EXPERIMENT_NAME)
 
     # test for leftout data 
-    if params['out_csv_dir'] and args.n_leftouts:
-        print('############ Test leftout data ##############')
-        set_random_seeds(args.seed)
-        test_ade, test_fde, _, _ = model.test(df_test, IMAGE_PATH, args.train_net == "modulator")
+    print('############ Test leftout data ##############')
+    set_random_seeds(args.seed)
+    test_ade, test_fde, _, _ = model.test(df_test, IMAGE_PATH, args.train_net == "modulator")
 
     toc = time.time()
     print('Time spent:', time.strftime("%Hh%Mm%Ss", time.gmtime(toc - tic)))

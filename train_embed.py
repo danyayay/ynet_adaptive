@@ -18,6 +18,7 @@ def main(args):
     params = get_params(args)
     IMAGE_PATH, DATA_PATH = get_image_and_data_path(params)
 
+    # load data 
     df_train, df_val, df_test = load_train_val_test(DATA_PATH, 
         n_sample=args.batch_size*args.n_train_batch, shuffle=args.shuffle)
     print(df_train.metaId.unique())
@@ -33,9 +34,9 @@ def main(args):
     print(f"Experiment {EXPERIMENT_NAME} has started")
 
     # plot
-    plot_given_trajectories_scenes_overlay(IMAGE_PATH, df_train, f'figures/traj_check/{EXPERIMENT_NAME}/train')
-    plot_given_trajectories_scenes_overlay(IMAGE_PATH, df_val, f'figures/traj_check/{EXPERIMENT_NAME}/val')
-    plot_given_trajectories_scenes_overlay(IMAGE_PATH, df_test, f'figures/traj_check/{EXPERIMENT_NAME}/test')
+    # plot_given_trajectories_scenes_overlay(IMAGE_PATH, df_train, f'figures/traj_check/{EXPERIMENT_NAME}/train')
+    # plot_given_trajectories_scenes_overlay(IMAGE_PATH, df_val, f'figures/traj_check/{EXPERIMENT_NAME}/val')
+    # plot_given_trajectories_scenes_overlay(IMAGE_PATH, df_test, f'figures/traj_check/{EXPERIMENT_NAME}/test')
 
     # model
     model = YNetTrainer(params=params)
@@ -66,10 +67,9 @@ def main(args):
     val_ade, val_fde = model.train(df_train, df_val, IMAGE_PATH, IMAGE_PATH, EXPERIMENT_NAME)
 
     # test for leftout data 
-    if params['out_csv_dir'] and args.n_leftouts:
-        print('############ Test leftout data ##############')
-        set_random_seeds(args.seed)
-        test_ade, test_fde, _, _ = model.test(df_test, IMAGE_PATH, args.train_net == "modulator")
+    print('############ Test leftout data ##############')
+    set_random_seeds(args.seed)
+    test_ade, test_fde, _, _ = model.test(df_test, IMAGE_PATH, args.train_net == "modulator")
 
     toc = time.time()
     print('Time spent:', time.strftime("%Hh%Mm%Ss", time.gmtime(toc - tic)))
@@ -81,4 +81,3 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     main(args)
-

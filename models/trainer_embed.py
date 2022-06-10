@@ -81,7 +81,7 @@ class YNetTrainer:
         dataset_name, resize_factor, obs_len, pred_len, batch_size, lr, n_epoch, 
         waypoints, n_goal, n_traj, kernlen, nsig, e_unfreeze, loss_scale, temperature,
         use_raw_data=False, save_every_n=10, train_net="all", position=[], 
-        fine_tune=False, is_augment_data=False, ynet_bias=False, 
+        fine_tune=False, augment=False, ynet_bias=False, 
         use_CWS=False, resl_thresh=0.002, CWS_params=None, n_early_stop=5, 
         steps=[20], lr_decay_ratio=0.1, add_embedding=False, swap_semantic=False, **kwargs):
         """
@@ -100,7 +100,7 @@ class YNetTrainer:
         # get data
         train_images, train_loader, self.homo_mat = self.prepare_data(
             df_train, train_image_path, dataset_name, 'train', 
-            obs_len, pred_len, resize_factor, use_raw_data, is_augment_data)
+            obs_len, pred_len, resize_factor, use_raw_data, augment)
         val_images, val_loader, _ = self.prepare_data(
             df_val, val_image_path, dataset_name, 'val', 
             obs_len, pred_len, resize_factor, use_raw_data, False)
@@ -463,7 +463,7 @@ class YNetTrainer:
 
     def prepare_data(
         self, df, image_path, dataset_name, mode, obs_len, pred_len, 
-        resize_factor, use_raw_data, is_augment_data=False):
+        resize_factor, use_raw_data, augment=False):
         """
         Prepare dataset for training, validation, and testing. 
 
@@ -503,7 +503,7 @@ class YNetTrainer:
             homo_mat = None
             seg_mask = False
         # Load scene images 
-        if not is_augment_data:
+        if not augment:
             # do not augment train data and images 
             images_dict = create_images_dict(
                 df.sceneId.unique(), image_path=image_path, 
