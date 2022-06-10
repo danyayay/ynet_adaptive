@@ -60,6 +60,9 @@ def get_train_args(parser):
     parser.add_argument("--config_filename", default='sdd_raw_train.yaml', type=str)
     parser.add_argument('--init_check', action='store_true')
 
+    parser.add_argument('--window_size', default=9, type=int)
+    parser.add_argument('--smooth_val', action='store_true')
+
     # Arguments work for load_data == 'sequential'
     parser.add_argument("--train_files", default=None, type=str, nargs="+")
     return parser

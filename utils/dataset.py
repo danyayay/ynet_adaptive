@@ -860,7 +860,7 @@ def split_train_val_test_randomly(data_dir, data_filename, val_split, test_split
     Generate train / val / test set randomly. 
     It will output train.pkl / val.pkl / test.pkl under the same directory of input data file. 
     """
-    data_folder = data_filename.split('.')[0]
+    data_folder = data_filename.replace('.pkl', '')
     out_dir = f'{data_dir}/{data_folder}'
     pathlib.Path(out_dir).mkdir(parents=True, exist_ok=True)
     

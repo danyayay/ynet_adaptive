@@ -12,7 +12,7 @@ train_net=train
 dataset_path=filter/avg_vel/dc_013/Biker/2.75_7.5
 load_data=predefined
 
-for seed in ${list_train_seed[@]}; do
-    python train.py --seed $seed --batch_size $batch_size --n_epoch $n_epoch --dataset_path $dataset_path --load_data $load_data --train_net $train_net --n_fusion $n_fusion --ckpt_path $ckpt_path --augment --n_round $n_round 
+for train_seed in ${list_train_seed[@]}; do
+    python train.py --seed $train_seed --batch_size $batch_size --n_epoch $n_epoch --dataset_path $dataset_path --network $network --load_data $load_data --train_net $train_net --n_fusion $n_fusion --ckpt_path $ckpt_path --augment --n_round $n_round 
 done 
 

@@ -8,10 +8,9 @@ if __name__ == '__main__':
     parser.add_argument('--data_dir', default=None, type=str, 
         help='Path to the raw data, can be a subset of the entire dataset')
     parser.add_argument('--data_filename', default=None, type=str)
-    parser.add_argument('--output_dir', default=None, type=str)
 
-    parser.add_argument('--val_split', type=float)
-    parser.add_argument('--test_split', type=float)
+    parser.add_argument('--val_split', default=None, type=float)
+    parser.add_argument('--test_split', default=None, type=float)
     parser.add_argument('--seed', default=1, type=int)
 
     args = parser.parse_args()

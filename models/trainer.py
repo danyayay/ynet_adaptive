@@ -6,7 +6,7 @@ import torch.nn as nn
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 from copy import deepcopy
-from collections import OrderedDict
+from collections import OrderedDict, deque
 
 from models.ynet import YNet
 from utils.train_epoch import train_epoch
@@ -84,7 +84,7 @@ class YNetTrainer:
         use_raw_data=False, save_every_n=10, train_net="all", position=[], 
         fine_tune=False, augment=False, ynet_bias=False, 
         use_CWS=False, resl_thresh=0.002, CWS_params=None, n_early_stop=5, 
-        steps=[20], lr_decay_ratio=0.1, network=None, swap_semantic=False, **kwargs):
+        steps=[20], lr_decay_ratio=0.1, network=None, swap_semantic=False, window_size=9, smooth_val=False, **kwargs):
         """
         Train function
         :param df_train: pd.df, train data
@@ -217,6 +217,8 @@ class YNetTrainer:
         best_epoch = 0
         self.val_ADE = []
         self.val_FDE = []
+        state_dicts = deque()
+        half_window_size = (window_size // 2) + 1
 
         with_style = train_net == "modulator"
         print('Start training')
@@ -241,10 +243,27 @@ class YNetTrainer:
             self.val_FDE.append(val_FDE)
             lr_scheduler.step()
 
+            if smooth_val:
+                # TODO: do not work if n_epoch < window_size
+                print("Length: ", len(state_dicts))
+                # Handle Model Ckpts Queue
+                if len(state_dicts) == half_window_size:
+                    curr_model_dict = state_dicts.popleft()
+                    state_dicts.append(deepcopy(model.state_dict())) # Better to keep on CPU: TODO
+                else:
+                    state_dicts.append(deepcopy(model.state_dict())) # Better to keep on CPU: TODO
+                # Handle smoothened ADE / FDE
+                if e < window_size:
+                    val_ADE = best_val_ADE + 1
+                else:
+                    val_ADE = sum(self.val_ADE[-window_size:])/window_size
+            else:
+                curr_model_dict = deepcopy(model.state_dict())
+            
             if val_ADE < best_val_ADE:
                 best_val_ADE = val_ADE
                 best_epoch = e
-                best_state_dict = deepcopy(model.state_dict())
+                best_state_dict = curr_model_dict
 
             if e % save_every_n == 0 and not fine_tune:
                 pathlib.Path(ckpt_path).mkdir(parents=True, exist_ok=True)

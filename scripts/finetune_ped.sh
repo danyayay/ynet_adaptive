@@ -26,8 +26,8 @@ for train_seed in ${list_train_seed[@]}; do
     for lr in ${list_lr[@]}; do 
         for n_train_batch in ${list_n_train_batch[@]}; do 
             for train_net in ${list_train_net[@]}; do 
-                for position in ${list_position[@]}; do
-                    python train.py --fine_tune --seed $train_seed --batch_size $batch_size --n_epoch $n_epoch --n_round $n_round --dataset_path $dataset_path --load_data $load_data --train_files $train_files --val_files $val_files --val_split $val_split --test_splits $test_splits --train_net $train_net --position $position --ckpt_path $ckpt_path --n_train_batch $n_train_batch --lr $lr 
+                for position in "${list_position[@]}"; do
+                    python train.py --fine_tune --seed $train_seed --batch_size $batch_size --n_epoch $n_epoch --n_round $n_round --dataset_path $dataset_path --network $network --load_data $load_data --train_files $train_files --val_files $val_files --val_split $val_split --test_splits $test_splits --train_net $train_net --position $position --ckpt_path $ckpt_path --n_train_batch $n_train_batch --lr $lr 
                 done 
             done 
         done 

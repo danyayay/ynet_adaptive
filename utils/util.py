@@ -7,7 +7,11 @@ from models.trainer import YNetTrainer
 def get_experiment_name(args, n_data):
     experiment = ""
     experiment += f"Seed_{args.seed}"
-    experiment += f"__{(args.dataset_path).replace('/', '_')}"
+    if args.load_data == 'sequential':
+        files = '_'.join([file.replace('.pkl', '') for file in args.train_files])
+        experiment += f"__{(args.dataset_path).replace('/', '_')}_{files}"
+    else:
+        experiment += f"__{(args.dataset_path).replace('/', '_')}"
     experiment += f"__{args.train_net}"
     
     if not args.fine_tune: 
@@ -26,7 +30,8 @@ def get_experiment_name(args, n_data):
     if args.pretrained_ckpt is not None:
         if 'original' not in args.pretrained_ckpt: 
             base_arch = args.pretrained_ckpt.split('__')[-1].split('.')[0]
-            experiment += f'__{base_arch}' 
+            if base_arch != 'AUG' and base_arch != 'bias':
+                experiment += f'__{base_arch}' 
 
     return experiment
 
