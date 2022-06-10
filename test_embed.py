@@ -1,7 +1,7 @@
 import time 
 import numpy as np
 from utils.parser import get_parser
-from utils.dataset import set_random_seeds, load_train_val_test
+from utils.dataset import set_random_seeds, prepare_dataeset
 from utils.util_embed import get_params, get_image_and_data_path, restore_model, get_ckpts_and_names
 from evaluator.visualization import plot_given_trajectories_scenes_overlay
 
@@ -14,9 +14,10 @@ def main(args):
     IMAGE_PATH, DATA_PATH = get_image_and_data_path(params)
 
     # prepare data 
-    df_train, df_val, df_test = load_train_val_test(DATA_PATH, n_sample=None, shuffle=args.shuffle)
-    print(df_test.metaId.unique())
-
+    _, _, df_test = prepare_dataeset(DATA_PATH, args.load_data, args.batch_size, 
+        None, None, args.val_files, args.val_split, args.test_splits, 
+        args.shuffle, args.share_val_test, 'eval', args.hide_data_details)
+    
     # if args.pretrained_ckpt is not None:
     #     plot_given_trajectories_scenes_overlay(IMAGE_PATH, df_test, f'figures/traj_check/{args.tuned_ckpt}/test')
     # else:

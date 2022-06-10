@@ -8,6 +8,16 @@ def get_data_args(parser):
     parser.add_argument('--ckpt_path', default='ckpts')
     parser.add_argument("--shuffle", action='store_true')
     parser.add_argument("--augment", action='store_true')
+    parser.add_argument('--load_data', default='sequential', choices=['sequenatial', 'predefined'])
+    parser.add_argument('--hide_data_details', action='store_true')
+
+    # Arguments work for load_data == 'sequential'
+    parser.add_argument("--val_split", default=0.1, type=float)
+    parser.add_argument("--test_splits", default=None, type=int, nargs='+', 
+        help='The number of data left for testing for each val_file')
+    parser.add_argument("--val_files", default=None, type=str, nargs="+")
+    parser.add_argument("--share_val_test", action='store_true')
+
     return parser 
 
 
@@ -21,12 +31,12 @@ def get_model_args(parser):
     parser.add_argument('--tuned_ckpts', default=None, type=str, nargs='+')
     
     # added net 
-    parser.add_argument('--add_embedding', action='store_true')
-    parser.add_argument('--n_fusion', default=2, type=int)
+    parser.add_argument('--network', choices=['original', 'embed', 'fusion'])
+    parser.add_argument('--n_fusion', default=None, type=int)
     parser.add_argument('--swap_semantic', action='store_true')
     parser.add_argument('--position', default=[], type=str, nargs='+')
     parser.add_argument('--ynet_bias', action='store_true')
-    parser.add_argument("--train_net", default="all", type=str, 
+    parser.add_argument("--train_net", default="train", type=str, 
         help="train all parameters or only encoder or with modulator")
     return parser
 
@@ -48,6 +58,10 @@ def get_train_args(parser):
     parser.add_argument("--steps", default=[], type=int, nargs='+')
     parser.add_argument("--lr_decay_ratio", default=0.1)
     parser.add_argument("--config_filename", default='sdd_raw_train.yaml', type=str)
+    parser.add_argument('--init_check', action='store_true')
+
+    # Arguments work for load_data == 'sequential'
+    parser.add_argument("--train_files", default=None, type=str, nargs="+")
     return parser
 
 

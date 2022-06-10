@@ -8,13 +8,13 @@ from tqdm import tqdm
 from copy import deepcopy
 from collections import OrderedDict
 
-from models.ynet_embed import YNet
-from utils.train_embed import train_epoch
+from models.ynet import YNet
+from utils.train_epoch import train_epoch
 from utils.dataset import augment_data, create_images_dict
 from utils.image_utils import create_gaussian_heatmap_template, create_dist_mat, get_patch, \
     preprocess_image_for_segmentation, pad, resize
 from utils.dataloader import SceneDataset, scene_collate
-from utils.evaluate_embed import evaluate
+from utils.evaluate import evaluate
 
 
 def mark_encoder_bias_trainable(model):
@@ -70,7 +70,8 @@ class YNetTrainer:
             n_waypoints=len(params['waypoints']),
             train_net=params['train_net'], 
             position=params['position'],
-            add_embedding=params['add_embedding']
+            network=params['network'],
+            n_fusion=params['n_fusion']
         )
     
     def train(self, df_train, df_val, train_image_path, val_image_path, experiment_name):
@@ -83,7 +84,7 @@ class YNetTrainer:
         use_raw_data=False, save_every_n=10, train_net="all", position=[], 
         fine_tune=False, augment=False, ynet_bias=False, 
         use_CWS=False, resl_thresh=0.002, CWS_params=None, n_early_stop=5, 
-        steps=[20], lr_decay_ratio=0.1, add_embedding=False, swap_semantic=False, **kwargs):
+        steps=[20], lr_decay_ratio=0.1, network=None, swap_semantic=False, **kwargs):
         """
         Train function
         :param df_train: pd.df, train data
@@ -144,6 +145,34 @@ class YNetTrainer:
             elif 'semantic' in train_net:
                 for param_name, param in model.named_parameters():
                     if 'semantic_adapter' in param_name: param.requires_grad = True
+            # tuned modified part 
+            elif network == 'fusion' and train_net == 'scene':
+                for param in model.encoder.scene_stages.parameters():
+                    param.requires_grad = True
+            elif network == 'fusion' and train_net == 'motion':
+                for param in model.encoder.motion_stages.parameters():
+                    param.requires_grad = True
+            elif network == 'fusion' and train_net == 'scene_fusion':
+                for param in model.encoder.scene_stages.parameters():
+                    param.requires_grad = True
+                for param in model.encoder.fusion_stages.parameters():
+                    param.requires_grad = True
+            elif network == 'fusion' and train_net == 'motion_fusion':
+                for param in model.encoder.motion_stages.parameters():
+                    param.requires_grad = True
+                for param in model.encoder.fusion_stages.parameters():
+                    param.requires_grad = True
+            elif network == 'fusion' and train_net == 'scene_motion':
+                for param in model.encoder.scene_stages.parameters():
+                    param.requires_grad = True
+                for param in model.encoder.motion_stages.parameters():
+                    param.requires_grad = True
+            elif network == 'fusion' and train_net == 'fusion':
+                for param in model.encoder.fusion_stages.parameters():
+                    param.requires_grad = True
+            elif network == 'fusion' and train_net == 'scene_motion_fusion':
+                for param in model.encoder.parameters():
+                    param.requires_grad = True
             # bias term 
             elif train_net == 'biasEncoder':
                 model = mark_encoder_bias_trainable(model)
@@ -196,7 +225,7 @@ class YNetTrainer:
                 model, train_loader, train_images, optimizer, criterion, loss_scale, self.device, 
                 dataset_name, self.homo_mat, gt_template, input_template, waypoints,
                 e, obs_len, pred_len, batch_size, e_unfreeze, resize_factor, 
-                with_style, add_embedding, swap_semantic)
+                with_style, network, swap_semantic)
 
             # For faster inference, we don't use TTST and CWS here, only for the test set evaluation
             val_ADE, val_FDE, _, _ = evaluate(
@@ -204,7 +233,7 @@ class YNetTrainer:
                 dataset_name, self.homo_mat, input_template, waypoints, 'val', 
                 n_goal, n_traj, obs_len, batch_size, resize_factor, with_style,
                 temperature, False, use_CWS, resl_thresh, CWS_params, 
-                add_embedding=add_embedding, swap_semantic=swap_semantic)
+                network=network, swap_semantic=swap_semantic)
             
             print(
                 f'Epoch {e}: 	Train (Top-1) ADE: {train_ADE:.2f} FDE: {train_FDE:.2f} 		Val (Top-k) ADE: {val_ADE:.2f} FDE: {val_FDE:.2f}   lr={lr_scheduler.get_last_lr()[0]}')
@@ -246,7 +275,7 @@ class YNetTrainer:
         batch_size, n_round, obs_len, pred_len, 
         waypoints, n_goal, n_traj, temperature, rel_threshold, 
         use_TTST, use_CWS, CWS_params, use_raw_data=False, with_style=False, 
-        return_preds=False, return_samples=False, add_embedding=False, swap_semantic=False, **kwargs):
+        return_preds=False, return_samples=False, network=None, swap_semantic=False, **kwargs):
         """
         Val function
         :param df_test: pd.df, val data
@@ -283,7 +312,7 @@ class YNetTrainer:
                 n_goal, n_traj, obs_len, batch_size, resize_factor, with_style,
                 temperature, use_TTST, use_CWS, rel_threshold, CWS_params,
                 return_preds=return_preds, return_samples=return_samples, 
-                add_embedding=add_embedding, swap_semantic=swap_semantic)
+                network=network, swap_semantic=swap_semantic)
             list_metrics.append(df_metrics)
             list_trajs.append(trajs_dict)
             print(f'Round {e}: \nTest ADE: {test_ADE} \nTest FDE: {test_FDE}')
@@ -429,14 +458,13 @@ class YNetTrainer:
         
         # feature input 
         if noisy_semantic and noisy_traj:
-            feature_input = torch.cat([noisy_semantic_image, noisy_observed_map], dim=1)
+            features = model.pred_features(noisy_semantic_image, noisy_semantic_image)
         elif noisy_semantic and not noisy_traj:
-            feature_input = torch.cat([noisy_semantic_image, observed_map], dim=1)
+            features = model.pred_features(noisy_semantic_image, observed_map)
         elif not noisy_semantic and noisy_traj:
-            feature_input = torch.cat([semantic_image, noisy_observed_map], dim=1)
+            features = model.pred_features(semantic_image, noisy_observed_map)
         else:
-            feature_input = torch.cat([semantic_image, observed_map], dim=1) 
-        features = model.pred_features(feature_input)
+            features = model.pred_features(semantic_image, observed_map)
         pred_goal_map = model.pred_goal(features)
 
         # goal loss 

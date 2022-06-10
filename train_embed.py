@@ -6,7 +6,7 @@ import pandas as pd
 from models.trainer_embed import YNetTrainer
 from utils.parser import get_parser
 from utils.util_embed import get_experiment_name, get_params, get_image_and_data_path
-from utils.dataset import set_random_seeds, load_train_val_test
+from utils.dataset import set_random_seeds, prepare_dataeset
 from evaluator.visualization import plot_given_trajectories_scenes_overlay
 
 
@@ -19,14 +19,11 @@ def main(args):
     IMAGE_PATH, DATA_PATH = get_image_and_data_path(params)
 
     # load data 
-    df_train, df_val, df_test = load_train_val_test(DATA_PATH, 
-        n_sample=args.batch_size*args.n_train_batch, shuffle=args.shuffle)
-    print(df_train.metaId.unique())
-    print(df_val.metaId.unique())
-    print(df_test.metaId.unique())
-    print(f"df_train: {df_train.shape}; #={df_train.metaId.unique().shape[0]}")
-    if df_val is not None: print(f"df_val: {df_val.shape}; #={df_val.metaId.unique().shape[0]}")
-    if df_test is not None: print(f"df_test: {df_test.shape}; #={df_test.metaId.unique().shape[0]}")
+    df_train, df_val, df_test = prepare_dataeset(
+        DATA_PATH, args.load_data, args.batch_size, args.n_train_batch, 
+        args.train_files, args.val_files, args.val_split, args.test_splits, 
+        args.shuffle, args.share_val_test, 'train', args.hide_data_details)
+
     folder_name = f"{args.seed}__{'_'.join(args.dataset_path.split('/'))}"
 
     # experiment name 

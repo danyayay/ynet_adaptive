@@ -3,9 +3,9 @@ import time
 import numpy as np 
 import pandas as pd
 
-from models.trainer_fusion import YNetTrainer
+from models.trainer import YNetTrainer
 from utils.parser import get_parser
-from utils.util_fusion import get_experiment_name, get_params, get_image_and_data_path
+from utils.util import get_experiment_name, get_params, get_image_and_data_path
 from utils.dataset import set_random_seeds, prepare_dataeset
 from evaluator.visualization import plot_given_trajectories_scenes_overlay
 
@@ -74,7 +74,6 @@ def main(args):
 
 if __name__ == '__main__':
     parser = get_parser(True)
-    parser.add_argument('--init_check', action='store_true')
     args = parser.parse_args()
 
     main(args)

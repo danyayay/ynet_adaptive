@@ -786,31 +786,15 @@ def filter_long_tail_df(df_varfs, varf_list, n=3):
     return df_varfs_filter, p_filter
 
 
-def dataset_split(
-    data_path, train_files, val_split=0.1, n_leftouts=None, 
-    shuffle_data=False, share_val_test=False, given_scenes=None, given_test_meta_ids=None):
-    if n_leftouts:
-        df_train, df_val, df_test = dataset_split_given_ratio_and_leftout(
-            data_path, train_files, val_split, n_leftouts, shuffle_data, share_val_test, given_test_meta_ids)
-    elif given_scenes:
-        df_test = dataset_split_given_scenes(
-            data_path, train_files, given_scenes)
-        df_train, df_val = None, None
-    else:
-        # TODO: cases where train files and val files do not overlap 
-        raise ValueError('No implementation in this case')
-    return df_train, df_val, df_test 
-
-
-def dataset_split_given_ratio_and_leftout(
-    data_path, train_files, val_split, n_leftouts=None, 
-    shuffle_data=False, share_val_test=False, given_test_meta_ids=None):
-    print(f"Split {train_files} given val_split={val_split}, n_leftout={n_leftouts}")
+def split_train_val_test_sequentially(
+    data_path, train_files, val_split, test_splits=None, 
+    shuffle=False, share_val_test=False):
+    print(f"Split {train_files} given val_split={val_split}, test_split={test_splits}")
     df_train, df_val, df_test = pd.DataFrame([]), pd.DataFrame([]), pd.DataFrame([])
-    for train_file, n_leftout in zip(train_files, n_leftouts):
+    for train_file, test_split in zip(train_files, test_splits):
         df_train_ = pd.read_pickle(os.path.join(data_path, train_file))
-        df_train_, df_val_, df_test_ = split_train_val_test(
-            df_train_, val_split, n_leftout, share_val_test, shuffle_data, given_test_meta_ids)
+        df_train_, df_val_, df_test_ = dataset_split_by_ratio(
+            df_train_, val_split, test_split, shuffle, share_val_test)
         df_train = pd.concat([df_train, df_train_])
         df_val = pd.concat([df_val, df_val_])
         if df_test_ is not None:
@@ -818,17 +802,18 @@ def dataset_split_given_ratio_and_leftout(
     return df_train, df_val, df_test
 
 
-def split_train_val_test(
-    df, val_split, n_test=None, share_val_test=False, shuffle_data=False, given_test_meta_ids=None):
+def dataset_split_by_ratio(df, val_split, test_split=None, 
+    shuffle=False, share_val_test=False, given_test_meta_ids=None):
     # idx
     unique_meta_ids = np.unique(df["metaId"])
-    if shuffle_data:
+    if shuffle:
         print('Shuffling data')
         np.random.shuffle(unique_meta_ids)
     n_metaId = unique_meta_ids.shape[0]
     n_val = int(val_split) if val_split > 1 else int(val_split * n_metaId)
     # split
-    if n_test:
+    if test_split is not None:
+        n_test = int(test_split) if test_split > 1 else int(test_split * n_metaId)
         if share_val_test:
             print('Share validation and test set')
             n_train = n_metaId - n_test 
@@ -906,11 +891,12 @@ def split_train_val_test_randomly(data_dir, data_filename, val_split, test_split
     print('Split train/val/test set')
 
 
-def load_train_val_test(data_path, n_sample=None, shuffle=False):
+def load_predefined_train_val_test(data_path, batch_size, n_train_batch=None, shuffle=False):
     df_train = pd.read_pickle(f'{data_path}/train.pkl')
     df_val = pd.read_pickle(f'{data_path}/val.pkl')
     df_test = pd.read_pickle(f'{data_path}/test.pkl')
-    if n_sample is not None: 
+    if n_train_batch is not None:
+        n_sample = batch_size * n_train_batch 
         unique_train_ids = df_train.metaId.unique()
         n_train = unique_train_ids.shape[0]
         assert n_sample < n_train, \
@@ -920,6 +906,45 @@ def load_train_val_test(data_path, n_sample=None, shuffle=False):
         df_train = reduce_df_meta_ids(df_train, unique_train_ids[:n_sample])
     return df_train, df_val, df_test 
 
+
+def prepare_dataeset(
+    data_path, load_data, batch_size, n_train_batch, 
+    train_files, val_files, val_split, test_splits, 
+    shuffle, share_val_test, mode='train', hide_data_details=False):
+    if load_data == 'predefined':
+        print('Loading predefined train/val/test sets')
+        df_train, df_val, df_test = load_predefined_train_val_test(data_path, 
+            batch_size=batch_size, n_train_batch=n_train_batch, shuffle=shuffle)
+    else:
+        print('Splitting train/val/test sets sequentially')
+        if mode == 'train':
+            assert train_files is not None, 'No train file is provided'
+            assert val_files is not None, 'No val file is provided'
+            assert val_split is not None, 'No val split is provided'
+            if train_files == val_files:
+                df_train, df_val, df_test = split_train_val_test_sequentially(data_path, 
+                    train_files, val_split, test_splits, shuffle, share_val_test)
+            else:
+                raise NotImplementedError 
+            df_train = limit_samples(df_train, n_train_batch, batch_size)
+        elif mode == 'eval':
+            assert val_files is not None, 'No val file is provided'
+            df_train, df_val, df_test = split_train_val_test_sequentially(data_path, 
+                val_files, val_split, test_splits, shuffle, share_val_test)
+        else:
+            raise NotImplementedError
+
+    if not hide_data_details:
+        print(f'train_meta_ids: {df_train.metaId.unique()}')
+        print(f'val_meta_ids: {df_val.metaId.unique()}')
+        print(f'test_meta_ids: {df_test.metaId.unique()}')
+
+    if mode == 'train':
+        if df_train is not None: print(f"df_train: {df_val.shape}; #={df_train.metaId.unique().shape[0]}")
+        if df_val is not None: print(f"df_val: {df_val.shape}; #={df_val.metaId.unique().shape[0]}")
+    if df_test is not None: print(f"df_test: {df_test.shape}; #={df_test.metaId.unique().shape[0]}")
+
+    return df_train, df_val, df_test 
 
 def get_meta_ids_focus(df=None, given_meta_ids=None, given_csv=None, random_n=None):
     if given_meta_ids is not None:
