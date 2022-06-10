@@ -7,16 +7,27 @@ from utils.util_fusion import get_position
 import matplotlib.pyplot as plt
 
 
-def moving_average(x, window, mode='same'):
-    data = np.convolve(x, np.ones(window), mode) / window
-    n = x.shape[0]
-    adjust = window // 2
-    for i in range(adjust):
-        # first several points
-        data[i] = np.mean(data[:(i+adjust+1)])
-        # last several points 
-        data[n-i-1] = np.mean(x[(n-i-adjust-1):])
-    return data 
+def moving_average(x, window, mode='same', box_loc='middle'):
+    if box_loc == 'middle':
+        data = np.convolve(x, np.ones(window), mode) / window
+        n = x.shape[0]
+        adjust = window // 2
+        for i in range(adjust):
+            # first several points
+            data[i] = np.mean(data[:(i+adjust+1)])
+            # last several points 
+            data[n-i-1] = np.mean(x[(n-i-adjust-1):])
+        return data 
+    elif box_loc == 'history':
+        data = np.zeros(x.shape[0])
+        for i in range(window-1):
+            data[i] = np.mean(x[:i+1])
+        for i in range(window-1, x.shape[0]):
+            data[i] = np.mean(x[(i-window+1):(i+1)])
+        return data 
+    else:
+        raise NotImplementedError
+
 
 def extract_training_score(text):
     df = pd.DataFrame()
@@ -32,7 +43,8 @@ def extract_training_score(text):
 
 
 def extract_curve(
-    train_msgs, test_msgs=None, val_window=9, test_window=9, show_raw_val=False, show_raw_test=False,
+    train_msgs, test_msgs=None, val_window=9, test_window=9, 
+    show_raw_val=False, show_raw_test=False, box_loc='middle',
     out_path='figures/training_curve/curve.png'):
     if test_msgs is not None:
         df_test = extract_test_score(test_msgs)
@@ -67,11 +79,11 @@ def extract_curve(
             test_fde = df_test_seed.fde 
             test_ready = True if test_ade.shape[0] != 0 else False 
         if val_window is not None:
-            val_ade = moving_average(df_curve.val_ade, val_window)
-            val_fde = moving_average(df_curve.val_fde, val_window)
+            val_ade = moving_average(df_curve.val_ade, val_window, box_loc=box_loc)
+            val_fde = moving_average(df_curve.val_fde, val_window, box_loc=box_loc)
             if test_msgs is not None and test_ready:
-                test_ade = moving_average(test_ade, test_window)
-                test_fde = moving_average(test_fde, test_window)            
+                test_ade = moving_average(test_ade, test_window, box_loc='middle')
+                test_fde = moving_average(test_fde, test_window, box_loc='middle')            
 
         start = 5
         # ade 
@@ -164,17 +176,14 @@ def get_train_seed(ckpt_path):
 
 def get_train_net(ckpt_path):
     if ckpt_path is not None:
-        return ckpt_path.split('__')[5]
+        return ckpt_path.split('__')[2]
     else:
         return None 
 
 
 def get_n_train(ckpt_path):
     if ckpt_path is not None:
-        if 'Pos' in ckpt_path: 
-            n_train = int(ckpt_path.split('__')[7].split('_')[1])
-        else:
-            n_train = int(ckpt_path.split('__')[6].split('_')[1])
+        n_train = int(ckpt_path.split('TrN_')[-1].split('_')[0])
         return n_train
     else:
         return None 
@@ -210,7 +219,9 @@ def get_bool_aug(ckpt_path):
         return None 
 
 
-def extract_file(file_path, test_file_path, out_dir, val_window, test_window):
+def extract_file(
+    file_path, test_file_path, out_dir, 
+    val_window, test_window, box_loc, show_raw_val, show_raw_test):
     with open(file_path, 'r') as f:
         msgs = f.read()
     if test_file_path is not None:
@@ -225,17 +236,27 @@ def extract_file(file_path, test_file_path, out_dir, val_window, test_window):
     else:
         file_name = file_path.replace('.out', '')
     
-    out_path = f'{out_dir}/{file_name}_{val_window}_{test_window}.png' if test_file_path is None else f'{out_dir}/{file_name}_test_{val_window}_{test_window}.png'
-    extract_curve(train_msgs=msgs, test_msgs=test_msgs, val_window=val_window, test_window=test_window, out_path=out_path)
+    if test_file_path is None:
+        out_path = f'{out_dir}/{file_name}__{box_loc}_{val_window}_{test_window}_{show_raw_val}_{show_raw_test}.png'  
+    else:
+        out_path = f'{out_dir}/{file_name}__test_{box_loc}_{val_window}_{test_window}_{show_raw_val}_{show_raw_test}.png'
+
+    extract_curve(train_msgs=msgs, test_msgs=test_msgs, 
+        val_window=val_window, test_window=test_window, out_path=out_path, 
+        box_loc=box_loc, show_raw_val=show_raw_val, show_raw_test=show_raw_test)
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--file_path', default=None, type=str)
     parser.add_argument('--test_file_path', default=None, type=str)
+    parser.add_argument('--box_loc', default='middle', type=str, choices=['history', 'middle'])
     parser.add_argument('--val_window', default=9, type=int)
     parser.add_argument('--test_window', default=9, type=int)
+    parser.add_argument('--show_raw_val', action='store_true')
+    parser.add_argument('--show_raw_test', action='store_true')
     parser.add_argument('--out_dir', default='csv/log', type=str)
     args = parser.parse_args()
     
-    extract_file(args.file_path, args.test_file_path, args.out_dir, args.val_window, args.test_window)
+    extract_file(args.file_path, args.test_file_path, args.out_dir, 
+        args.val_window, args.test_window, args.box_loc, args.show_raw_val, args.show_raw_test)
