@@ -98,17 +98,14 @@ def extract_imp_msg(imp_msg):
 
 def get_train_net(ckpt_path):
     if ckpt_path is not None:
-        return ckpt_path.split('__')[5]
+        return ckpt_path.split('__')[2]
     else:
         None 
 
 
 def get_n_train(ckpt_path):
     if ckpt_path is not None:
-        if 'Pos' in ckpt_path: 
-            n_train = int(ckpt_path.split('__')[7].split('_')[1])
-        else:
-            n_train = int(ckpt_path.split('__')[6].split('_')[1])
+        n_train = int(ckpt_path.split('TrN_')[-1].split('_')[0])
         return n_train
     else:
         return None 

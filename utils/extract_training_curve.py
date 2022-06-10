@@ -71,6 +71,8 @@ def extract_curve(
         
         if position is not None:    
             label_name = f'TrS{train_seed}_{train_net}[{position}]({n_train})_{ade}/{fde}'
+        else:
+            label_name = f'TrS{train_seed}_{train_net}({n_train})_{ade}/{fde}'
         
         val_ade = df_curve.val_ade
         val_fde = df_curve.val_fde
