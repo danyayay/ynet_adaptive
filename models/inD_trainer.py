@@ -200,7 +200,7 @@ class YNetTrainer:
 
         optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
-        lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=steps, gamma=lr_decay_ratio)
+        # lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=steps, gamma=lr_decay_ratio)
 
         print('The number of trainable parameters: {:d}'.format(
             sum(param.numel() for param in model.parameters() if param.requires_grad)))
@@ -238,10 +238,11 @@ class YNetTrainer:
                 network=network, swap_semantic=swap_semantic)
             
             print(
-                f'Epoch {e}: 	Train (Top-1) ADE: {train_ADE:.2f} FDE: {train_FDE:.2f} 		Val (Top-k) ADE: {val_ADE:.2f} FDE: {val_FDE:.2f}   lr={lr_scheduler.get_last_lr()[0]}')
+                # f'Epoch {e}: 	Train (Top-1) ADE: {train_ADE:.2f} FDE: {train_FDE:.2f} 		Val (Top-k) ADE: {val_ADE:.2f} FDE: {val_FDE:.2f}   lr={lr_scheduler.get_last_lr()[0]}')
+                f'Epoch {e}: 	Train (Top-1) ADE: {train_ADE:.2f} FDE: {train_FDE:.2f} 		Val (Top-k) ADE: {val_ADE:.2f} FDE: {val_FDE:.2f}')
             self.val_ADE.append(val_ADE)
             self.val_FDE.append(val_FDE)
-            lr_scheduler.step()
+            # lr_scheduler.step()
 
             if smooth_val:
                 # TODO: do not work if n_epoch < window_size
@@ -264,15 +265,17 @@ class YNetTrainer:
                 best_val_ADE = val_ADE
                 best_epoch = e
                 best_state_dict = curr_model_dict
+                print(f'Best Epoch {e}: \nVal ADE: {val_ADE} \nVal FDE: {val_FDE}')
+                torch.save(model.state_dict(),  f'{ckpt_path}/{experiment_name}_weights.pt') 
 
-            if e % save_every_n == 0 and not fine_tune:
-                pathlib.Path(ckpt_path).mkdir(parents=True, exist_ok=True)
-                self.save_params(f'{ckpt_path}/{experiment_name}__epoch_{e}.pt', train_net)
+            # if e % save_every_n == 0 and not fine_tune:
+            #     pathlib.Path(ckpt_path).mkdir(parents=True, exist_ok=True)
+            #     self.save_params(f'{ckpt_path}/{experiment_name}__epoch_{e}.pt', train_net)
 
-            # early stop in case of clear overfitting
-            if best_val_ADE < min(self.val_ADE[-n_early_stop:]):
-                print(f'Early stop at epoch {e}')
-                break
+            # # early stop in case of clear overfitting
+            # if best_val_ADE < min(self.val_ADE[-n_early_stop:]):
+            #     print(f'Early stop at epoch {e}')
+            #     break
 
         # Load the best model
         print(f'Best epoch at {best_epoch}')
