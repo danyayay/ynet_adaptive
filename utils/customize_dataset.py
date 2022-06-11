@@ -26,7 +26,7 @@ if __name__ == "__main__":
                             "'avg_acc', 'max_acc', 'abs+max_acc', 'abs+avg_acc', "+\
                             "'min_dist', 'avg_den50', 'avg_den100', 'agent_type'")
     parser.add_argument("--varf_ranges", help='range of varation factor to take', 
-                        default=[(0.25, 0.7), (1, 3)])
+                        default=[(0.5, 3.5), (4, 8)])
 
     parser.add_argument("--labels", default=['Pedestrian', 'Biker'], nargs='+', type=str,
                         choices=['Biker', 'Bus', 'Car', 'Cart', 'Pedestrian', 'Skater'])
