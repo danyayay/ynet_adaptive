@@ -52,7 +52,7 @@ def get_general_args(parser):
 def get_train_args(parser):
     parser.add_argument("--fine_tune", action="store_true")
     parser.add_argument("--n_epoch", default=1, type=int)
-    parser.add_argument("--n_train_batch", default=None, type=int, help="Limited number of batches for each training agent (fine-tuning), None means no limit (training)")
+    parser.add_argument("--n_train_batch", default=None, type=float, help="Limited number of batches for each training agent (fine-tuning), None means no limit (training)")
     # learning rate 
     parser.add_argument("--lr", default=0.0001, type=float)
     parser.add_argument("--steps", default=[], type=int, nargs='+')

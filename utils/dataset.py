@@ -896,7 +896,7 @@ def load_predefined_train_val_test(data_path, batch_size, n_train_batch=None, sh
     df_val = pd.read_pickle(f'{data_path}/val.pkl')
     df_test = pd.read_pickle(f'{data_path}/test.pkl')
     if n_train_batch is not None:
-        n_sample = batch_size * n_train_batch 
+        n_sample = int(batch_size * n_train_batch)
         unique_train_ids = df_train.metaId.unique()
         n_train = unique_train_ids.shape[0]
         assert n_sample < n_train, \
