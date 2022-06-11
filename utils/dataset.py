@@ -405,10 +405,10 @@ def aggregate_per_varf_value_per_metaId(df_meta, varf, obs_len):
     return stats, label
 
 
-def add_range_column(df, varf, varf_range, obs_len, inclusive='both'):
+def add_range_column(df, varf, varf_ranges, obs_len, inclusive='both'):
     df_stats = aggregate_per_varf_value(df, varf, obs_len)
-    df_stats.loc[df_stats[varf].between(varf_range[0], varf_range[1], 
-        inclusive=inclusive), f'{varf}_range'] = f'{varf_range[0]}_{varf_range[1]}'
+    for r in varf_ranges:
+        df_stats.loc[df_stats[varf].between(r[0], r[1], inclusive=inclusive), f'{varf}_range'] = f'{r[0]}_{r[1]}'
     df = df.merge(df_stats[['metaId', f'{varf}_range']], on='metaId')
     return df
 
@@ -476,12 +476,19 @@ def create_dataset_given_range(df, varf, varf_ranges, labels, out_dir,
     df_label = df[df.label.isin(labels)]
 
     # categorize by factor of variation
-    for var_factor, var_range in zip(varf, varf_ranges):
-        df_label = add_range_column(df_label, var_factor, var_range, obs_len, inclusive=inclusive)
-    varf_col_name = '__'.join(varf)+'_range'
-    nonan_mask = df_label.isna().any(axis=1)
-    df_label.loc[~nonan_mask, varf_col_name] = \
-        df_label.loc[~nonan_mask, [f + '_range' for f in varf]].agg('__'.join, axis=1)
+    if isinstance(varf_ranges[0], tuple):
+        varf = varf[0]
+        df_label = add_range_column(df_label, varf, varf_ranges, obs_len, inclusive=inclusive)
+        varf_col_name = f'{varf}_range'
+    elif isinstance(varf_ranges[0], list):
+        for f, r in zip(varf, varf_ranges):
+            df_label = add_range_column(df_label, f, r, obs_len, inclusive=inclusive)
+        varf_col_name = '__'.join(varf)+'_range'
+        nonan_mask = df_label.isna().any(axis=1)
+        df_label.loc[~nonan_mask, varf_col_name] = \
+            df_label.loc[~nonan_mask, [f + '_range' for f in varf]].agg('__'.join, axis=1)
+    else:
+        raise ValueError(f'Cannot process {varf}.')
     df_gb = df_label.groupby(by=varf_col_name, dropna=True)
     print('Statistics:\n', df_gb.count()['metaId'] / 20)
     print('# total:', (df_gb.count()['metaId'] / 20).sum())
