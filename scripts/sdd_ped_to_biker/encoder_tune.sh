@@ -1,4 +1,4 @@
-list_train_seed=(1) 
+list_train_seed=(2 3 4 5) 
 batch_size=10
 n_epoch=100
 n_round=3
@@ -9,7 +9,7 @@ train_net=train
 list_n_train_batch=(0.5 1 2 4 8) 
 list_train_net=(encoder)
 list_position=("0 1 2 3 4")  # non-baseline models need position 
-list_lr=(0.0005 0.0001)
+list_lr=(0.0005)
 
 # pretrained_ckpt=${ckpt_path}/Seed_1__Tr_Pedestrian__Val_Pedestrian__ValRatio_0.1__filter_agent_type__train__original.pt
 pretrained_ckpt=${ckpt_path}/sdd_trajnet_weights.pt
