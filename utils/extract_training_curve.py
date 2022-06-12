@@ -3,7 +3,7 @@ import argparse
 import pathlib
 import numpy as np
 import pandas as pd
-from utils.util_fusion import get_position
+from utils.util import get_position
 import matplotlib.pyplot as plt
 
 
@@ -42,7 +42,7 @@ def extract_training_score(text):
     return df
 
 
-def extract_curve(
+def extract_curve_seed(
     train_msgs, test_msgs=None, val_window=9, test_window=9, 
     show_raw_val=False, show_raw_test=False, box_loc='middle',
     out_path='figures/training_curve/curve.png'):
@@ -50,7 +50,6 @@ def extract_curve(
         df_test = extract_test_score(test_msgs)
 
     train_msgs_list = re.split('save_every_n', train_msgs)[1:]
-    df = pd.DataFrame(columns=['seed', 'pretrained_ckpt', 'experiment', 'n_param', 'n_epoch', 'ade', 'fde'])
     fig, axes = plt.subplots(1, 2, figsize=(13, 4))
     for msg in train_msgs_list: 
         df_curve = extract_training_score(msg)
@@ -134,8 +133,73 @@ def extract_curve(
     plt.savefig(out_path)   
     print('Saved', out_path)
     plt.close(fig)
+
+
+def extract_curve_model(
+    train_msgs, val_window=9,  
+    show_train=False, show_raw_val=False, box_loc='middle',
+    out_path='figures/training_curve/curve.png'):
+
+    train_msgs_list = re.split('save_every_n', train_msgs)[1:]
+    fig, axes = plt.subplots(1, 2, figsize=(13, 4))
+    for msg in train_msgs_list: 
+        df_curve = extract_training_score(msg)
+
+        experiment = re.search("Experiment (.*?) has started", msg).group(1)
+        train_seed = int(re.search("'seed': ([\d+]),", msg).group(1))
+        n_epoch = re.search("Best epoch at ([\d]+)", msg)
+        n_epoch = int(n_epoch.group(1)) + 1 if n_epoch is not None else 199
+        metric = re.search('Average performance \(by [\d]+\): \nTest ADE: ([\d\.]+) \nTest FDE: ([\d\.]+)', msg)
+        ade = round(float(metric.group(1)), 2)
+        fde = round(float(metric.group(2)), 2)
+        train_net = get_train_net(experiment)
+        n_train = int(get_n_train(experiment))
+        position = get_position(experiment, return_list=False)
+        lr = get_lr(experiment)
+        
+        if position is not None:    
+            label_name = f'TrS{train_seed}_{train_net}[{position}]({n_train})_{lr}_{ade}/{fde}'
+        else:
+            label_name = f'TrS{train_seed}_{train_net}({n_train})_{lr}_{ade}/{fde}'
+        
+        val_ade = df_curve.val_ade
+        val_fde = df_curve.val_fde
+        if val_window is not None:
+            val_ade = moving_average(df_curve.val_ade, val_window, box_loc=box_loc)
+            val_fde = moving_average(df_curve.val_fde, val_window, box_loc=box_loc)        
+
+        start = 5
+        # ade 
+        # validation
+        p = axes[0].plot(df_curve.epoch[start:], val_ade[start:], linewidth=1)
+        axes[0].scatter(n_epoch, val_ade[n_epoch], c=p[-1].get_color(), marker='*')
+        if show_raw_val:
+            axes[0].plot(df_curve.epoch[start:], df_curve.val_ade[start:], 
+                linewidth=0.5, alpha=0.5, c=p[-1].get_color())
+            axes[0].scatter(df_curve.epoch[start:], df_curve.val_ade[start:], c=p[-1].get_color(), s=1)
+        if show_train:
+            axes[0].plot(df_curve.epoch[start:], df_curve.train_ade[start:], linestyle='--', c=p[-1].get_color())
+
+        # fde 
+        # validation 
+        p = axes[1].plot(df_curve.epoch[start:], val_fde[start:], 
+            label=label_name, linewidth=1)
+        axes[1].scatter(n_epoch, val_fde[n_epoch], c=p[-1].get_color(), marker='*')
+        if show_raw_val:
+            axes[1].plot(df_curve.epoch[start:], df_curve.val_fde[start:], 
+                linewidth=0.5, alpha=0.5, c=p[-1].get_color())
+            axes[1].scatter(df_curve.epoch[start:], df_curve.val_fde[start:], 
+                c=p[-1].get_color(), s=1)
+        if show_train:
+            axes[1].plot(df_curve.epoch[start:], df_curve.train_fde[start:], linestyle='--', c=p[-1].get_color())
     
-    return df
+    axes[0].set_ylabel('ADE')
+    axes[1].set_ylabel('FDE')
+    plt.legend(bbox_to_anchor=(1.04,1), borderaxespad=0)
+    plt.subplots_adjust(right=0.7)
+    plt.savefig(out_path)   
+    print('Saved', out_path)
+    plt.close(fig)
 
 
 def extract_test_score(test_msg):
@@ -223,7 +287,8 @@ def get_bool_aug(ckpt_path):
 
 def extract_file(
     file_path, test_file_path, out_dir, 
-    val_window, test_window, box_loc, show_raw_val, show_raw_test):
+    val_window, test_window, box_loc, 
+    show_train, show_raw_val, show_raw_test, diff):
     with open(file_path, 'r') as f:
         msgs = f.read()
     if test_file_path is not None:
@@ -237,15 +302,19 @@ def extract_file(
         file_name = re.search('/([^/]+).out', file_path).group(1)
     else:
         file_name = file_path.replace('.out', '')
-    
-    if test_file_path is None:
-        out_path = f'{out_dir}/{file_name}__{box_loc}_{val_window}_{test_window}_{show_raw_val}_{show_raw_test}.png'  
-    else:
-        out_path = f'{out_dir}/{file_name}__test_{box_loc}_{val_window}_{test_window}_{show_raw_val}_{show_raw_test}.png'
 
-    extract_curve(train_msgs=msgs, test_msgs=test_msgs, 
-        val_window=val_window, test_window=test_window, out_path=out_path, 
-        box_loc=box_loc, show_raw_val=show_raw_val, show_raw_test=show_raw_test)
+    if diff == 'seed':
+        if test_file_path is None:
+            out_path = f'{out_dir}/{file_name}__{box_loc}_{val_window}_{test_window}_{show_raw_val}_{show_raw_test}.png'  
+        else:
+            out_path = f'{out_dir}/{file_name}__test_{box_loc}_{val_window}_{test_window}_{show_raw_val}_{show_raw_test}.png'
+        extract_curve_seed(train_msgs=msgs, test_msgs=test_msgs, 
+            val_window=val_window, test_window=test_window, out_path=out_path, 
+            box_loc=box_loc, show_raw_val=show_raw_val, show_raw_test=show_raw_test)
+    elif diff == 'model':
+        out_path = f'{out_dir}/{file_name}_{box_loc}_{val_window}_{show_train}_{show_raw_val}_{show_raw_test}.png'
+        extract_curve_model(train_msgs=msgs, val_window=val_window, out_path=out_path, 
+            box_loc=box_loc, show_raw_val=show_raw_val, show_train=show_train)
 
 
 if __name__ == '__main__':
@@ -255,10 +324,14 @@ if __name__ == '__main__':
     parser.add_argument('--box_loc', default='middle', type=str, choices=['history', 'middle'])
     parser.add_argument('--val_window', default=9, type=int)
     parser.add_argument('--test_window', default=9, type=int)
+
+    parser.add_argument('--show_train', action='store_true')
     parser.add_argument('--show_raw_val', action='store_true')
     parser.add_argument('--show_raw_test', action='store_true')
-    parser.add_argument('--out_dir', default='csv/log', type=str)
+    parser.add_argument('--out_dir', default='./', type=str)
+    parser.add_argument('--diff', choices=['seed', 'model'])
     args = parser.parse_args()
     
     extract_file(args.file_path, args.test_file_path, args.out_dir, 
-        args.val_window, args.test_window, args.box_loc, args.show_raw_val, args.show_raw_test)
+        args.val_window, args.test_window, args.box_loc, 
+        args.show_train, args.show_raw_val, args.show_raw_test, args.diff)

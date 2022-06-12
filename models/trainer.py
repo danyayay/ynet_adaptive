@@ -262,7 +262,7 @@ class YNetTrainer:
             
             if val_ADE < best_val_ADE:
                 best_val_ADE = val_ADE
-                best_epoch = e
+                best_epoch = e - half_window_size + 1 if smooth_val else e
                 best_state_dict = curr_model_dict
 
             if e % save_every_n == 0 and not fine_tune:
