@@ -1,9 +1,8 @@
-from multiprocessing.sharedctypes import Value
 import re
 import argparse
 import pathlib
 import pandas as pd
-from utils.util_fusion import get_position
+from utils.util import get_position
 
 
 def extract_train_msg(test_msg):

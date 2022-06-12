@@ -24,6 +24,7 @@ def get_experiment_name(args, n_data):
     if args.n_train_batch is not None: 
         experiment += f'__TrN_{n_data}'
         experiment += f'__lr_{np.format_float_positional(args.lr, trim="-")}'
+        if args.smooth_val: experiment += '__smooth'
         if args.augment: experiment += '__AUG'
         if args.ynet_bias: experiment += '__bias'
 
@@ -43,9 +44,10 @@ def get_params(args):
     params['segmentation_model_fp'] = os.path.join(
         params['data_dir'], params['dataset_name'], 'segmentation_model.pth')
     params.update(vars(args))
-    if args.n_train_batch is not None:
-        if int(args.n_train_batch) == args.n_train_batch:
-            args.n_train_batch = int(args.n_train_batch)
+    if hasattr(args, 'n_train_batch'):
+        if args.n_train_batch is not None:
+            if int(args.n_train_batch) == args.n_train_batch:
+                args.n_train_batch = int(args.n_train_batch)
     print(params)
     return params 
 
