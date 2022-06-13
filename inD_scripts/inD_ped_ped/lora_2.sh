@@ -1,4 +1,4 @@
-list_train_seed=(1) 
+list_train_seed=(2 3 4 5 6 7 8 9) 
 batch_size=10
 n_epoch=120
 n_round=3
@@ -6,10 +6,10 @@ ckpt_path=inD_ckpts
 network=original
 train_net=train
 
-list_n_train_batch=(0.5 1 2) 
-list_train_net=(lora_2)
+list_n_train_batch=(1 2) 
+list_train_net=(lora_1)
 list_position=("0 1 2 3 4")  # non-baseline models need position 
-list_lr=(0.005 0.003 0.001 0.0005)
+list_lr=(0.005)
 
 # pretrained_ckpt=${ckpt_path}/Seed_1__Tr_Pedestrian__Val_Pedestrian__ValRatio_0.1__filter_agent_type__train__original.pt
 # pretrained_ckpt=${ckpt_path}/Seed_1__filter_agent_type_scene234_pedestrian___train__original_weights.pt
