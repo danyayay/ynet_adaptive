@@ -265,7 +265,7 @@ class YNetTrainer:
                 best_epoch = e - half_window_size + 1 if smooth_val else e
                 best_state_dict = curr_model_dict
 
-            if e % save_every_n == 0 and not fine_tune:
+            if (e+1) % save_every_n == 0:
                 pathlib.Path(ckpt_path).mkdir(parents=True, exist_ok=True)
                 self.save_params(f'{ckpt_path}/{experiment_name}__epoch_{e}.pt', train_net)
 

@@ -192,7 +192,7 @@ def extract_curve_model(
                 c=p[-1].get_color(), s=1)
         if show_train:
             axes[1].plot(df_curve.epoch[start:], df_curve.train_fde[start:], linestyle='--', c=p[-1].get_color())
-    
+
     axes[0].set_ylabel('ADE')
     axes[1].set_ylabel('FDE')
     plt.legend(bbox_to_anchor=(1.04,1), borderaxespad=0)
