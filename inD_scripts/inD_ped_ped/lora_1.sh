@@ -1,4 +1,4 @@
-list_train_seed=(7 8 9) 
+list_train_seed=(1 2 3 4 5 6 7 8 9 10) 
 batch_size=10
 n_epoch=120
 n_round=3
@@ -6,7 +6,7 @@ ckpt_path=inD_ckpts
 network=original
 train_net=train
 
-list_n_train_batch=(1) 
+list_n_train_batch=(3 4) 
 list_train_net=(lora_1)
 list_position=("0 1 2 3 4")  # non-baseline models need position 
 # list_lr=(0.005 0.003 0.001 0.0005)
@@ -18,7 +18,7 @@ pretrained_ckpt=${ckpt_path}/inD_longterm_weights.pt
 
 
 ########## if use sequentially split data 
-dataset_path=filter/agent_type/scene1/pedestrian
+dataset_path=filter/agent_type/scene1/pedestrian_40
 # train_files=pedestrian.pkl
 # val_files=pedestrian.pkl
 # val_split=40
