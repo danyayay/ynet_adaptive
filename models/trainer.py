@@ -265,7 +265,7 @@ class YNetTrainer:
                 best_epoch = e - half_window_size + 1 if smooth_val else e
                 best_state_dict = curr_model_dict
 
-            if e % save_every_n == 0 and not fine_tune:
+            if (e+1) % save_every_n == 0:
                 pathlib.Path(ckpt_path).mkdir(parents=True, exist_ok=True)
                 self.save_params(f'{ckpt_path}/{experiment_name}__epoch_{e}.pt', train_net)
 
@@ -379,7 +379,7 @@ class YNetTrainer:
                             noisy_scene_img, traj, input_template, gt_template, criterion, 
                             obs_len, pred_len, waypoints, loss_scale, self.device, False)
                     elif decision == 'map':
-                        pred_goal_map, pred_traj_map, feature_input = self._forward_batch(
+                        pred_goal_map, pred_traj_map = self._forward_batch(
                             noisy_scene_img, traj, input_template, gt_template, criterion, 
                             obs_len, pred_len, waypoints, loss_scale, self.device, 
                             set_input, True)
@@ -392,7 +392,7 @@ class YNetTrainer:
                             noisy_scene_img, traj, input_template, gt_template, criterion, 
                             obs_len, pred_len, waypoints, loss_scale, self.device, False)
                     elif decision == 'map':
-                        pred_goal_map, pred_traj_map, semantic_input_cat, feature_input = self._forward_batch(
+                        pred_goal_map, pred_traj_map, semantic_input_cat = self._forward_batch(
                             scene_raw_img, traj, input_template, gt_template, criterion, 
                             obs_len, pred_len, waypoints, loss_scale, self.device, 
                             set_input, noisy_std_frac, True)
@@ -408,7 +408,7 @@ class YNetTrainer:
                             scene_raw_img, traj, input_template, gt_template, criterion, 
                             obs_len, pred_len, waypoints, loss_scale, self.device, False)
                     elif decision == 'map':
-                        pred_goal_map, pred_traj_map, feature_input = self._forward_batch(
+                        pred_goal_map, pred_traj_map = self._forward_batch(
                             scene_raw_img, traj, input_template, gt_template, criterion, 
                             obs_len, pred_len, waypoints, loss_scale, self.device, 
                             set_input, noisy_std_frac, True)
@@ -427,9 +427,9 @@ class YNetTrainer:
                 return goal_loss, traj_loss, scene_raw_img 
         elif decision == 'map':
             if noisy_std_frac is not None:
-                return pred_goal_map, pred_traj_map, scene_raw_img, noisy_scene_img, semantic_input_cat, feature_input
+                return pred_goal_map, pred_traj_map, scene_raw_img, noisy_scene_img, semantic_input_cat
             else:
-                return pred_goal_map, pred_traj_map, scene_raw_img, feature_input
+                return pred_goal_map, pred_traj_map, scene_raw_img
 
     def _forward_batch(
         self, scene_raw_img, traj, input_template, gt_template, criterion, 
@@ -503,9 +503,9 @@ class YNetTrainer:
         
         if return_pred_map:
             if noisy_semantic or noisy_traj:
-                return pred_goal_map, pred_traj_map, torch.cat([semantic_image, observed_map], dim=1), feature_input
+                return pred_goal_map, pred_traj_map, torch.cat([semantic_image, observed_map], dim=1)
             else:
-                return pred_goal_map, pred_traj_map, feature_input
+                return pred_goal_map, pred_traj_map
         return goal_loss, traj_loss
 
     def prepare_data(

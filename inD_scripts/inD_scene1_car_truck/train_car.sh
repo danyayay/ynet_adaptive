@@ -8,10 +8,10 @@ n_fusion=2
 train_net=train 
 
 ########## if use predefined data
-dataset_path=filter/agent_type/scene1/car_8_12
+dataset_path=filter/agent_type/scene1/car_filter
 load_data=predefined
 
 
 for train_seed in ${list_train_seed[@]}; do
-    CUDA_VISIBLE_SCENE=0 python inD_train.py --config_filename 'inD_shortterm_train.yaml' --seed $train_seed --batch_size $batch_size --n_epoch $n_epoch --dataset_path $dataset_path --network $network --load_data $load_data --train_net $train_net  --n_fusion $n_fusion --ckpt_path $ckpt_path --augment --n_round $n_round 
+    python inD_train.py --config_filename 'inD_shortterm_train.yaml' --seed $train_seed --batch_size $batch_size --n_epoch $n_epoch --dataset_path $dataset_path --network $network --load_data $load_data --train_net $train_net  --n_fusion $n_fusion --ckpt_path $ckpt_path --augment --n_round $n_round 
 done

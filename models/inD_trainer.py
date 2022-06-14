@@ -270,6 +270,7 @@ class YNetTrainer:
                 best_state_dict = curr_model_dict
                 if not fine_tune:
                     print(f'Best Epoch {e}: \nVal ADE: {val_ADE} \nVal FDE: {val_FDE}')
+                    pathlib.Path(ckpt_path).mkdir(parents=True, exist_ok=True)
                     torch.save(model.state_dict(),  f'{ckpt_path}/{experiment_name}_weights.pt')
 
             # if e % save_every_n == 0 and not fine_tune:
@@ -510,9 +511,9 @@ class YNetTrainer:
         
         if return_pred_map:
             if noisy_semantic or noisy_traj:
-                return pred_goal_map, pred_traj_map, torch.cat([semantic_image, observed_map], dim=1), feature_input
+                return pred_goal_map, pred_traj_map, torch.cat([semantic_image, observed_map], dim=1)
             else:
-                return pred_goal_map, pred_traj_map, feature_input
+                return pred_goal_map, pred_traj_map
         return goal_loss, traj_loss
 
     def prepare_data(

@@ -947,7 +947,7 @@ def prepare_dataeset(
         print(f'test_meta_ids: {df_test.metaId.unique()}')
 
     if mode == 'train':
-        if df_train is not None: print(f"df_train: {df_val.shape}; #={df_train.metaId.unique().shape[0]}")
+        if df_train is not None: print(f"df_train: {df_train.shape}; #={df_train.metaId.unique().shape[0]}")
         if df_val is not None: print(f"df_val: {df_val.shape}; #={df_val.metaId.unique().shape[0]}")
     if df_test is not None: print(f"df_test: {df_test.shape}; #={df_test.metaId.unique().shape[0]}")
 
