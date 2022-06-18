@@ -9,17 +9,21 @@ config_filename=sdd_train.yaml
 network=original
 
 # pretrained model 
-pretrained_ckpt=ckpts/sdd_trajnet_weights.pt
+pretrained_ckpt=ckpts/sdd__ynet__ped_to_biker.pt
 ckpt_path=ckpts/sdd/ped_to_biker
 
 # data path 
-dataset_path=filter/agent_type/deathCircle_0/Biker
-load_data=predefined
+dataset_path=filter/agent_type/deathCircle_0
+train_files=Biker.pkl
+val_files=Biker.pkl
+val_split=80
+test_splits=500
+load_data=sequential
 
 # fine-tune setting 
 list_train_net=(parallelLayer_3x3)
 list_position=("0 1 2 3 4")  
-list_n_train_batch=(0.5 1 2 4 8) 
+list_n_train_batch=(1) 
 list_lr=(0.00005)
 
 
