@@ -185,8 +185,8 @@ def augment_data(data, image_path='data/SDD/train', images={}, image_file='refer
     '''
     ks = [1, 2, 3]
     for scene in data.sceneId.unique():
-        scene_name, scene_idx = scene.split("_")
         if use_raw_data:
+            scene_name, scene_idx = scene.split("_")
             im_path = os.path.join(
                 image_path, scene_name, f"video{scene_idx}", image_file)
         else:
