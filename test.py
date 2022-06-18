@@ -1,7 +1,7 @@
 import time 
 import numpy as np
 from utils.parser import get_parser
-from utils.dataset import set_random_seeds, prepare_dataeset
+from utils.data_utils import set_random_seeds, prepare_dataeset
 from utils.util import get_params, get_image_and_data_path, restore_model, get_ckpts_and_names
 from evaluator.visualization import plot_given_trajectories_scenes_overlay
 

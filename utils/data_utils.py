@@ -3,47 +3,12 @@ import cv2
 import torch
 import random
 import pathlib
-import datetime
-import argparse
 import numpy as np
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 mpl.rcParams.update({'figure.max_open_warning': 0})
-
-
-def load_sdd_raw(path):
-    data_path = os.path.join(path, "annotations")
-    scenes_main = os.listdir(data_path)
-    SDD_cols = ['trackId', 'xmin', 'ymin', 'xmax', 'ymax',
-                'frame', 'lost', 'occluded', 'generated', 'label']
-    data = []
-    for scene_main in sorted(scenes_main):
-        scene_main_path = os.path.join(data_path, scene_main)
-        for scene_sub in sorted(os.listdir(scene_main_path)):
-            scene_path = os.path.join(scene_main_path, scene_sub)
-            annot_path = os.path.join(scene_path, 'annotations.txt')
-            scene_df = pd.read_csv(annot_path, header=0,
-                                   names=SDD_cols, delimiter=' ')
-            # Calculate center point of bounding box
-            scene_df['x'] = (scene_df['xmax'] + scene_df['xmin']) / 2
-            scene_df['y'] = (scene_df['ymax'] + scene_df['ymin']) / 2
-            scene_df = scene_df[scene_df['lost'] == 0]  # drop lost samples
-            scene_df = scene_df.drop(
-                columns=['xmin', 'xmax', 'ymin', 'ymax', 'occluded', 'generated', 'lost'])
-            scene_df['sceneId'] = f"{scene_main}_{scene_sub.split('video')[1]}"
-            # new unique id by combining scene_id and track_id
-            scene_df['rec&trackId'] = [recId + '_' + str(trackId).zfill(4) for recId, trackId in
-                                       zip(scene_df.sceneId, scene_df.trackId)]
-            data.append(scene_df)
-    data = pd.concat(data, ignore_index=True)
-    rec_trackId2metaId = {}
-    for i, j in enumerate(data['rec&trackId'].unique()):
-        rec_trackId2metaId[j] = i
-    data['metaId'] = [rec_trackId2metaId[i] for i in data['rec&trackId']]
-    data = data.drop(columns=['rec&trackId'])
-    return data
 
 
 def mask_step(x, step):
@@ -77,12 +42,9 @@ def filter_short_trajectories(df, threshold):
     """
     len_per_id = df.groupby(by='metaId', as_index=False).count(
     )  # sequence-length for each unique pedestrian
-    idx_over_thres = len_per_id[len_per_id['frame']
-                                >= threshold]  # rows which are above threshold
-    # only get metaIdx with sequence-length longer than threshold
-    idx_over_thres = idx_over_thres['metaId'].unique()
-    # filter df to only contain long trajectories
-    df = df[df['metaId'].isin(idx_over_thres)]
+    idx_over_thres = len_per_id[len_per_id['frame'] >= threshold]  # rows which are above threshold
+    idx_over_thres = idx_over_thres['metaId'].unique() # only get metaIdx with sequence-length longer than threshold
+    df = df[df['metaId'].isin(idx_over_thres)] # filter df to only contain long trajectories
     return df
 
 
@@ -109,8 +71,7 @@ def sliding_window(df, window_size, stride):
     :return: df with chunked trajectories
     """
     gb = df.groupby(['metaId'], as_index=False)
-    df = gb.apply(groupby_sliding_window,
-                  window_size=window_size, stride=stride)
+    df = gb.apply(groupby_sliding_window, window_size=window_size, stride=stride)
     df['metaId'] = pd.factorize(df['newMetaId'], sort=False)[0]
     df = df.drop(columns='newMetaId')
     df = df.reset_index(drop=True)
@@ -140,8 +101,7 @@ def split_fragmented(df):
     gb = df.groupby('metaId', as_index=False)
     # calculate frame_{t+1} - frame_{t} and fill NaN which occurs for the first frame of each track
     df['frame_diff'] = gb['frame'].diff().fillna(value=1.0).to_numpy()
-    # df containing all the first frames of fragmentation
-    fragmented = df[df['frame_diff'] != 1.0]
+    fragmented = df[df['frame_diff'] != 1.0] # df containing all the first frames of fragmentation
     gb_frag = fragmented.groupby('metaId')  # helper for gb.apply
     frag_idx = fragmented.metaId.unique()  # helper for gb.apply
     df['newMetaId'] = df['metaId']  # temporary new metaId
@@ -149,15 +109,6 @@ def split_fragmented(df):
     df = gb.apply(split_at_fragment_lambda, frag_idx, gb_frag)
     df['metaId'] = pd.factorize(df['newMetaId'], sort=False)[0]
     df = df.drop(columns='newMetaId')
-    return df
-
-
-def load_raw_dataset(path, step, window_size, stride):
-    df = load_sdd_raw(path=path)
-    df = split_fragmented(df)  # split track if frame is not continuous
-    df = downsample(df, step=step)
-    df = filter_short_trajectories(df, threshold=window_size)
-    df = sliding_window(df, window_size=window_size, stride=stride)
     return df
 
 

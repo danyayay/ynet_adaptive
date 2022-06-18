@@ -1,4 +1,52 @@
-from utils.dataset import *
+import os
+import argparse
+import numpy as np
+import pandas as pd
+
+from utils.data_utils import split_fragmented, downsample, filter_short_trajectories, sliding_window, \
+	create_dataset_given_range, create_dataset_by_agent_type, compute_distance_with_neighbors
+
+
+def load_raw_sdd(path):
+    data_path = os.path.join(path, "annotations")
+    scenes_main = os.listdir(data_path)
+    SDD_cols = ['trackId', 'xmin', 'ymin', 'xmax', 'ymax',
+                'frame', 'lost', 'occluded', 'generated', 'label']
+    data = []
+    for scene_main in sorted(scenes_main):
+        scene_main_path = os.path.join(data_path, scene_main)
+        for scene_sub in sorted(os.listdir(scene_main_path)):
+            scene_path = os.path.join(scene_main_path, scene_sub)
+            annot_path = os.path.join(scene_path, 'annotations.txt')
+            scene_df = pd.read_csv(annot_path, header=0,
+                                   names=SDD_cols, delimiter=' ')
+            # Calculate center point of bounding box
+            scene_df['x'] = (scene_df['xmax'] + scene_df['xmin']) / 2
+            scene_df['y'] = (scene_df['ymax'] + scene_df['ymin']) / 2
+            scene_df = scene_df[scene_df['lost'] == 0]  # drop lost samples
+            scene_df = scene_df.drop(
+                columns=['xmin', 'xmax', 'ymin', 'ymax', 'occluded', 'generated', 'lost'])
+            scene_df['sceneId'] = f"{scene_main}_{scene_sub.split('video')[1]}"
+            # new unique id by combining scene_id and track_id
+            scene_df['rec&trackId'] = [recId + '_' + str(trackId).zfill(4) for recId, trackId in
+                                       zip(scene_df.sceneId, scene_df.trackId)]
+            data.append(scene_df)
+    data = pd.concat(data, ignore_index=True)
+    rec_trackId2metaId = {}
+    for i, j in enumerate(data['rec&trackId'].unique()):
+        rec_trackId2metaId[j] = i
+    data['metaId'] = [rec_trackId2metaId[i] for i in data['rec&trackId']]
+    data = data.drop(columns=['rec&trackId'])
+    return data
+
+
+def load_and_window_sdd(path, step, window_size, stride):
+    df = load_raw_sdd(path=path)
+    df = split_fragmented(df)  # split track if frame is not continuous
+    df = downsample(df, step=step)
+    df = filter_short_trajectories(df, threshold=window_size)
+    df = sliding_window(df, window_size=window_size, stride=stride)
+    return df
 
 
 if __name__ == "__main__":
@@ -32,8 +80,6 @@ if __name__ == "__main__":
                         choices=['Biker', 'Bus', 'Car', 'Cart', 'Pedestrian', 'Skater'])
     parser.add_argument('--selected_scenes', default=None, type=str, nargs='+')
 
-    parser.add_argument("--viz", action='store_true') 
-
     args = parser.parse_args()
     args.labels.sort()
     print(args)
@@ -41,7 +87,7 @@ if __name__ == "__main__":
     # ============== load raw dataset ===============
     if not args.reload:
         # ## load raw dataset
-        df = load_raw_dataset(args.raw_data_dir, args.step, args.window_size, args.stride)
+        df = load_and_window_sdd(args.raw_data_dir, args.step, args.window_size, args.stride)
         print('Loaded raw dataset')
         # possibly add a column of distance with neighbors 
         if 'dist' in args.varf or 'den' in args.varf or np.array(['dist' in f or 'den' in f for f in args.varf]).any():
@@ -57,37 +103,6 @@ if __name__ == "__main__":
         # ## or load from stored pickle
         df = pd.read_pickle(os.path.join(args.raw_data_dir, args.raw_data_filename))
         print('Reloaded raw dataset')
-
-
-    # ================= plot =================
-    if args.viz:
-        varf_list = ['avg_vel', 'max_vel', 'avg_acc', 'max_acc', 
-                    'abs+max_acc', 'abs+avg_acc', 'min_dist', 'avg_den100', 'avg_den50']
-
-        if not args.reload:
-            # ## get variation factor table 
-            df_varfs = get_varf_table(df, varf_list, args.obs_len)
-            df_varfs_com = get_varf_table(df, varf_list, None)
-            df_varfs = df_varfs.merge(
-                df_varfs_com.drop(['label', 'sceneId', 'scene'], axis=1), 
-                on='metaId', suffixes=('', '_com'))
-            out_path = os.path.join(args.additional_data_dir, "df_varfs.pkl")
-            df_varfs.to_pickle(out_path)
-            print(f'Saved variation factor data to {out_path}')
-        else:
-            # ## or load from stored one
-            df_varfs = pd.read_pickle(os.path.join(args.additional_data_dir, "df_varfs.pkl"))
-            print('Loaded variation factor data')
-
-        for varf in varf_list:
-            # plot_varf_hist_obs_and_complete(df_varfs[['label', varf, varf+'_com']], 'figures/filtered_distr/hist/diff')
-            plot_varf_histograms(df_varfs[['label', varf]], 'figures/filtered_distr/hist/obs')
-            plot_scene_w_numeric(df_varfs, varf, 'Bivar', 'figures/filtered_distr/bivar')
-
-        for label in ['Pedestrian', 'Biker', 'Mixed', 'All']:
-            plot_jointplot(df_varfs, varf_list,  label, 'Joint', 'figures/bivar_distr/filter', 'scene', kind='kde')
-        plot_jointplot(df_varfs, varf_list, 'All', 'Joint', 'figures/bivar_distr/filter', 'label', kind='kde')
-
 
     # ============== create customized dataset ================
     if args.varf == ['agent_type']:

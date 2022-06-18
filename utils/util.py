@@ -41,20 +41,38 @@ def get_params(args):
     if args.network == 'fusion': assert args.n_fusion is not None
     with open(os.path.join('config', args.config_filename)) as file:
         params = yaml.load(file, Loader=yaml.FullLoader)
-    params['segmentation_model_fp'] = os.path.join(
-        params['data_dir'], params['dataset_name'], 'segmentation_model.pth')
-    params.update(vars(args))
+
+    # load segmentation model given dataset name 
+    dataset_name = params['dataset_name'].lower()
+    if 'sdd' in dataset_name:
+        params['segmentation_model_fp'] = os.path.join(
+            params['data_dir'], params['dataset_name'], 'segmentation_model.pth')
+    elif 'ind' in dataset_name:
+        params['segmentation_model_fp'] = os.path.join(
+            params['data_dir'], params['dataset_name'], 'inD_segmentation.pth')
+    else:
+        raise ValueError(f'Invalid {dataset_name}')
+    
+    # make n_train_batch integer 
     if hasattr(args, 'n_train_batch'):
         if args.n_train_batch is not None:
             if int(args.n_train_batch) == args.n_train_batch:
                 args.n_train_batch = int(args.n_train_batch)
+    
+    params.update(vars(args))
     print(params)
     return params 
 
 
 def get_image_and_data_path(params):
-    # image path 
-    image_path = os.path.join(params['data_dir'], params['dataset_name'], 'raw', 'annotations')
+    # image path given dataset name 
+    dataset_name = params['dataset_name'].lower()
+    if 'sdd' in dataset_name:
+        image_path = os.path.join(params['data_dir'], params['dataset_name'], 'raw', 'annotations')
+    elif 'ind' in dataset_name:
+        image_path = os.path.join(params['data_dir'], params['dataset_name'], 'images')
+    else:
+        raise ValueError(f'Invalid {dataset_name}')
     assert os.path.isdir(image_path), f'image dir error: {image_path}'
     # data path 
     data_path = os.path.join(params['data_dir'], params['dataset_name'], params['dataset_path'])
@@ -132,3 +150,4 @@ def restore_model(
         model = YNetTrainer(params=updated_params)
         model.load_separated_params(base_ckpt, separated_ckpt)    
     return model 
+    
