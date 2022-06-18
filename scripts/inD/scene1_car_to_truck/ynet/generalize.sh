@@ -8,7 +8,8 @@ config_filename=inD_shortterm_eval.yaml
 network=original
 
 # pretrained model 
-pretrained_ckpt=ckpts/Seed_1__filter_agent_type_scene1_car_filter__train__fusion_2_weights.pt
+ckpts=ckpts/inD__ynet__car_to_truck.pt
+ckpts_name=OODG
 
 # data path 
 dataset_path=filter/agent_type/scene1/truck_bus_filter
@@ -16,5 +17,5 @@ load_data=predefined
 
 
 for eval_seed in ${list_eval_seed[@]}; do
-    python inD_test.py --config_filename $config_filename --seed $eval_seed --batch_size $batch_size --dataset_path $dataset_path --network $network --load_data $load_data --n_round $n_round --pretrained_ckpt $pretrained_ckpt
+    python test.py --config_filename $config_filename --seed $eval_seed --batch_size $batch_size --dataset_path $dataset_path --network $network --load_data $load_data --n_round $n_round --ckpts $ckpts --ckpts_name $ckpts_name
 done

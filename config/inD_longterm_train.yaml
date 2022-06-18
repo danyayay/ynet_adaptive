@@ -54,5 +54,5 @@ n_traj: 1  # K_a
 
 # Data
 use_raw_data: True
-data_dir: data/
+data_dir: /data/dli-data/
 dataset_name: inD-dataset-v1.0

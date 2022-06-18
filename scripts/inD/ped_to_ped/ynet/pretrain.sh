@@ -16,5 +16,5 @@ load_data=predefined
 
 
 for train_seed in ${list_train_seed[@]}; do
-    python inD_train.py --config_filename $config_filename --seed $train_seed --batch_size $batch_size --n_epoch $n_epoch --n_round $n_round --dataset_path $dataset_path --network $network --load_data $load_data --train_net $train_net --ckpt_path $ckpt_path --augment 
+    python train.py --config_filename $config_filename --seed $train_seed --batch_size $batch_size --n_epoch $n_epoch --n_round $n_round --dataset_path $dataset_path --network $network --load_data $load_data --train_net $train_net --ckpt_path $ckpt_path --augment 
 done 

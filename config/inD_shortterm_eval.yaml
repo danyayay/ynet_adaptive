@@ -52,6 +52,6 @@ n_goal: 20  # K_e
 n_traj: 1  # K_a
 
 # Data
-use_raw_data: True
+use_raw_data: False
 data_dir: data/
 dataset_name: inD-dataset-v1.0

@@ -857,7 +857,7 @@ def load_predefined_train_val_test(data_path, batch_size, n_train_batch=None, sh
         n_sample = int(batch_size * n_train_batch)
         unique_train_ids = df_train.metaId.unique()
         n_train = unique_train_ids.shape[0]
-        assert n_sample < n_train, \
+        assert n_sample <= n_train, \
             f'Training set size ({n_train}) < Sample size ({n_sample})'
         if shuffle:
             np.random.shuffle(unique_train_ids)

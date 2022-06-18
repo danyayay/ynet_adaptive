@@ -2,18 +2,18 @@
 list_eval_seed=(1) 
 batch_size=10
 n_round=3
-config_filename=inD_longterm_eval.yaml
+config_filename=inD_shortterm_eval.yaml
 
 # model 
 network=fusion
 n_fusion=2
 
 # pretrained model 
-ckpts=ckpts/inD__ynetmod__ped_to_ped.pt
+ckpts=ckpts/inD__ynetmod__car_to_truck.pt
 ckpts_name=OODG
 
 # data path 
-dataset_path=filter/agent_type/scene1/pedestrian
+dataset_path=filter/agent_type/scene1/truck_bus_filter
 load_data=predefined
 
 
