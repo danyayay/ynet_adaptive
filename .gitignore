@@ -1,25 +1,21 @@
 .vscode
 *.out
+
+ckpts
+ckpts_ynet/
+ckpts_ynetmod/
+ckpts_inD/
+
 figures/
-ckpts/
-ckpts_fusion/
-ckpts_fusion_share/
-
 data/
-
 logs/
-logs_fusion/
-logs_fusion_share/
-logs_original/
-noearly_shuffle/
 testset/
 
-run_try.sh
 pretrained_models
 sdd_ynet
 csv
-plots
 *.pt
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
