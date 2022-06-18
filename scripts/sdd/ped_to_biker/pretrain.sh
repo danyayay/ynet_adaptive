@@ -1,8 +1,8 @@
 # config 
 list_train_seed=(1) 
 batch_size=10
-n_epoch=100
-n_round=3
+n_epoch=1
+n_round=1
 config_filename=sdd_train.yaml
 ckpt_path=ckpts
 

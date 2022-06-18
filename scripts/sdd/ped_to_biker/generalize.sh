@@ -1,23 +1,25 @@
 # config 
 list_eval_seed=(1) 
 batch_size=10
-n_round=3
+n_round=1
 config_filename=sdd_eval.yaml
 
 # model 
-network=fusion
-n_fusion=2
+network=original
 
 # pretrained model 
-ckpts=ckpts/Seed_1__filter_avg_vel_multi_easy_Biker_0.5_3.5__train__fusion_2.pt
+ckpts=ckpts/sdd__ynet__ped_to_biker.pt
 ckpts_name=OODG
 
 # data path 
-dataset_path=filter/avg_vel/dc_013/Biker/4_8
-load_data=predefined
+dataset_path=filter/agent_type/deathCircle_0
+val_files=Biker.pkl
+val_split=80
+test_splits=500
+load_data=sequential
 
 
 for eval_seed in ${list_eval_seed[@]}; do
-    python test.py --config_filename $config_filename --seed $eval_seed --batch_size $batch_size --n_round $n_round --dataset_path $dataset_path --network $network --load_data $load_data --ckpts $ckpts --ckpts_name $ckpts_name --n_fusion $n_fusion
+    python test.py --config_filename $config_filename --seed $eval_seed --batch_size $batch_size --n_round $n_round --dataset_path $dataset_path --network $network --load_data $load_data --val_files $val_files --val_split $val_split --test_splits $test_splits --ckpts $ckpts --ckpts_name $ckpts_name
 done 
 

@@ -14,12 +14,6 @@ def get_experiment_name(args, n_data):
         experiment += f"__{(args.dataset_path).replace('/', '_')}"
     experiment += f"__{args.train_net}"
     
-    if not args.fine_tune: 
-        if args.network == 'original' or args.network == 'embed':
-            experiment += f'__{args.network}'
-        else:
-            experiment += f'__fusion_{args.n_fusion}'
-
     if args.position != []: experiment += f'__Pos_{"_".join(map(str, args.position))}' 
     if args.n_train_batch is not None: 
         experiment += f'__TrN_{n_data}'
@@ -28,11 +22,10 @@ def get_experiment_name(args, n_data):
         if args.augment: experiment += '__AUG'
         if args.ynet_bias: experiment += '__bias'
 
-    if args.pretrained_ckpt is not None:
-        if 'original' not in args.pretrained_ckpt: 
-            base_arch = args.pretrained_ckpt.split('__')[-1].split('.')[0]
-            if base_arch != 'AUG' and base_arch != 'bias':
-                experiment += f'__{base_arch}' 
+    if args.network == 'original' or args.network == 'embed':
+        experiment += f'__{args.network}'
+    else:
+        experiment += f'__fusion_{args.n_fusion}'
 
     return experiment
 

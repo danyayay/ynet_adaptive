@@ -10,7 +10,7 @@ network=fusion
 n_fusion=2
 
 # pretrained model
-pretrained_ckpt=ckpts/Seed_1__Tr_2.75_7.5__Val_2.75_7.5__ValRatio_0.1__filter_avg_vel_dc_013_Biker__train__fusion_2.pt
+pretrained_ckpt=ckpts/Seed_1__filter_avg_vel_dc_013_Biker_2.75_7.5__train__fusion_2.pt
 ckpt_path=ckpts/sdd/biker_high_to_low
 
 # data path 

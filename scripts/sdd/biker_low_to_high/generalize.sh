@@ -9,11 +9,11 @@ network=fusion
 n_fusion=2
 
 # pretrained model 
-ckpts=ckpts/Seed_1__Tr_2.75_7.5__Val_2.75_7.5__ValRatio_0.1__filter_avg_vel_dc_013_Biker__train__fusion_2.pt
+ckpts=ckpts/sdd__ynetmod__biker_low_to_high.pt
 ckpts_name=OODG
 
 # data path 
-dataset_path=filter/avg_vel/dc_013/Biker/0.5_2.25
+dataset_path=filter/avg_vel/dc_013/Biker/4_8
 load_data=predefined
 
 

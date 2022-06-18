@@ -239,8 +239,12 @@ class YNetTrainer:
                 temperature, False, use_CWS, resl_thresh, CWS_params, 
                 network=network, swap_semantic=swap_semantic)
             
-            print(
-                f'Epoch {e}: 	Train (Top-1) ADE: {train_ADE:.2f} FDE: {train_FDE:.2f} 		Val (Top-k) ADE: {val_ADE:.2f} FDE: {val_FDE:.2f}   lr={lr_scheduler.get_last_lr()[0]}')
+            if fine_tune: 
+                print(
+                    f'Epoch {e}: 	Train (Top-1) ADE: {train_ADE:.2f} FDE: {train_FDE:.2f} 		Val (Top-k) ADE: {val_ADE:.2f} FDE: {val_FDE:.2f}   lr={lr_scheduler.get_last_lr()[0]}')
+            else:
+                print(
+                    f'Epoch {e}: 	Train (Top-1) ADE: {train_ADE:.2f} FDE: {train_FDE:.2f} 		Val (Top-k) ADE: {val_ADE:.2f} FDE: {val_FDE:.2f}')
             self.val_ADE.append(val_ADE)
             self.val_FDE.append(val_FDE)
             if fine_tune:
