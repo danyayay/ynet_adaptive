@@ -1,3 +1,6 @@
+# train 
+save_every_n: 121
+n_early_stop: 30
 resize_factor: 0.25  # resize factor
 viz_epoch: 10
 
@@ -47,3 +50,5 @@ n_traj: 1  # K_a
 
 # Data
 use_raw_data: True
+data_dir: data/
+dataset_name: sdd 
