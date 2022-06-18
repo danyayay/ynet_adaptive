@@ -1,5 +1,5 @@
 import argparse
-from utils.dataset import split_train_val_test_randomly
+from utils.data_utils import split_train_val_test_randomly
 
 
 if __name__ == '__main__':
