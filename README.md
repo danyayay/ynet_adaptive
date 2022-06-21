@@ -61,14 +61,14 @@ mv build/lib*/* .
 
 ## Dataset
 
-TODO:
-Get the raw dataset, our filtered custom dataset and segmentation masks for SDD from the original Y-net authors
+
+<!-- Get the raw dataset, our filtered custom dataset and segmentation masks for SDD from the original Y-net authors
 ```
 pip install gdown && gdown https://drive.google.com/uc?id=14Jn8HsI-MjNIwepksgW4b5QoRcQe97Lg 
 unzip sdd_ynet.zip
-```
+``` -->
 
-After unzipping the file the directory should have following structure:
+Our filtered datasets and segmentation masks can be downloaded from [xxx](html). The data directory should have the following structure:
 ```
 data
 ├── sdd
@@ -81,15 +81,17 @@ data
 │   |    └── agent_type/
 │   └── segmentation_model.pth 
 |
-└── inD-dataset-v1.0
-    ├── filter/agent_type
-    │    ├── scene1/
-    │    └── scene234/
-    ├── images/
-    └── inD_segmentation.pth 
+├── inD-dataset-v1.0
+|   ├── filter/agent_type
+|   │    ├── scene1/
+|   │    └── scene234/
+|   ├── images/
+|   └── inD_segmentation.pth 
+|
+└── L5/
 ```
 
-In addition to our provided datasets in `sdd/filter` and `inD-dataset-v1.0/filter`, you can create custom datasets:
+In addition to our provided datasets, you can get the raw [SDD](html) or [inD](html) datasets and create custom datasets: 
 ```
 bash scripts/customize_dataset.sh
 ```
@@ -125,7 +127,7 @@ The above experiments correpond to scripts as follows:
 
 In each folder, scripts for pretraininng, generalizing, baseline fine-tuning, and MoSA fine-tuning are provided.
 
-Our pretrained models can be downloaded from xxx. 
+Our pretrained models can be downloaded from [xxx](html). 
 
 
 <!-- &nbsp;&nbsp;&nbsp;&nbsp;Our pretrained models can be downloaded from [google drive](https://drive.google.com/drive/folders/1HzHP2_Mg2bAlDV3bQERoGQU3PvijKQmU).
@@ -140,6 +142,6 @@ Results of different methods for low-shot transfer across agent types and speed 
 
 <img src="docs/result.png" height="180"/> -->
 
-### Acknowledgement
+## Acknowledgement
 
-Out code is developed upon the public code of [Y-net](https://github.com/HarshayuGirase/Human-Path-Prediction/tree/master/ynet) and [Decoupled Dynamic Filter](https://github.com/theFoxofSky/ddfnet).
+Our code is developed upon the public code of [Y-net](https://github.com/HarshayuGirase/Human-Path-Prediction/tree/master/ynet) and [Decoupled Dynamic Filter](https://github.com/theFoxofSky/ddfnet).
