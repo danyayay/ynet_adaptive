@@ -1,7 +1,7 @@
 # config 
 list_eval_seed=(1) 
 batch_size=10
-n_round=1
+n_round=3
 config_filename=inD_longterm_eval.yaml
 
 # model 
