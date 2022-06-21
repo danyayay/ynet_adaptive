@@ -73,6 +73,8 @@ mv build/lib*/* .
 <!-- Get the raw dataset, our filtered custom dataset and segmentation masks for SDD from the original Y-net authors
 ```
 pip install gdown && gdown https://drive.google.com/uc?id=14Jn8HsI-MjNIwepksgW4b5QoRcQe97Lg 
+
+pip install gdown && gdown https://drive.google.com/file/d/1BZQ6ApSTG8-nOPiX5jvN4FH7zf916uM_/view?usp=sharing
 unzip sdd_ynet.zip
 ``` -->
 
@@ -88,7 +90,8 @@ data
 |
 └── inD-dataset-v1.0
     ├── images/
-    ├── filter/
+    ├── data/
+    ├── filter/agent_type/
     └── inD_segmentation.pth 
 
 ```
@@ -124,7 +127,7 @@ The above experiments correpond to scripts as follows:
 
 In each folder, scripts for pretraininng, generalizing, baseline fine-tuning, and MoSA fine-tuning are provided. Please check out L5 experiment in [this repository](link). 
 
-Our pretrained models can be downloaded from [here](https://drive.google.com/file/d/12Za6XlInUPzk5__Xwj_k14lw2dBaVqMn/view?usp=sharing). 
+Our pretrained models can be downloaded from [here](https://drive.google.com/file/d/12Za6XlInUPzk5__Xwj_k14lw2dBaVqMn/view?usp=sharing) and should be placed under `ckpts/`. 
 
 
 <!-- &nbsp;&nbsp;&nbsp;&nbsp;Our pretrained models can be downloaded from [google drive](https://drive.google.com/drive/folders/1HzHP2_Mg2bAlDV3bQERoGQU3PvijKQmU).
