@@ -3,7 +3,8 @@ import argparse
 import numpy as np
 import pandas as pd
 
-from utils.data_utils import split_fragmented, downsample, filter_short_trajectories, sliding_window, \
+from utils.data_utils import split_fragmented, downsample, \
+    filter_short_trajectories, sliding_window, get_varf_table, \
 	create_dataset_given_range, create_dataset_by_agent_type, compute_distance_with_neighbors
 
 
@@ -90,15 +91,23 @@ if __name__ == "__main__":
         df = load_and_window_sdd(args.raw_data_dir, args.step, args.window_size, args.stride)
         print('Loaded raw dataset')
         # possibly add a column of distance with neighbors 
-        if 'dist' in args.varf or 'den' in args.varf or np.array(['dist' in f or 'den' in f for f in args.varf]).any():
-            out = df.groupby('sceneId').apply(compute_distance_with_neighbors)
-            for idx_1st in out.index.get_level_values('sceneId').unique():
-                df.loc[out[idx_1st].index, 'dist'] = out[idx_1st].values
-            print(f'Added a column of distance with neighbors to df')
-        # save
-        out_path = os.path.join(args.raw_data_dir, f"data_.pkl")
+        if args.varf is not None:
+            if np.array(['dist' in f or 'den' in f for f in args.varf]).any():
+                out = df.groupby('sceneId').apply(compute_distance_with_neighbors)
+                for idx_1st in out.index.get_level_values('sceneId').unique():
+                    df.loc[out[idx_1st].index, 'dist'] = out[idx_1st].values
+                print(f'Added a column of distance with neighbors to df')
+        out_path = os.path.join(args.raw_data_dir, f"data.pkl")
         df.to_pickle(out_path)
         print(f'Saved data to {out_path}')
+
+        # ## get variation factor table 
+        varf_list = ['avg_vel', 'max_acc']
+        df_varf = get_varf_table(df, varf_list, args.obs_len)
+        out_path = os.path.join(args.additional_data_dir, "varf.pkl")
+        df_varf.to_pickle(out_path)
+        print(f'Saved variation factor data to {out_path}')
+
     else:  # reload = True
         # ## or load from stored pickle
         df = pd.read_pickle(os.path.join(args.raw_data_dir, args.raw_data_filename))
