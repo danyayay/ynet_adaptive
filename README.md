@@ -14,14 +14,6 @@ Parth Kothari, Danya Li,
 <br> -->
 *Submitted to CoRL, 2022.*
 
-TL;DR: We propose a modular low-rank adaptation method that enables fast adaptation of deep motion forecasting models to new styles with limited samples.
-
-<!-- <p align="left">
-  <img src="docs/pull.pdf" width="800">
-</p> -->
-
-<embed src="docs/pull.pdf" width="500" height="375" 
- type="application/pdf">
 
 <!-- 
 If you find this code useful for your research, please cite our paper:
@@ -34,6 +26,23 @@ If you find this code useful for your research, please cite our paper:
   year={2021}
 }
 ``` -->
+
+
+## Overview
+
+We propose efficient adaptation of deep motion forecasting models pretrained in one domain with sufficient data to new styles with *limited samples*:
+
+* a low-rank motion style adapter, which projects and adapts 10 the style features at a low-dimensional bottleneck
+
+* a modular adapter strategy, which disentangles the features of scene context and motion history to facilitate a fine-grained choice of adaptation layers
+
+<embed src="https://drive.google.com/file/d/1Vrz07uD1jVRMXYyIolNxT_mqV5t__M5_/view?usp=sharing" type="application/pdf" width=100% height=850px />
+
+<embed src="docs/Pull2.pdf" type="application/pdf" width=100% height=850px />
+
+
+
+## 
 
 ## Setup
 
