@@ -36,7 +36,6 @@ If you find this code useful for your research, please cite our paper:
 ``` -->
 
 ## Setup
------
 
 Use `python=3.8`.
 
@@ -61,7 +60,6 @@ mv build/lib*/* .
 
 
 ## Dataset
-----
 
 TODO:
 Get the raw dataset, our filtered custom dataset and segmentation masks for SDD from the original Y-net authors
@@ -98,7 +96,6 @@ bash scripts/customize_dataset.sh
 
 
 ## Experiments 
-----
 
 There are six sets of experiments provided in our paper:
 
@@ -114,7 +111,6 @@ There are six sets of experiments provided in our paper:
 
 
 ## Scripts
-----
 
 The above experiments correpond to scripts as follows:
 
