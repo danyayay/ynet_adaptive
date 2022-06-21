@@ -12,7 +12,7 @@ def main(args):
     with open(os.path.join('config', 'sdd_raw_eval.yaml')) as file:
         params = yaml.load(file, Loader=yaml.FullLoader)
 
-    params['segmentation_model_fp'] = os.path.join(params['data_dir'], params['dataset_name'], 'segmentation_model.pth')
+    params['segmentation_model_fp'] = os.path.join(params['data_dir'], params['dataset_name'], 'sdd_segmentation.pth')
     params.update(vars(args))
     print(params)
 

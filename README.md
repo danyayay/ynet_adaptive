@@ -4,7 +4,9 @@ This is an implementation of the paper
 
 **Motion Style Transfer: Modular Low-Rank Adaptation for Deep Motion Forecasting**
 <br>
-Parth Kothari, Danya Li,
+
+<a href="https://thedebugger811.github.io">Parth Kothari</a>, 
+<a href="https://people.epfl.ch/danya.li/?lang=en">Danya Li</a>
 <a href="https://sites.google.com/view/yuejiangliu">Yuejiang Liu</a>,
 <a href="https://people.epfl.ch/alexandre.alahi/?lang=en/">Alexandre Alahi</a>
 <br>
@@ -12,7 +14,7 @@ Parth Kothari, Danya Li,
 
 <!-- Links: **[`Arxiv 11/2021`](https://arxiv.org/abs/2111.14820) | [`Video (7 min)`](https://drive.google.com/file/d/1Uo0Y0eHq4vI7wOxya4mJlxbAe3U4kMx6/view) | [`Spurious`](https://github.com/vita-epfl/causalmotion/tree/main/spurious) | [`Style`](https://github.com/vita-epfl/causalmotion/tree/main/style)**
 <br> -->
-*Submitted to CoRL, 2022.*
+*Under Review*
 
 
 <!-- 
@@ -42,9 +44,6 @@ We propose efficient adaptation of deep motion forecasting models pretrained in 
 
 
 
-
-## 
-
 ## Setup
 
 Use `python=3.8`.
@@ -71,37 +70,30 @@ mv build/lib*/* .
 
 ## Dataset
 
-
 <!-- Get the raw dataset, our filtered custom dataset and segmentation masks for SDD from the original Y-net authors
 ```
 pip install gdown && gdown https://drive.google.com/uc?id=14Jn8HsI-MjNIwepksgW4b5QoRcQe97Lg 
 unzip sdd_ynet.zip
 ``` -->
 
-Our filtered datasets and segmentation masks can be downloaded from [xxx](html). The data directory should have the following structure:
+Our filtered datasets and segmentation masks can be downloaded from [here](https://drive.google.com/file/d/1BZQ6ApSTG8-nOPiX5jvN4FH7zf916uM_/view?usp=sharing). Due to copyright, we cannot provide data for inD dataset. Please request the inD file from the authors and then use the `utils.processing_inD.py` file for preprocessing. The data directory should have the following structure:
 ```
 data
 ├── sdd
-│   ├── raw
-│   │    ├── annotations/
-│   │    ├── data.pkl
-│   │    └── varf.pkl    
+│   ├── raw/annotations/
 │   ├── filter
 │   |    ├── avg_vel/
 │   |    └── agent_type/
-│   └── segmentation_model.pth 
+│   └── sdd_segmentation.pth 
 |
-├── inD-dataset-v1.0
-|   ├── filter/agent_type
-|   │    ├── scene1/
-|   │    └── scene234/
-|   ├── images/
-|   └── inD_segmentation.pth 
-|
-└── L5/
+└── inD-dataset-v1.0
+    ├── images/
+    ├── filter/
+    └── inD_segmentation.pth 
+
 ```
 
-In addition to our provided datasets, you can get the raw [SDD](html) or [inD](html) datasets and create custom datasets: 
+In addition to our provided datasets, you can create customized ones: 
 ```
 bash scripts/customize_dataset.sh
 ```
@@ -120,24 +112,19 @@ There are six sets of experiments provided in our paper:
 | Modular Style Adapter (Scene) | inD | Y-Net-Mod | short-term | pedestrians (scenes=2,3,4) | pedestrians (scenes=1) |
 | Modular Style Adapter (Agent motion) | SDD | Y-Net-Mod | shot-term | bikers (low speed) | bikers (high speed)
 
-
-
-## Scripts
-
 The above experiments correpond to scripts as follows:
 
 | Experiment | Script folder | 
 |------------|---------------|
 | Motion Style Transfer across Agents | `scripts/sdd/ped_to_biker/` | 
 | Motion Style Transfer across Scenes | `scripts/inD/ped_to_ped/ynet/` | 
-| Motion Style Transfer across Scenes | `scripts/L5/` |
 | Modular Style Adapter (Agent motion) | `scripts/inD/scene1_car_to_truck/` | 
 | Modular Style Adapter (Scene)1 | `scripts/inD/ped_to_ped/ynetmod/` | 
 | Modular Style Adapter (Agent motion) | `scripts/sdd/biker_low_to_high/` |
 
-In each folder, scripts for pretraininng, generalizing, baseline fine-tuning, and MoSA fine-tuning are provided.
+In each folder, scripts for pretraininng, generalizing, baseline fine-tuning, and MoSA fine-tuning are provided. Please check out L5 experiment in [this repository](link). 
 
-Our pretrained models can be downloaded from [xxx](html). 
+Our pretrained models can be downloaded from [here](https://drive.google.com/file/d/12Za6XlInUPzk5__Xwj_k14lw2dBaVqMn/view?usp=sharing). 
 
 
 <!-- &nbsp;&nbsp;&nbsp;&nbsp;Our pretrained models can be downloaded from [google drive](https://drive.google.com/drive/folders/1HzHP2_Mg2bAlDV3bQERoGQU3PvijKQmU).
@@ -151,6 +138,7 @@ gdown https://drive.google.com/uc?id=180sMpRiGhZOyCaGMMakZPXsTS7Affhuf
 Results of different methods for low-shot transfer across agent types and speed limits.
 
 <img src="docs/result.png" height="180"/> -->
+
 
 ## Acknowledgement
 
