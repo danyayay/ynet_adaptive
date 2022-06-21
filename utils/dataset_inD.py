@@ -173,12 +173,13 @@ if __name__ == "__main__":
 		print('Reloaded raw dataset')
 
 	# ============== create customized dataset ================
-	if args.varf == ['agent_type']:
-		out_dir = os.path.join(args.filter_data_dir, args.varf[0])
-		create_dataset_by_agent_type(df, args.labels, out_dir, 
-			statistic_only=args.statistic_only, selected_scenes=args.selected_scenes)
-	else:
-		out_dir = os.path.join(args.filter_data_dir, '__'.join(args.varf), '_'.join(args.labels))
-		create_dataset_given_range(df, args.varf, args.varf_ranges, args.labels, 
-			out_dir, obs_len=args.obs_len, statistic_only=args.statistic_only)
-	print(f'Created dataset: \nVariation factor = {args.varf} \nAgents = {args.labels}')
+	if args.varf is not None:
+		if args.varf == ['agent_type']:
+			out_dir = os.path.join(args.filter_data_dir, args.varf[0])
+			create_dataset_by_agent_type(df, args.labels, out_dir, 
+				statistic_only=args.statistic_only, selected_scenes=args.selected_scenes)
+		else:
+			out_dir = os.path.join(args.filter_data_dir, '__'.join(args.varf), '_'.join(args.labels))
+			create_dataset_given_range(df, args.varf, args.varf_ranges, args.labels, 
+				out_dir, obs_len=args.obs_len, statistic_only=args.statistic_only)
+		print(f'Created dataset: \nVariation factor = {args.varf} \nAgents = {args.labels}')

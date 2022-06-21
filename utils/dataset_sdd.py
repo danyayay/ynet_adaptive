@@ -69,7 +69,7 @@ if __name__ == "__main__":
     parser.add_argument("--stride", default=20, type=int)
     parser.add_argument("--obs_len", default=8, type=int)
 
-    parser.add_argument("--varf", default=['avg_vel'], nargs='+',
+    parser.add_argument("--varf", default=None, nargs='+',
                         help="Variation factors from: 'avg_vel', 'max_vel', "+\
                             "'avg_acc', 'max_acc', 'abs+max_acc', 'abs+avg_acc', "+\
                             "'min_dist', 'avg_den50', 'avg_den100', 'agent_type'")
@@ -105,12 +105,13 @@ if __name__ == "__main__":
         print('Reloaded raw dataset')
 
     # ============== create customized dataset ================
-    if args.varf == ['agent_type']:
-        out_dir = os.path.join(args.filter_data_dir, args.varf[0])
-        create_dataset_by_agent_type(df, args.labels, out_dir, 
-            statistic_only=args.statistic_only, selected_scenes=args.selected_scenes)
-    else:
-        out_dir = os.path.join(args.filter_data_dir, '__'.join(args.varf), '_'.join(args.labels))
-        create_dataset_given_range(df, args.varf, args.varf_ranges, args.labels, 
-            out_dir, obs_len=args.obs_len, statistic_only=args.statistic_only)
-    print(f'Created dataset: \nVariation factor = {args.varf} \nAgents = {args.labels}')
+    if args.varf is not None:
+        if args.varf == ['agent_type']:
+            out_dir = os.path.join(args.filter_data_dir, args.varf[0])
+            create_dataset_by_agent_type(df, args.labels, out_dir, 
+                statistic_only=args.statistic_only, selected_scenes=args.selected_scenes)
+        else:
+            out_dir = os.path.join(args.filter_data_dir, '__'.join(args.varf), '_'.join(args.labels))
+            create_dataset_given_range(df, args.varf, args.varf_ranges, args.labels, 
+                out_dir, obs_len=args.obs_len, statistic_only=args.statistic_only)
+        print(f'Created dataset: \nVariation factor = {args.varf} \nAgents = {args.labels}')
