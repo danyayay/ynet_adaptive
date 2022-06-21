@@ -30,15 +30,16 @@ If you find this code useful for your research, please cite our paper:
 
 ## Overview
 
-We propose efficient adaptation of deep motion forecasting models pretrained in one domain with sufficient data to new styles with *limited samples*:
+We propose efficient adaptation of deep motion forecasting models pretrained in one domain with sufficient data to new styles with *limited samples* through the following designs: 
 
 * a low-rank motion style adapter, which projects and adapts 10 the style features at a low-dimensional bottleneck
 
 * a modular adapter strategy, which disentangles the features of scene context and motion history to facilitate a fine-grained choice of adaptation layers
 
-<embed src="https://drive.google.com/file/d/1Vrz07uD1jVRMXYyIolNxT_mqV5t__M5_/view?usp=sharing" type="application/pdf" width=100% height=850px />
+<p align="center">
+  <img src="docs/Pull2.png" width="800">
+</p>
 
-<embed src="docs/Pull2.pdf" type="application/pdf" width=100% height=850px />
 
 
 
