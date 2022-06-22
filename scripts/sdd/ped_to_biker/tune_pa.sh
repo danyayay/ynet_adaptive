@@ -15,7 +15,7 @@ ckpt_path=ckpts/sdd/ped_to_biker
 
 # data path 
 dataset_path=filter/agent_type/deathCircle_0/Biker
-load_data=sequential
+load_data=predefined 
 
 # fine-tune setting 
 list_train_net=(parallelLayer_3x3)
