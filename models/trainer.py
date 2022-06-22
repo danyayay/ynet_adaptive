@@ -10,7 +10,7 @@ from collections import OrderedDict, deque
 
 from models.ynet import YNet
 from utils.train_epoch import train_epoch
-from utils.dataset import augment_data, create_images_dict
+from utils.data_utils import augment_data, create_images_dict
 from utils.image_utils import create_gaussian_heatmap_template, create_dist_mat, get_patch, \
     preprocess_image_for_segmentation, pad, resize
 from utils.dataloader import SceneDataset, scene_collate
@@ -200,7 +200,9 @@ class YNetTrainer:
 
         optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
-        lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=steps, gamma=lr_decay_ratio)
+        if fine_tune:
+            print("LR Schedular because finetuning")
+            lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=steps, gamma=lr_decay_ratio)
 
         print('The number of trainable parameters: {:d}'.format(
             sum(param.numel() for param in model.parameters() if param.requires_grad)))
@@ -237,11 +239,16 @@ class YNetTrainer:
                 temperature, False, use_CWS, resl_thresh, CWS_params, 
                 network=network, swap_semantic=swap_semantic)
             
-            print(
-                f'Epoch {e}: 	Train (Top-1) ADE: {train_ADE:.2f} FDE: {train_FDE:.2f} 		Val (Top-k) ADE: {val_ADE:.2f} FDE: {val_FDE:.2f}   lr={lr_scheduler.get_last_lr()[0]}')
+            if fine_tune: 
+                print(
+                    f'Epoch {e}: 	Train (Top-1) ADE: {train_ADE:.2f} FDE: {train_FDE:.2f} 		Val (Top-k) ADE: {val_ADE:.2f} FDE: {val_FDE:.2f}   lr={lr_scheduler.get_last_lr()[0]}')
+            else:
+                print(
+                    f'Epoch {e}: 	Train (Top-1) ADE: {train_ADE:.2f} FDE: {train_FDE:.2f} 		Val (Top-k) ADE: {val_ADE:.2f} FDE: {val_FDE:.2f}')
             self.val_ADE.append(val_ADE)
             self.val_FDE.append(val_FDE)
-            lr_scheduler.step()
+            if fine_tune:
+                lr_scheduler.step()
 
             if smooth_val:
                 # TODO: do not work if n_epoch < window_size
@@ -264,13 +271,17 @@ class YNetTrainer:
                 best_val_ADE = val_ADE
                 best_epoch = e - half_window_size + 1 if smooth_val else e
                 best_state_dict = curr_model_dict
+                if not fine_tune:
+                    print(f'Best Epoch {e}: \nVal ADE: {val_ADE} \nVal FDE: {val_FDE}')
+                    pathlib.Path(ckpt_path).mkdir(parents=True, exist_ok=True)
+                    torch.save(model.state_dict(),  f'{ckpt_path}/{experiment_name}_weights.pt')
 
             if (e+1) % save_every_n == 0:
                 pathlib.Path(ckpt_path).mkdir(parents=True, exist_ok=True)
                 self.save_params(f'{ckpt_path}/{experiment_name}__epoch_{e}.pt', train_net)
 
             # early stop in case of clear overfitting
-            if best_val_ADE < min(self.val_ADE[-n_early_stop:]):
+            if fine_tune and (best_val_ADE < min(self.val_ADE[-n_early_stop:])):
                 print(f'Early stop at epoch {e}')
                 break
 
@@ -533,7 +544,7 @@ class YNetTrainer:
         dataset_name = dataset_name.lower()
         if dataset_name == 'sdd':
             image_file_name = 'reference.jpg'
-        elif dataset_name == 'ind':
+        elif dataset_name == 'ind-dataset-v1.0':
             image_file_name = 'reference.png'
         elif dataset_name == 'eth':
             image_file_name = 'oracle.png'
@@ -587,6 +598,7 @@ class YNetTrainer:
     def save_params(self, path, train_net):
         if train_net == 'all' or train_net == 'train':
             state_dict = self.model.state_dict()
+            state_dict = {k:v for k,v in state_dict.items() if 'segmentation' not in k}
         else:
             # save parameters with requires_grad = True
             state_dict = OrderedDict()

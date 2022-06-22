@@ -4,8 +4,8 @@ import torch
 import pathlib
 import itertools
 from utils.parser import get_parser
-from utils.dataset import set_random_seeds, dataset_split, get_meta_ids_focus
-from utils.util_fusion import get_params, get_image_and_data_path, restore_model, get_ckpts_and_names
+from utils.data_utils import set_random_seeds, dataset_split, get_meta_ids_focus
+from utils.util import get_params, get_image_and_data_path, restore_model, get_ckpts_and_names
 
 
 def main(args):

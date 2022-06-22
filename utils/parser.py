@@ -4,7 +4,7 @@ __all__ = ['get_parser']
 
 
 def get_data_args(parser):
-    parser.add_argument("--dataset_path", default='sherwin/dataset_ped_biker/gap', type=str)
+    parser.add_argument("--dataset_path", default=None, type=str)
     parser.add_argument('--ckpt_path', default='ckpts')
     parser.add_argument("--shuffle", action='store_true')
     parser.add_argument("--augment", action='store_true')
@@ -46,18 +46,18 @@ def get_general_args(parser):
     parser.add_argument("--batch_size", default=8, type=int)
     parser.add_argument("--gpu", default=None, type=int, help='gpu id to use')
     parser.add_argument("--n_round", default=1, type=int, help='number of rounds in stochastics eval process')  
+    parser.add_argument("--config_filename", default=None, type=str)
     return parser
 
 
 def get_train_args(parser):
     parser.add_argument("--fine_tune", action="store_true")
-    parser.add_argument("--n_epoch", default=1, type=int)
+    parser.add_argument("--n_epoch", default=100, type=int)
     parser.add_argument("--n_train_batch", default=None, type=float, help="Limited number of batches for each training agent (fine-tuning), None means no limit (training)")
     # learning rate 
     parser.add_argument("--lr", default=0.0001, type=float)
     parser.add_argument("--steps", default=[], type=int, nargs='+')
     parser.add_argument("--lr_decay_ratio", default=0.1)
-    parser.add_argument("--config_filename", default='sdd_raw_train.yaml', type=str)
     parser.add_argument('--init_check', action='store_true')
 
     parser.add_argument('--window_size', default=9, type=int)
@@ -68,10 +68,6 @@ def get_train_args(parser):
     return parser
 
 
-def get_eval_args(parser):
-    parser.add_argument("--config_filename", default='sdd_raw_eval.yaml', type=str)
-    return parser
-
 
 def get_parser(is_train):
     parser = argparse.ArgumentParser()
@@ -80,6 +76,4 @@ def get_parser(is_train):
     parser = get_general_args(parser)
     if is_train:
         parser = get_train_args(parser)
-    else:
-        parser = get_eval_args(parser)
     return parser

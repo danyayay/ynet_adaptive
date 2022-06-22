@@ -14,12 +14,6 @@ def get_experiment_name(args, n_data):
         experiment += f"__{(args.dataset_path).replace('/', '_')}"
     experiment += f"__{args.train_net}"
     
-    if not args.fine_tune: 
-        if args.network == 'original' or args.network == 'embed':
-            experiment += f'__{args.network}'
-        else:
-            experiment += f'__fusion_{args.n_fusion}'
-
     if args.position != []: experiment += f'__Pos_{"_".join(map(str, args.position))}' 
     if args.n_train_batch is not None: 
         experiment += f'__TrN_{n_data}'
@@ -28,12 +22,10 @@ def get_experiment_name(args, n_data):
         if args.augment: experiment += '__AUG'
         if args.ynet_bias: experiment += '__bias'
 
-    if args.pretrained_ckpt is not None:
-        # if 'original' not in args.pretrained_ckpt:
-        if ('original' not in args.pretrained_ckpt) and ('sdd' not in args.pretrained_ckpt): 
-            base_arch = args.pretrained_ckpt.split('__')[-1].split('.')[0]
-            if base_arch != 'AUG' and base_arch != 'bias':
-                experiment += f'__{base_arch}' 
+    if args.network == 'original' or args.network == 'embed':
+        experiment += f'__{args.network}'
+    else:
+        experiment += f'__fusion_{args.n_fusion}'
 
     return experiment
 
@@ -42,20 +34,39 @@ def get_params(args):
     if args.network == 'fusion': assert args.n_fusion is not None
     with open(os.path.join('config', args.config_filename)) as file:
         params = yaml.load(file, Loader=yaml.FullLoader)
+
+    # load segmentation model given dataset name 
+    dataset_name = params['dataset_name'].lower()
+
+    if 'sdd' in dataset_name:
+        segmentation_model = 'sdd_segmentation.pth'
+    elif 'ind' in dataset_name:
+        segmentation_model = 'inD_segmentation.pth'
+    else:
+        raise ValueError(f'Invalid {dataset_name}')
     params['segmentation_model_fp'] = os.path.join(
-        params['data_dir'], params['dataset_name'], 'segmentation_model.pth')
-    params.update(vars(args))
+        params['data_dir'], params['dataset_name'], segmentation_model)
+
+    # make n_train_batch integer 
     if hasattr(args, 'n_train_batch'):
         if args.n_train_batch is not None:
             if int(args.n_train_batch) == args.n_train_batch:
                 args.n_train_batch = int(args.n_train_batch)
+    
+    params.update(vars(args))
     print(params)
     return params 
 
 
 def get_image_and_data_path(params):
-    # image path 
-    image_path = os.path.join(params['data_dir'], params['dataset_name'], 'raw', 'annotations')
+    # image path given dataset name 
+    dataset_name = params['dataset_name'].lower()
+    if 'sdd' in dataset_name:
+        image_path = os.path.join(params['data_dir'], params['dataset_name'], 'raw', 'annotations')
+    elif 'ind' in dataset_name:
+        image_path = os.path.join(params['data_dir'], params['dataset_name'], 'images')
+    else:
+        raise ValueError(f'Invalid {dataset_name}')
     assert os.path.isdir(image_path), f'image dir error: {image_path}'
     # data path 
     data_path = os.path.join(params['data_dir'], params['dataset_name'], params['dataset_path'])
@@ -133,3 +144,4 @@ def restore_model(
         model = YNetTrainer(params=updated_params)
         model.load_separated_params(base_ckpt, separated_ckpt)    
     return model 
+    

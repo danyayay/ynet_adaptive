@@ -2,8 +2,8 @@ import os
 import yaml
 import pathlib
 import argparse
-from models.trainer_fusion import YNetTrainer
-from utils.dataset import set_random_seeds, dataset_split, dataset_given_scenes
+from models.trainer import YNetTrainer
+from utils.data_utils import set_random_seeds, dataset_split, dataset_given_scenes
 from evaluator.visualization import plot_importance_analysis
 
 
@@ -12,7 +12,7 @@ def main(args):
     with open(os.path.join('config', 'sdd_raw_eval.yaml')) as file:
         params = yaml.load(file, Loader=yaml.FullLoader)
 
-    params['segmentation_model_fp'] = os.path.join(params['data_dir'], params['dataset_name'], 'segmentation_model.pth')
+    params['segmentation_model_fp'] = os.path.join(params['data_dir'], params['dataset_name'], 'sdd_segmentation.pth')
     params.update(vars(args))
     print(params)
 

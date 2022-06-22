@@ -6,9 +6,9 @@ import argparse
 import numpy as np
 import pandas as pd
 
-from utils.dataset import set_random_seeds, dataset_split, get_meta_ids_focus
+from utils.data_utils import set_random_seeds, prepare_dataeset, get_meta_ids_focus
 from utils.parser import get_parser
-from utils.util_fusion import get_params, get_image_and_data_path, restore_model, get_ckpts_and_names
+from utils.util import get_params, get_image_and_data_path, restore_model, get_ckpts_and_names
 from evaluator.visualization import plot_prediction, plot_multiple_predictions, plot_goal_map_with_samples
 
 
@@ -19,7 +19,7 @@ def main(args):
     IMAGE_PATH, DATA_PATH = get_image_and_data_path(params)
 
     # prepare data 
-    _, _, df_test = dataset_split(DATA_PATH, args.val_files, 0, args.n_leftouts)
+    _, _, df_test = prepare_dataeset(DATA_PATH, args.val_files, 0, args.n_leftouts)
     # get focused data 
     print(f"df_test: {df_test.shape}; #={df_test.shape[0]/(params['obs_len']+params['pred_len'])}")
     meta_ids_focus = get_meta_ids_focus(df_test, 

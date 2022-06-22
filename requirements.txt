@@ -8,3 +8,5 @@ segmentation_models_pytorch==0.1.0
 notebook
 ddf
 tensorboard
+seaborn==0.11.2
+loralib==0.1.1
