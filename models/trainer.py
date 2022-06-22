@@ -598,6 +598,7 @@ class YNetTrainer:
     def save_params(self, path, train_net):
         if train_net == 'all' or train_net == 'train':
             state_dict = self.model.state_dict()
+            state_dict = {k:v for k,v in state_dict.items() if 'segmentation' not in k}
         else:
             # save parameters with requires_grad = True
             state_dict = OrderedDict()

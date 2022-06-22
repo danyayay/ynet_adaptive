@@ -3,7 +3,7 @@ import argparse
 import numpy as np
 import pandas as pd
 
-from utils.data_utils import downsample, filter_short_trajectories, sliding_window, \
+from utils.data_utils import downsample, filter_short_trajectories, sliding_window, get_varf_table, \
 	create_dataset_given_range, create_dataset_by_agent_type, compute_distance_with_neighbors
 
 
@@ -116,12 +116,12 @@ if __name__ == "__main__":
 
 	parser = argparse.ArgumentParser()
 
-	parser.add_argument('--additional_data_dir', default='/data/inD-dataset-v1.0/data', type=str, 
+	parser.add_argument('--additional_data_dir', default='data/inD-dataset-v1.0/data', type=str, 
 		help='Path to the scene images and variation factor file')
-	parser.add_argument('--raw_data_dir', default='/data/inD-dataset-v1.0/data', type=str, 
+	parser.add_argument('--raw_data_dir', default='data/inD-dataset-v1.0/data', type=str, 
 		help='Path to the raw data, can be a subset of the entire dataset')
 	parser.add_argument('--raw_data_filename', default='data_5_30_1fps.pkl', type=str)
-	parser.add_argument('--filter_data_dir', default='/data/inD-dataset-v1.0/filter', type=str)
+	parser.add_argument('--filter_data_dir', default='data/inD-dataset-v1.0/filter', type=str)
 
 	parser.add_argument('--reload', action='store_true')
 	parser.add_argument('--statistic_only', action='store_true', 
@@ -163,22 +163,30 @@ if __name__ == "__main__":
 			for idx_1st in out.index.get_level_values('sceneId').unique():
 				df.loc[out[idx_1st].index, 'dist'] = out[idx_1st].values
 			print(f'Added a column of distance with neighbors to df')
-		# save
 		out_path = os.path.join(args.raw_data_dir, args.raw_data_filename)
 		df.to_pickle(out_path)
 		print(f'Saved data to {out_path}')
+
+		# ## get variation factor table 
+		varf_list = ['avg_vel', 'max_acc']
+		df_varf = get_varf_table(df, varf_list, args.obs_len)
+		out_path = os.path.join(args.additional_data_dir, "varf.pkl")
+		df_varf.to_pickle(out_path)
+		print(f'Saved variation factor data to {out_path}')
+
 	else:  # reload = True
 		# ## or load from stored pickle
 		df = pd.read_pickle(os.path.join(args.raw_data_dir, args.raw_data_filename))
 		print('Reloaded raw dataset')
 
 	# ============== create customized dataset ================
-	if args.varf == ['agent_type']:
-		out_dir = os.path.join(args.filter_data_dir, args.varf[0])
-		create_dataset_by_agent_type(df, args.labels, out_dir, 
-			statistic_only=args.statistic_only, selected_scenes=args.selected_scenes)
-	else:
-		out_dir = os.path.join(args.filter_data_dir, '__'.join(args.varf), '_'.join(args.labels))
-		create_dataset_given_range(df, args.varf, args.varf_ranges, args.labels, 
-			out_dir, obs_len=args.obs_len, statistic_only=args.statistic_only)
-	print(f'Created dataset: \nVariation factor = {args.varf} \nAgents = {args.labels}')
+	if args.varf is not None:
+		if args.varf == ['agent_type']:
+			out_dir = os.path.join(args.filter_data_dir, args.varf[0])
+			create_dataset_by_agent_type(df, args.labels, out_dir, 
+				statistic_only=args.statistic_only, selected_scenes=args.selected_scenes)
+		else:
+			out_dir = os.path.join(args.filter_data_dir, '__'.join(args.varf), '_'.join(args.labels))
+			create_dataset_given_range(df, args.varf, args.varf_ranges, args.labels, 
+				out_dir, obs_len=args.obs_len, statistic_only=args.statistic_only)
+		print(f'Created dataset: \nVariation factor = {args.varf} \nAgents = {args.labels}')

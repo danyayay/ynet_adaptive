@@ -37,15 +37,16 @@ def get_params(args):
 
     # load segmentation model given dataset name 
     dataset_name = params['dataset_name'].lower()
+
     if 'sdd' in dataset_name:
-        params['segmentation_model_fp'] = os.path.join(
-            params['data_dir'], params['dataset_name'], 'segmentation_model.pth')
+        segmentation_model = 'sdd_segmentation.pth'
     elif 'ind' in dataset_name:
-        params['segmentation_model_fp'] = os.path.join(
-            params['data_dir'], params['dataset_name'], 'inD_segmentation.pth')
+        segmentation_model = 'inD_segmentation.pth'
     else:
         raise ValueError(f'Invalid {dataset_name}')
-    
+    params['segmentation_model_fp'] = os.path.join(
+        params['data_dir'], params['dataset_name'], segmentation_model)
+
     # make n_train_batch integer 
     if hasattr(args, 'n_train_batch'):
         if args.n_train_batch is not None:
