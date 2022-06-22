@@ -1,6 +1,5 @@
 # train 
 save_every_n: 1000
-n_early_stop: 3000
 resize_factor: 0.33  # resize factor
 viz_epoch: 10
 
