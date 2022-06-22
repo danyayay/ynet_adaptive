@@ -1011,7 +1011,13 @@ def plot_multiple_predictions(
     trajs_list = ckpts_trajs_dict[list(ckpts_trajs_dict)[0]]
     first_dict = trajs_list[0]
     n_round = len(trajs_list)
-    scene_images = create_images_dict(first_dict['sceneId'], image_path, 'reference.jpg', True)
+    if 'sdd' in image_path:
+        scene_images = create_images_dict(first_dict['sceneId'], image_path, 'reference.jpg', True)
+    elif 'ind' in image_path.lower():
+        scene_images = create_images_dict(first_dict['sceneId'], image_path, 'reference.jpg', False)
+    else:
+        raise ValueError(f'Invalid {image_path}')
+    # TODO: no image for 
     # color
     cmap = mpl.cm.get_cmap('tab10')
     for i, meta_id in enumerate(first_dict['metaId']):

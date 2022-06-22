@@ -13,7 +13,7 @@ def main(args):
     params.update({'decision': 'map'})
 
     # prepare data 
-    df_train, df_val, df_test = prepare_dataeset(
+    _, _, df_test = prepare_dataeset(
         DATA_PATH, args.load_data, args.batch_size, None, 
         None, args.val_files, args.val_split, args.test_splits, 
         args.shuffle, args.share_val_test, 'eval', hide_data_details=True)

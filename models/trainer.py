@@ -137,8 +137,8 @@ class YNetTrainer:
             elif 'parallel' in train_net:
                 for param_name, param in model.encoder.named_parameters():
                     if 'parallel' in param_name: param.requires_grad = True
-            # lora 
-            elif 'lora' in train_net:
+            # mosa 
+            elif 'mosa' in train_net:
                 for param_name, param in model.encoder.named_parameters():
                     if 'lora' in param_name: param.requires_grad = True
             # after semantic segmentation 

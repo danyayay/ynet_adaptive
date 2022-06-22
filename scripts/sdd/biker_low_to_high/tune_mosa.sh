@@ -1,8 +1,8 @@
 # config 
 list_train_seed=(1) 
 batch_size=10
-n_epoch=1
-n_round=1
+n_epoch=100
+n_round=3
 config_filename=sdd_train.yaml
 steps=20
 
@@ -19,7 +19,7 @@ dataset_path=filter/avg_vel/dc_013/Biker/4_8
 load_data=predefined
 
 # fine-tune setting  
-list_train_net=(lora_1)
+list_train_net=(mosa_1)
 list_position=("scene")  
 list_n_train_batch=(1) 
 list_lr=(0.0005)

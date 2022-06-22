@@ -157,7 +157,7 @@ def get_conv2d(
     if padding is None: padding = kernel_size // 2
     l = str(l)
     position = [str(i) for i in position]
-    if 'lora' in train_net and l in position:
+    if 'mosa' in train_net and l in position:
         assert rank != 0 and rank is not None
         return lora.Conv2d(in_channels, out_channels, 
             kernel_size=kernel_size, r=rank, stride=stride, padding=padding)
@@ -202,7 +202,7 @@ class YNetEncoder(nn.Module):
         self.train_net = train_net
         self.position = position
         self.stages = nn.ModuleList()
-        if 'lora' in self.train_net: 
+        if 'mosa' in self.train_net: 
             self.rank = int(self.train_net.split('_')[1]) if len(self.train_net.split('_')) > 1 else 1
         else:
             self.rank = None 
@@ -313,7 +313,7 @@ class YNetEncoderFusion(nn.Module):
         self.train_net = train_net
         self.position = position
         
-        if 'lora' in self.train_net: 
+        if 'mosa' in self.train_net: 
             self.rank = int(self.train_net.split('_')[1]) if len(self.train_net.split('_')) > 1 else 1
         else:
             self.rank = None 
@@ -549,7 +549,7 @@ class YNet(nn.Module):
                 self.scene_embedding = Embedding(n_semantic_classes)
                 self.motion_embedding = Embedding(obs_len)
 
-            if 'lora' in train_net or 'Layer' in train_net:
+            if 'mosa' in train_net or 'Layer' in train_net:
                 self.encoder = YNetEncoderL(
                     in_channels=self.feature_channels, channels=encoder_channels,
                     train_net=train_net, position=position)

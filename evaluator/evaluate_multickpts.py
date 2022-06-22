@@ -19,15 +19,17 @@ def main(args):
     IMAGE_PATH, DATA_PATH = get_image_and_data_path(params)
 
     # prepare data 
-    _, _, df_test = prepare_dataeset(DATA_PATH, args.val_files, 0, args.n_leftouts)
+    _, _, df_test = prepare_dataeset(
+        DATA_PATH, args.load_data, args.batch_size, None, 
+        None, args.val_files, args.val_split, args.test_splits, 
+        args.shuffle, args.share_val_test, 'eval', hide_data_details=True)
     # get focused data 
-    print(f"df_test: {df_test.shape}; #={df_test.shape[0]/(params['obs_len']+params['pred_len'])}")
     meta_ids_focus = get_meta_ids_focus(df_test, 
         given_csv={'path': args.result_path, 'name': args.result_name, 'n_limited': args.result_limited}, 
         given_meta_ids=args.given_meta_ids, random_n=args.random_n)
     df_test = df_test[df_test.metaId.isin(meta_ids_focus)]
     print('meta_ids_focus: #=', len(meta_ids_focus))
-    print(f"df_test_limited: {df_test.shape}; #={df_test.shape[0]/(params['obs_len']+params['pred_len'])}")
+    print(f"df_test_limited: {df_test.shape}; #={df_test.metaId.unique().shape[0]}")
     
     # ckpts
     ckpts, ckpts_name, is_file_separated = get_ckpts_and_names(
@@ -62,7 +64,10 @@ def main(args):
         else:
             ckpts_trajs_dict[ckpt_name] = list_trajs
 
-    folder_name = f"{args.seed}__{'_'.join(args.dataset_path.split('/'))}__{'_'.join(args.val_files).rstrip('.pkl')}" 
+    if args.val_files is not None:
+        folder_name = f"{args.seed}__{'_'.join(args.dataset_path.split('/'))}__{'_'.join(args.val_files).rstrip('.pkl')}" 
+    else: 
+        folder_name = f"{args.seed}__{'_'.join(args.dataset_path.split('/'))}"
     out_dir = f'csv/comparison/{folder_name}'
     pathlib.Path(out_dir).mkdir(parents=True, exist_ok=True)
     csv_name = f"{'_'.join(ckpts_name)}__N{len(meta_ids_focus)}_R{args.n_round}"
@@ -99,6 +104,4 @@ if __name__ == '__main__':
 
     main(args)
 
-# python -m pdb -m evaluator.evaluate_multickpts --dataset_path filter/agent_type/deathCircle_0 --val_files Biker.pkl --n_leftouts 500 --pretrained_ckpt ckpts/Seed_2__Tr_Pedestrian__Val_Pedestrian__ValRatio_0.1__filter_agent_type__train__fusion_2.pt --tuned_ckpts ckpts/Seed_1__Tr_Biker__Val_Biker__ValRatio_0.1__filter_agent_type_deathCircle_0__lora_1__Pos_0_1_2_3_4__TrN_20__lr_0.0005.pt --n_round 2 --given_meta_ids 6318
-
-# python -m pdb -m evaluator.evaluate_multickpts --dataset_path filter/agent_type/deathCircle_0 --val_files Biker.pkl --n_leftouts 500 --pretrained_ckpt ckpts/Seed_1__Tr_Pedestrian__Val_Pedestrian__ValRatio_0.1__filter_agent_type__train.pt --tuned_ckpts ckpts/Seed_1__Tr_Biker__Val_Biker__ValRatio_0.1__filter_agent_type_deathCircle_0__lora_1__Pos_0_1_2_3_4__TrN_20__lr_0.0005.pt --result_path './csv/comparison/1__filter_agent_type_deathCircle_0__Biker/OODG_encoder_0(20)_encoder_0-1(20).csv' --result_name 'ade_OODG__ade_encoder_0(20)__diff' --result_limited 5 --n_round 10 
+# python -m pdb -m evaluator.evaluate_multickpts --config_filename inD_shortterm_eval.yaml --dataset_path filter/agent_type/scene1/truck_bus_filter --load_data predefined --network fusion --n_fusion 2 --pretrained_ckpt ckpts/inD__ynetmod__car_to_truck.pt --tuned_ckpts ckpts_inD/Seed_1__filter_agent_type_scene1_truck_bus_filter__lora_1__Pos_scene__TrN_20__lr_0.001.pt ckpts_inD/Seed_1__filter_agent_type_scene1_truck_bus_filter__lora_1__Pos_motion__TrN_20__lr_0.001.pt --n_round 5 --viz

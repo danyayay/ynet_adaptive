@@ -1,7 +1,7 @@
 # config 
 list_train_seed=(10) 
 batch_size=10
-n_epoch=300
+n_epoch=120
 n_round=3
 config_filename=inD_shortterm_train.yaml
 
@@ -18,9 +18,9 @@ dataset_path=filter/agent_type/scene1/truck_bus_filter
 load_data=predefined
 
 # fine-tune setting 
-list_train_net=(lora_1)
+list_train_net=(mosa_1)
 list_position=("scene" "motion" "scene fusion" "motion fusion" "scene motion fusion")  
-list_n_train_batch=(2) 
+list_n_train_batch=(1) 
 list_lr=(0.001)
 
 

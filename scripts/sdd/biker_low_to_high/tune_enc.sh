@@ -10,7 +10,7 @@ network=fusion
 n_fusion=2
 
 # pretrained model
-pretrained_ckpt=ckpts_fusion/sdd__ynetmod__biker_low_to_high.pt
+pretrained_ckpt=ckpts/sdd__ynetmod__biker_low_to_high.pt
 ckpt_path=ckpts/sdd/biker_low_to_high
 
 # data path 
@@ -18,7 +18,7 @@ dataset_path=filter/avg_vel/dc_013/Biker/4_8
 load_data=predefined
 
 # fine-tune setting  
-list_train_net=("scene")
+list_train_net=("scene_motion_fusion")
 list_n_train_batch=(1) 
 list_lr=(0.0005)
 

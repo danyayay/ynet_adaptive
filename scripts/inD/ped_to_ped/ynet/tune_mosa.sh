@@ -1,5 +1,5 @@
 # config  
-list_train_seed=(1 2 3 4 5 6 7 8 9 10) 
+list_train_seed=(1) 
 batch_size=10
 n_epoch=120
 n_round=3
@@ -17,9 +17,9 @@ dataset_path=filter/agent_type/scene1/pedestrian_40
 load_data=predefined
 
 # fine-tune setting
-list_train_net=(lora_1)
+list_train_net=(mosa_1)
 list_position=("0 1 2 3 4")
-list_n_train_batch=(3 4) 
+list_n_train_batch=(1) 
 list_lr=(0.005)
 
 

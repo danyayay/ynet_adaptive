@@ -1,8 +1,8 @@
 # config 
 list_train_seed=(1) 
 batch_size=10
-n_epoch=1
-n_round=1
+n_epoch=100
+n_round=3
 config_filename=inD_shortterm_train.yaml
 
 # model 
@@ -18,7 +18,7 @@ load_data=predefined
 
 # fine-tune setting 
 train_net=all
-list_n_train_batch=(2) 
+list_n_train_batch=(1) 
 list_lr=(0.00005)
 
 
