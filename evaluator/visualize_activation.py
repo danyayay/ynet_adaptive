@@ -2,7 +2,7 @@ import pandas as pd
 from utils.parser import get_parser
 from utils.data_utils import set_random_seeds, prepare_dataeset, get_meta_ids_focus
 from utils.util import get_params, get_image_and_data_path, restore_model, get_ckpts_and_names
-from evaluator.visualization import plot_activation_single
+from evaluator.visualization import plot_activation_single, plot_activation
 
 
 def main(args):
@@ -40,6 +40,7 @@ def main(args):
         model.model.eval()
 
         # register layer 
+        layers_dict = {}
         # layers_dict = {
         #     'encoder.stages.0.0': model.model.encoder.stages[0][0],
         #     'encoder.stages.0.1': model.model.encoder.stages[0][1],
@@ -53,9 +54,13 @@ def main(args):
         # for layer_name, layer in layers_dict.items():
         #     layer.register_forward_hook(hook_store_output)
         #     layers_hook[layer_name] = layer
-        # layer = model.model.encoder.stages[0][0]
-        # layer.register_forward_hook(hook_store_input)
-        # layers_hook['encoder.stages.0.0_input'] = layer
+        layer = model.model.encoder.scene_stages[0][0]
+        layer.register_forward_hook(hook_store_input)
+        layers_hook['encoder.scene_stages.0.0_input'] = layer
+
+        layer = model.model.encoder.motion_stages[0][0]
+        layer.register_forward_hook(hook_store_input)
+        layers_hook['encoder.motion_stages.0.0_input'] = layer
             
         # forward 
         pred_goal_map, pred_traj_map, raw_img = model.forward_test(
@@ -64,8 +69,10 @@ def main(args):
         # store 
         # for layer_name in layers_dict.keys():
         #     ckpts_hook_dict[ckpt_name][layer_name+'_output'] = layers_hook[layer_name].output
-        # ckpts_hook_dict[ckpt_name]['encoder.stages.0.0_input'] = \
-        #     layers_hook['encoder.stages.0.0_input'].input
+        ckpts_hook_dict[ckpt_name]['encoder.scene_stages.0.0_input'] = \
+            layers_hook['encoder.scene_stages.0.0_input'].input
+        ckpts_hook_dict[ckpt_name]['encoder.motion_stages.0.0_input'] = \
+            layers_hook['encoder.motion_stages.0.0_input'].input
         # semantic_imgs = layers_hook['encoder.stages.0.0_input'].input[:, :6]
         pred_goal_map_sigmoid = model.model.sigmoid(pred_goal_map / params['temperature'])  
         pred_traj_map_sigmoid = model.model.sigmoid(pred_traj_map / params['temperature'])
@@ -95,8 +102,8 @@ def main(args):
     #     inhance_threshold=0.05, format='png')
     plot_activation_single(
         ckpts_hook_dict, index, df_test, IMAGE_PATH, 
-        out_dir='figures/activation_yy', display_scene_img=False,
-        inhance_threshold=0.15, format='png')
+        out_dir='figures/activation_yy/0.1_seed9', display_scene_img=False,
+        inhance_threshold=0.1, format='png')
     # plot_activation_single(
     #     ckpts_hook_dict, index, df_test, IMAGE_PATH, 
     #     out_dir='figures/activation_yy', display_scene_img=False,
@@ -110,7 +117,7 @@ def main(args):
     #     out_dir='figures/activation_yy', display_scene_img=True,
     #     inhance_threshold=0.15, zoom_in=False)
     # plot_activation(ckpts_hook_dict, index, 
-    #     f'figures/activation/{folder_name}', 
+    #     f'figures/activation_yy/{folder_name}', 
     #     compare_raw=args.compare_raw, compare_diff=args.compare_diff, 
     #     compare_overlay=args.compare_overlay, compare_relative=args.compare_relative, 
     #     scene_imgs=raw_img, semantic_imgs=None, scale_row=True, inhance_diff=False)
@@ -145,7 +152,11 @@ if __name__ == '__main__':
     args = parser.parse_args()
     main(args)
 
-# python -m pdb -m evaluator.visualize_activation --config_filename inD_shortterm_eval.yaml --load_data predefined --network fusion --n_fusion 2 --dataset_path filter/agent_type/scene1/truck_bus_filter --pretrained_ckpt ckpts/inD__ynetmod__car_to_truck.pt --tuned_ckpts ckpts_inD/Seed_1__filter_agent_type_scene1_truck_bus_filter__lora_1__Pos_scene__TrN_20__lr_0.001.pt ckpts_inD/Seed_1__filter_agent_type_scene1_truck_bus_filter__lora_1__Pos_motion__TrN_20__lr_0.001.pt --given_meta_ids 1317
+# python -m evaluator.visualize_activation --config_filename inD_shortterm_eval.yaml --load_data predefined --network fusion --n_fusion 2 --dataset_path filter/agent_type/scene1/truck_bus_filter --pretrained_ckpt ckpts/inD__ynetmod__car_to_truck.pt --tuned_ckpts ckpts/Seed_1__filter_agent_type_scene1_truck_bus_filter__mosa_1__Pos_scene__TrN_20__lr_0.001.pt ckpts/Seed_1__filter_agent_type_scene1_truck_bus_filter__mosa_1__Pos_motion__TrN_20__lr_0.001.pt ckpts/Seed_1__filter_agent_type_scene1_truck_bus_filter__mosa_1__Pos_scene_fusion__TrN_20__lr_0.001.pt ckpts/Seed_1__filter_agent_type_scene1_truck_bus_filter__mosa_1__Pos_motion_fusion__TrN_20__lr_0.001.pt ckpts/Seed_1__filter_agent_type_scene1_truck_bus_filter__mosa_1__Pos_scene_motion_fusion__TrN_20__lr_0.001.pt ckpts/Seed_1__filter_agent_type_scene1_truck_bus_filter__all__TrN_20__lr_0.00005.pt --given_meta_ids 1317
+
+# python -m evaluator.visualize_activation --config_filename inD_shortterm_eval.yaml --load_data predefined --network fusion --n_fusion 2 --dataset_path filter/agent_type/scene1/truck_bus_filter --pretrained_ckpt ckpts/inD__ynetmod__car_to_truck.pt --tuned_ckpts ckpts/Seed_9__filter_agent_type_scene1_truck_bus_filter__mosa_1__Pos_scene__TrN_20__lr_0.001.pt ckpts/Seed_9__filter_agent_type_scene1_truck_bus_filter__mosa_1__Pos_motion__TrN_20__lr_0.001.pt ckpts/Seed_9__filter_agent_type_scene1_truck_bus_filter__mosa_1__Pos_scene_fusion__TrN_20__lr_0.001.pt ckpts/Seed_9__filter_agent_type_scene1_truck_bus_filter__mosa_1__Pos_motion_fusion__TrN_20__lr_0.001.pt ckpts/Seed_9__filter_agent_type_scene1_truck_bus_filter__mosa_1__Pos_scene_motion_fusion__TrN_20__lr_0.001.pt --given_meta_ids 1317
+
+
 # --given_meta_ids 1317 559 279 647 5403 3479 4419 3859
 
 # --given_meta_ids 5358 5883 5982

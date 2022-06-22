@@ -134,8 +134,10 @@ def plot_activation_single(
     unique_scene = np.unique(np.array([idx[1] for idx in index]))
     if 'sdd' in image_path:
         scene_images = create_images_dict(unique_scene, image_path, 'reference.jpg', True)
+        resize_factor = 0.25
     elif 'inD' in image_path:
         scene_images = create_images_dict(unique_scene, image_path, 'reference.png', False)
+        resize_factor = 0.33
     else:
         raise ValueError(f'Invalid {image_path}')
     # body 
@@ -215,7 +217,6 @@ def plot_activation_single(
                             # plot map 
                             if vmin >= 0: vmin = -0.00001
                             if vmax <= 0: vmax = 0.00001
-                            # TODO: the values are the same again 
                             divnorm = mpl.colors.TwoSlopeNorm(vcenter=0, vmin=vmin, vmax=vmax)
                             if inhance_threshold is not None:
                                 cmap_div = get_hollow_cmap(inhance_threshold)
@@ -226,7 +227,9 @@ def plot_activation_single(
                             ax.set_xticklabels([])
                             ax.set_xticks([])
                             ax.set_yticks([])
-                            plt.legend(fontsize=15)
+                            leg = plt.legend(fontsize=15)
+                            leg.legendHandles[0].set_color('mediumseagreen')
+                            leg.legendHandles[1].set_color('goldenrod')
                         out_name = f'{ckpt_name}__{layer_name}__diff_single'
                         if display_scene_img: out_name = out_name + '__scene'
                         out_name = out_name + f'__{inhance_threshold}.{format}' if inhance_threshold is not None else out_name + f'.{format}'
@@ -1028,32 +1031,35 @@ def plot_multiple_predictions(
     n_round = len(trajs_list)
     if 'sdd' in image_path:
         scene_images = create_images_dict(first_dict['sceneId'], image_path, 'reference.jpg', True)
+        divide = 100
     elif 'inD' in image_path:
         scene_images = create_images_dict(first_dict['sceneId'], image_path, 'reference.png', False)
+        divide = 40
     else:
         raise ValueError(f'Invalid {image_path}')
-    # TODO: no image for 
     # color
     cmap = mpl.cm.get_cmap('tab10')
     for i, meta_id in enumerate(first_dict['metaId']):
         scene_id = first_dict['sceneId'][i]
         scene_image = scene_images[scene_id]
-        fig = plt.figure(figsize=(scene_image.shape[0]/100, scene_image.shape[1]/100))
+        fig = plt.figure(figsize=(scene_image.shape[0]/divide, scene_image.shape[1]/divide))
         plt.imshow(scene_image)
-        ms = 4
+        ms = 1
+        linewidth = 0.5
+        n_total = len(ckpts_trajs_dict)
         for j, (ckpt_name, trajs_list) in enumerate(ckpts_trajs_dict.items()):
             gt_traj = trajs_list[0]['groundtruth'][i]
-            if j == 0:
-                plt.plot(gt_traj[:obs_len,0], gt_traj[:obs_len,1], 
-                    '.-', ms=ms, c='black')
-                plt.plot(gt_traj[(obs_len-1):,0], gt_traj[(obs_len-1):,1], 
-                    '.-', ms=ms, c='black', label='groundtruth')
             for n in range(n_round):   
                 pred_traj = trajs_list[n]['prediction'][i]            
                 pred_x = np.insert(pred_traj[:,0], 0, gt_traj[obs_len-1,0])
                 pred_y = np.insert(pred_traj[:,1], 0, gt_traj[obs_len-1,1])
-                plt.plot(pred_x, pred_y, '.-', c=cmap(j), ms=ms)
-            plt.plot(0, 0, '.-', c=cmap(j), ms=ms, label=ckpt_name)
+                plt.plot(pred_x, pred_y, '.-', linewidth=linewidth, c=cmap(j), ms=ms)
+            plt.plot(0, 0, '.-', c=cmap(j), linewidth=linewidth, ms=ms, label=ckpt_name)
+            if j == n_total - 1:
+                plt.plot(gt_traj[:obs_len,0], gt_traj[:obs_len,1], 
+                    '.-', linewidth=linewidth, ms=ms, c='black')
+                plt.plot(gt_traj[(obs_len-1):,0], gt_traj[(obs_len-1):,1], 
+                    '.-', linewidth=linewidth, ms=ms, c='black', label='groundtruth')
         title = f'meta_id={meta_id}, scene_id={scene_id}'
         plt.title(title)
         plt.legend(loc='best')
