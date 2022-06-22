@@ -20,7 +20,7 @@ load_data=predefined
 
 # fine-tune setting 
 list_train_net=(parallelLayer_3x3)
-list_position=("0 1 2 3 4")  
+list_position=("0 1 2 3 4")
 list_n_train_batch=(3) 
 list_lr=(0.00005)
 
