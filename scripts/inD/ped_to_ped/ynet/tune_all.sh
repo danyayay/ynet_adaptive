@@ -1,7 +1,7 @@
 # config 
 list_train_seed=(1) 
 batch_size=10
-n_epoch=120  # @Parth to confirm
+n_epoch=300  # @Parth to confirm
 n_early_stop=3000
 n_round=3
 config_filename=inD_longterm_train.yaml

@@ -19,7 +19,7 @@ load_data=predefined
 
 # fine-tune setting 
 list_train_net=(mosa_1)
-list_position=("scene" "motion" "scene fusion" "motion fusion" "scene motion fusion")  
+list_position=("0 1 2 3 4")  
 list_n_train_batch=(2) 
 list_lr=(0.001)
 
