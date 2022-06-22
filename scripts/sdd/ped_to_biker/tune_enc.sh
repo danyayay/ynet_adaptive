@@ -1,5 +1,5 @@
 # config 
-list_train_seed=(1) 
+list_train_seed=(4 5) 
 batch_size=10
 n_epoch=100
 n_early_stop=30
@@ -10,18 +10,17 @@ steps=20
 # model 
 network=original
 
-# pretrained_ckpt
+# pretrained model 
 pretrained_ckpt=ckpts/sdd__ynet__ped_to_biker.pt
 ckpt_path=ckpts/sdd/ped_to_biker
 
 # data path 
 dataset_path=filter/agent_type/deathCircle_0/Biker
 load_data=predefined
-
 # fine-tune setting 
 train_net=encoder
 list_position=("0 1 2 3 4")  
-list_n_train_batch=(1) 
+list_n_train_batch=(3) 
 list_lr=(0.0005)
 
 

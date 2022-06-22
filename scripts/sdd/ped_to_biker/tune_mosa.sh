@@ -21,8 +21,8 @@ load_data=predefined
 # fine-tune setting 
 list_train_net=(mosa_1)
 list_position=("0 1 2 3 4") 
-list_n_train_batch=(1) 
-list_lr=(0.005)
+list_n_train_batch=(3) 
+list_lr=(0.001)
 
 
 for train_seed in ${list_train_seed[@]}; do

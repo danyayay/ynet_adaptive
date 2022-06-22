@@ -1,10 +1,10 @@
 # config 
-list_train_seed=(1) 
+list_train_seed=(1 2 3 4 5) 
 batch_size=10
 n_epoch=100
-n_early_stop=30
 n_round=3
 config_filename=sdd_train.yaml
+n_early_stop=30
 steps=20
 
 # model 
@@ -20,7 +20,7 @@ load_data=predefined
 
 # fine-tune setting 
 train_net=all
-list_n_train_batch=(1) 
+list_n_train_batch=(3) 
 list_lr=(0.00005)
 
 

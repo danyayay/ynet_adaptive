@@ -1,8 +1,11 @@
 # config 
-list_train_seed=(1) 
+list_train_seed=(1 2 3 4 5) 
 batch_size=10
 n_epoch=100
+<<<<<<< Updated upstream
 n_early_stop=30
+=======
+>>>>>>> Stashed changes
 n_round=3
 config_filename=sdd_train.yaml
 steps=20
@@ -21,7 +24,7 @@ load_data=predefined
 # fine-tune setting 
 list_train_net=(parallelLayer_3x3)
 list_position=("0 1 2 3 4")  
-list_n_train_batch=(1) 
+list_n_train_batch=(3) 
 list_lr=(0.00005)
 
 
