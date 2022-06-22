@@ -2,10 +2,7 @@
 list_train_seed=(1 2 3 4 5) 
 batch_size=10
 n_epoch=100
-<<<<<<< Updated upstream
 n_early_stop=30
-=======
->>>>>>> Stashed changes
 n_round=3
 config_filename=sdd_train.yaml
 steps=20
