@@ -2,7 +2,7 @@ list_train_seed=(1)
 batch_size=10
 n_epoch=300
 n_round=3
-ckpt_path=inD_ckpt
+ckpt_path=inD_ckpts
 network=original
 train_net=train 
 
