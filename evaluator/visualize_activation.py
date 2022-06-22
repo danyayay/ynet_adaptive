@@ -79,7 +79,10 @@ def main(args):
         # print('semantic_imgs', semantic_imgs.shape)
 
     # plot 
-    folder_name = f"{args.seed}__{'_'.join(args.dataset_path.split('/'))}__{'_'.join(args.val_files).rstrip('.pkl')}/{'_'.join(ckpts_name)}" 
+    if args.val_files is not None:
+        folder_name = f"{args.seed}__{'_'.join(args.dataset_path.split('/'))}__{'_'.join(args.val_files).rstrip('.pkl')}/{'_'.join(ckpts_name)}" 
+    else:
+        folder_name = f"{args.seed}__{'_'.join(args.dataset_path.split('/'))}/{'_'.join(ckpts_name)}" 
     index = df_test.groupby(by=['metaId', 'sceneId']).count().index
     print(index)
     # plot_activation_single(
@@ -94,10 +97,10 @@ def main(args):
         ckpts_hook_dict, index, df_test, IMAGE_PATH, 
         out_dir='figures/activation_yy', display_scene_img=False,
         inhance_threshold=0.15, format='png')
-    plot_activation_single(
-        ckpts_hook_dict, index, df_test, IMAGE_PATH, 
-        out_dir='figures/activation_yy', display_scene_img=False,
-        inhance_threshold=0.15, format='pdf')
+    # plot_activation_single(
+    #     ckpts_hook_dict, index, df_test, IMAGE_PATH, 
+    #     out_dir='figures/activation_yy', display_scene_img=False,
+    #     inhance_threshold=0.15, format='pdf')
     # plot_activation_single(
     #     ckpts_hook_dict, index, df_test, IMAGE_PATH, 
     #     out_dir='figures/activation_yy', display_scene_img=True,
@@ -142,7 +145,8 @@ if __name__ == '__main__':
     args = parser.parse_args()
     main(args)
 
-# CUDA_VISIBLE_DEVICES=1 python -m pdb -m evaluator.visualize_activation --load_data sequential --network original --dataset_path filter/agent_type/deathCircle_0 --pretrained_ckpt ckpts/Seed_1__Tr_Pedestrian__Val_Pedestrian__ValRatio_0.1__filter_agent_type__train__original.pt --tuned_ckpts ckpts/Seed_1__filter_agent_type_deathCircle_0_Biker__lora_1__Pos_0_1_2_3_4__TrN_20__lr_0.0005.pt --val_files Biker.pkl --test_splits 500 --given_meta_ids 5358 5883 5982 
+# python -m pdb -m evaluator.visualize_activation --config_filename inD_shortterm_eval.yaml --load_data predefined --network fusion --n_fusion 2 --dataset_path filter/agent_type/scene1/truck_bus_filter --pretrained_ckpt ckpts/inD__ynetmod__car_to_truck.pt --tuned_ckpts ckpts_inD/Seed_1__filter_agent_type_scene1_truck_bus_filter__lora_1__Pos_scene__TrN_20__lr_0.001.pt ckpts_inD/Seed_1__filter_agent_type_scene1_truck_bus_filter__lora_1__Pos_motion__TrN_20__lr_0.001.pt --given_meta_ids 1317
+# --given_meta_ids 1317 559 279 647 5403 3479 4419 3859
 
 # --given_meta_ids 5358 5883 5982
 

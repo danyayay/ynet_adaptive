@@ -132,7 +132,12 @@ def plot_activation_single(
     display_scene_img=True, inhance_threshold=None):
     # scene 
     unique_scene = np.unique(np.array([idx[1] for idx in index]))
-    scene_images = create_images_dict(unique_scene, image_path, 'reference.jpg', True)
+    if 'sdd' in image_path:
+        scene_images = create_images_dict(unique_scene, image_path, 'reference.jpg', True)
+    elif 'inD' in image_path:
+        scene_images = create_images_dict(unique_scene, image_path, 'reference.png', False)
+    else:
+        raise ValueError(f'Invalid {image_path}')
     # body 
     first_ckpt = list(ckpts_hook_dict)[0]
     layers_name = ckpts_hook_dict[first_ckpt].keys()
@@ -198,17 +203,6 @@ def plot_activation_single(
                             plt.legend()
                             plt.subplots_adjust(wspace=0.02, hspace=0.02, bottom=0.1, right=0.78, top=0.9)
                         else:
-                            # fig, ax = plt.subplots(1, 1, figsize=(width, height))
-                            # ax.imshow(scene_img)
-                            # ax.set_yticklabels([])
-                            # ax.set_xticklabels([])
-                            # ax.set_xticks([])
-                            # ax.set_yticks([])
-                            # out_path = f'{new_out_dir}/{scene_id}.png'
-                            # plt.savefig(out_path, bbox_inches='tight')
-                            # plt.close(fig)
-                            # print(f'Saved {out_path}')
-
                             fig, ax = plt.subplots(1, 1, figsize=(width, height))
                             # plot background 
                             ax.imshow(scene_img)
@@ -219,8 +213,9 @@ def plot_activation_single(
                             ax.plot(df_meta.x.values[(obs_len-1):], df_meta.y.values[(obs_len-1):], 
                                 '.-', c='gold', linewidth=2, markersize=5, label='groundtruth prediction')
                             # plot map 
-                            if vmin > 0: vmin = -0.00001
-                            if vmax < 0: vmax = 0.00001
+                            if vmin >= 0: vmin = -0.00001
+                            if vmax <= 0: vmax = 0.00001
+                            # TODO: the values are the same again 
                             divnorm = mpl.colors.TwoSlopeNorm(vcenter=0, vmin=vmin, vmax=vmax)
                             if inhance_threshold is not None:
                                 cmap_div = get_hollow_cmap(inhance_threshold)
@@ -882,7 +877,12 @@ def plot_feature_space_diff_evolution(
 
 def plot_trajectories_scenes_overlay(image_path, df_biker, df_ped, out_dir='figures/scene_with_trajs', format='png'):
     unique_scene = list(set(df_biker.sceneId.unique()).intersection(set(df_ped.sceneId.unique())))
-    scene_images = create_images_dict(unique_scene, image_path, 'reference.jpg', True)
+    if 'sdd' in image_path:
+        scene_images = create_images_dict(unique_scene, image_path, 'reference.jpg', True)
+    elif 'inD' in image_path:
+        scene_images = create_images_dict(unique_scene, image_path, 'reference.png', False)
+    else:
+        raise ValueError(f'Invalid {image_path}')
     for scene_id in unique_scene:
         print(f'Plotting {scene_id}')
         scene_biker = df_biker[df_biker.sceneId == scene_id]
@@ -913,7 +913,12 @@ def plot_trajectories_scenes_overlay(image_path, df_biker, df_ped, out_dir='figu
 
 def plot_given_trajectories_scenes_overlay(image_path, df, out_dir='figures/scene_with_trajs_given', format='png'):
     unique_scene = df.sceneId.unique()
-    scene_images = create_images_dict(unique_scene, image_path, 'reference.jpg', True)
+    if 'sdd' in image_path:
+        scene_images = create_images_dict(unique_scene, image_path, 'reference.jpg', True)
+    elif 'inD' in image_path:
+        scene_images = create_images_dict(unique_scene, image_path, 'reference.png', False)
+    else:
+        raise ValueError(f'Invalid {image_path}')
     for scene_id in unique_scene:
         print(f'Plotting {scene_id}')
         df_scene = df[df.sceneId == scene_id]
@@ -941,7 +946,12 @@ def plot_given_trajectories_scenes_overlay(image_path, df, out_dir='figures/scen
 
 def plot_obs_pred_trajs(image_path, dict_trajs, out_dir='figures/prediction', format='png', obs_len=8):
     first_dict = dict_trajs[list(dict_trajs)[0]]
-    scene_images = create_images_dict(first_dict['sceneId'], image_path, 'reference.jpg', True)
+    if 'sdd' in image_path:
+        scene_images = create_images_dict(first_dict['sceneId'], image_path, 'reference.jpg', True)
+    elif 'inD' in image_path:
+        scene_images = create_images_dict(first_dict['sceneId'], image_path, 'reference.png', False)
+    else:
+        raise ValueError(f'Invalid {image_path}')
     colors = {'OB': 'black', 'GT': 'green', 'INDG': 'cyan', 'OODG': 'blue', 'FT': 'orange', 'ET': 'red'}
     for i, meta_id in enumerate(first_dict['metaId']):
         scene_id = first_dict['sceneId'][i]
@@ -974,7 +984,12 @@ def plot_obs_pred_trajs(image_path, dict_trajs, out_dir='figures/prediction', fo
 
 def plot_prediction(image_path, ckpt_trajs_dict, out_dir='figures/prediction', format='png', obs_len=8):
     first_dict = ckpt_trajs_dict[list(ckpt_trajs_dict)[0]]
-    scene_images = create_images_dict(first_dict['sceneId'], image_path, 'reference.jpg', True)
+    if 'sdd' in image_path:
+        scene_images = create_images_dict(first_dict['sceneId'], image_path, 'reference.jpg', True)
+    elif 'inD' in image_path:
+        scene_images = create_images_dict(first_dict['sceneId'], image_path, 'reference.png', False)
+    else:
+        raise ValueError(f'Invalid {image_path}')
     for i, meta_id in enumerate(first_dict['metaId']):
         scene_id = first_dict['sceneId'][i]
         scene_image = scene_images[scene_id]
@@ -1013,8 +1028,8 @@ def plot_multiple_predictions(
     n_round = len(trajs_list)
     if 'sdd' in image_path:
         scene_images = create_images_dict(first_dict['sceneId'], image_path, 'reference.jpg', True)
-    elif 'ind' in image_path.lower():
-        scene_images = create_images_dict(first_dict['sceneId'], image_path, 'reference.jpg', False)
+    elif 'inD' in image_path:
+        scene_images = create_images_dict(first_dict['sceneId'], image_path, 'reference.png', False)
     else:
         raise ValueError(f'Invalid {image_path}')
     # TODO: no image for 
@@ -1056,8 +1071,12 @@ def plot_goal_map_with_samples(image_path, ckpts_trajs_dict,
     ms = 4
     for ckpt_name, trajs_list in ckpts_trajs_dict.items():
         n_round = len(trajs_list)
-        scene_images = create_images_dict(
-            trajs_list[0]['sceneId'], image_path, 'reference.jpg', True)
+        if 'sdd' in image_path:
+            scene_images = create_images_dict(trajs_list[0]['sceneId'], image_path, 'reference.jpg', True)
+        elif 'inD' in image_path:
+            scene_images = create_images_dict(trajs_list[0]['sceneId'], image_path, 'reference.png', False)
+        else:
+            raise ValueError(f'Invalid {image_path}')
         resize(scene_images, resize_factor)
         for i, meta_id in enumerate(trajs_list[0]['metaId']):
             scene_id = trajs_list[0]['sceneId'][i]
@@ -1118,8 +1137,12 @@ def plot_decoder_overlay(image_path, dict_features, out_dir='figures/decoder', f
     else: # 'GoalDecoder_B7_L1' in first_ckpt_dict[list(first_ckpt_dict)[0]]
         goal_dec_name, traj_dec_name = 'GoalDecoder_B7_L1', 'TrajDecoder_B7_L1'
     # take unique scene images
-    scene_images = create_images_dict(
-        first_ckpt_dict.keys(), image_path, 'reference.jpg', True)
+    if 'sdd' in image_path:
+        scene_images = create_images_dict(first_ckpt_dict.keys(), image_path, 'reference.jpg', True)
+    elif 'inD' in image_path:
+        scene_images = create_images_dict(first_ckpt_dict.keys(), image_path, 'reference.png', False)
+    else:
+        raise ValueError(f'Invalid {image_path}')
     for scene_id, dict_scene in first_ckpt_dict.items():
         for i, meta_id in enumerate(dict_scene['metaId']):
             scene_image = scene_images[scene_id]
