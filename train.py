@@ -37,7 +37,6 @@ def main(args):
 
     # model
     model = YNetTrainer(params=params)
-    if args.train_net == "modulator": model.model.initialize_style()
     if args.pretrained_ckpt is not None:
         model.load_params(args.pretrained_ckpt)
         print(f"Loaded checkpoint {args.pretrained_ckpt}")
@@ -51,9 +50,9 @@ def main(args):
         pretrained_model = YNetTrainer(params=params_pretrained)
         pretrained_model.load_params(args.pretrained_ckpt)
         set_random_seeds(args.seed)
-        ade_pre, fde_pre, _, _ = pretrained_model.test(df_test, IMAGE_PATH, args.train_net == "modulator")
+        ade_pre, fde_pre, _, _ = pretrained_model.test(df_test, IMAGE_PATH)
         set_random_seeds(args.seed)
-        ade_cur, fde_cur, _, _ = model.test(df_test, IMAGE_PATH, args.train_net == "modulator")
+        ade_cur, fde_cur, _, _ = model.test(df_test, IMAGE_PATH)
         if ade_pre != ade_cur or fde_pre != fde_cur:
             raise RuntimeError('Wrong model initialization')
         else:
@@ -66,7 +65,7 @@ def main(args):
     # test for leftout data 
     print('############ Test leftout data ##############')
     set_random_seeds(args.seed)
-    test_ade, test_fde, _, _ = model.test(df_test, IMAGE_PATH, args.train_net == "modulator")
+    test_ade, test_fde, _, _ = model.test(df_test, IMAGE_PATH)
 
     toc = time.time()
     print('Time spent:', time.strftime("%Hh%Mm%Ss", time.gmtime(toc - tic)))

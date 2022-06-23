@@ -116,12 +116,8 @@ class YNetTrainer:
         if not (train_net == 'all' or train_net == 'train'):
             for param in model.parameters(): param.requires_grad = False
 
-            # modulator 
-            if train_net == "modulator":
-                for param in model.style_modulators.parameters():
-                    param.requires_grad = True
             # tune the whole encoder 
-            elif train_net == "encoder" and len(position) == 0:
+            if train_net == "encoder" and len(position) == 0:
                 for param in model.encoder.parameters():
                     param.requires_grad = True
             # tune partial encoder 
@@ -222,20 +218,19 @@ class YNetTrainer:
         state_dicts = deque()
         half_window_size = (window_size // 2) + 1
 
-        with_style = train_net == "modulator"
         print('Start training')
         for e in tqdm(range(n_epoch), desc='Epoch'):
             train_ADE, train_FDE, train_loss = train_epoch(
                 model, train_loader, train_images, optimizer, criterion, loss_scale, self.device, 
                 dataset_name, self.homo_mat, gt_template, input_template, waypoints,
                 e, obs_len, pred_len, batch_size, e_unfreeze, resize_factor, 
-                with_style, network, swap_semantic)
+                network, swap_semantic)
 
             # For faster inference, we don't use TTST and CWS here, only for the test set evaluation
             val_ADE, val_FDE, _, _ = evaluate(
                 model, val_loader, val_images, self.device, 
                 dataset_name, self.homo_mat, input_template, waypoints, 'val', 
-                n_goal, n_traj, obs_len, batch_size, resize_factor, with_style,
+                n_goal, n_traj, obs_len, batch_size, resize_factor,
                 temperature, False, use_CWS, resl_thresh, CWS_params, 
                 network=network, swap_semantic=swap_semantic)
             
@@ -296,15 +291,15 @@ class YNetTrainer:
 
         return self.val_ADE, self.val_FDE
 
-    def test(self, df_test, image_path, with_style, return_preds=False, return_samples=False):
-        return self._test(df_test, image_path, with_style=with_style, 
+    def test(self, df_test, image_path, return_preds=False, return_samples=False):
+        return self._test(df_test, image_path, 
             return_preds=return_preds, return_samples=return_samples, **self.params)
 
     def _test(
         self, df_test, image_path, dataset_name, resize_factor, 
         batch_size, n_round, obs_len, pred_len, 
         waypoints, n_goal, n_traj, temperature, rel_threshold, 
-        use_TTST, use_CWS, CWS_params, use_raw_data=False, with_style=False, 
+        use_TTST, use_CWS, CWS_params, use_raw_data=False, 
         return_preds=False, return_samples=False, network=None, swap_semantic=False, **kwargs):
         """
         Val function
@@ -339,7 +334,7 @@ class YNetTrainer:
             test_ADE, test_FDE, df_metrics, trajs_dict = evaluate(
                 model, test_loader, test_images, self.device, 
                 dataset_name, self.homo_mat, input_template, waypoints, 'test',
-                n_goal, n_traj, obs_len, batch_size, resize_factor, with_style,
+                n_goal, n_traj, obs_len, batch_size, resize_factor,
                 temperature, use_TTST, use_CWS, rel_threshold, CWS_params,
                 return_preds=return_preds, return_samples=return_samples, 
                 network=network, swap_semantic=swap_semantic)

@@ -5,25 +5,6 @@ import loralib as lora
 from utils.softargmax import SoftArgmax2D, create_meshgrid
 
 
-class StyleModulator(nn.Module):
-    def __init__(self, sizes):
-        """
-        Additional style modulator for efficient fine-tuning
-        """
-        from ddf import DDFPack
-        super(StyleModulator, self).__init__()
-        tau = 0.5
-        self.modulators = nn.ModuleList(
-            [DDFPack(s) for s in sizes + [sizes[-1]]]
-        )
-
-    def forward(self, x):
-        stylized = []
-        for xi, layer in zip(x, self.modulators):
-            stylized.append(layer(xi))
-        return stylized
-
-
 def conv2d(in_channels, out_channels=None, kernel_size=1, stride=1, padding=None, is_bias=False):
     if padding is None: padding = kernel_size // 2
     if out_channels is None: out_channels = in_channels
@@ -567,9 +548,6 @@ class YNet(nn.Module):
 
         self.encoder_channels = encoder_channels
 
-    def initialize_style(self):
-        self.style_modulators = nn.ModuleList([StyleModulator(self.encoder_channels) for _ in range(3)])
-
     def segmentation(self, image):
         return self.semantic_segmentation(image)
 
@@ -595,10 +573,6 @@ class YNet(nn.Module):
         else:   
             x = torch.cat([scene_map, motion_map], dim=1) 
             return self.encoder(x)
-
-    # Used for style encoding
-    def stylize_features(self, x, style_class):
-        return self.style_modulators[style_class](x)
 
     # Softmax for Image data as in dim=NxCxHxW, returns softmax image shape=NxCxHxW
     def softmax(self, x):

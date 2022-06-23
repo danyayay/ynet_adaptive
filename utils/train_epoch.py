@@ -7,7 +7,7 @@ def train_epoch(
     model, train_loader, train_images, optimizer, criterion, loss_scale, device, 
     dataset_name, homo_mat, gt_template, input_template, waypoints, 
     epoch, obs_len, pred_len, batch_size, e_unfreeze, resize_factor, 
-    with_style=False, network=None, swap_semantic=False):
+    network=None, swap_semantic=False):
     """
     Run training for one epoch
 
@@ -82,10 +82,6 @@ def train_epoch(
             
             # forward pass 
             features = model.pred_features(semantic_map, observed_map)
-
-            # Style integrator
-            if with_style:
-                features = model.stylize_features(features, 0)
 
             # Predict goal and waypoint probability distribution
             pred_goal_map = model.pred_goal(features)

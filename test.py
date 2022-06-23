@@ -41,7 +41,7 @@ def main(args):
     # test
     print('############ Test model ##############')
     set_random_seeds(args.seed)
-    ade, fde, _, _ = model.test(df_test, IMAGE_PATH, with_style=args.train_net=="modulator")
+    ade, fde, _, _ = model.test(df_test, IMAGE_PATH)
 
     toc = time.time()
     print('Time spent:', time.strftime("%Hh%Mm%Ss", time.gmtime(toc - tic)))

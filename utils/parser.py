@@ -37,7 +37,7 @@ def get_model_args(parser):
     parser.add_argument('--position', default=[], type=str, nargs='+')
     parser.add_argument('--ynet_bias', action='store_true')
     parser.add_argument("--train_net", default="train", type=str, 
-        help="train all parameters or only encoder or with modulator")
+        help="Train which part of the network")
     return parser
 
 

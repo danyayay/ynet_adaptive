@@ -16,8 +16,7 @@ from utils.image_utils import resize
 
 
 labels = {"all": "vanilla fine-tuning",
-          "encoder": "encoder adaptation", 
-          "modulator": "modulator adaptation"}
+          "encoder": "encoder adaptation"}
 
 labels_ckpt = {
     'GT': 'groundtruth',

@@ -37,7 +37,7 @@ def torch_multivariate_gaussian_heatmap(coordinates, H, W, dist, sigma_factor, r
 def evaluate(
     model, val_loader, val_images, device, 
     dataset_name, homo_mat, input_template, waypoints, mode, 
-    n_goal, n_traj, obs_len, batch_size, resize_factor=0.25, with_style=False, 
+    n_goal, n_traj, obs_len, batch_size, resize_factor=0.25,  
     temperature=1, use_TTST=False, use_CWS=False, rel_thresh=0.002, CWS_params=None, 
     return_preds=False, return_samples=False, network=None, swap_semantic=False):
     """
@@ -122,10 +122,6 @@ def evaluate(
 
                 # Forward pass
                 features = model.pred_features(semantic_image, observed_map)  # n_layer=6 list of (batch_size, n_channel, height, width)
-
-                # Style integrator
-                if with_style:
-                    features = model.stylize_features(features, 0)
 
                 # Predict goal and waypoint probability distributions
                 pred_goal_map = model.pred_goal(features)  # (batch_size, pred_len, height, width)

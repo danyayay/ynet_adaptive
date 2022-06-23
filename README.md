@@ -60,13 +60,6 @@ Install dependencies
 pip install -r requirements.txt
 ```
 
-Build [ddf dependency](https://github.com/theFoxofSky/ddfnet)
-```
-cd ddf
-python setup.py install
-mv build/lib*/* .
-```
-
 
 ## Dataset
 
@@ -145,4 +138,4 @@ Results of different methods for low-shot transfer across agent types and speed 
 
 ## Acknowledgement
 
-Our code is developed upon the public code of [Y-net](https://github.com/HarshayuGirase/Human-Path-Prediction/tree/master/ynet) and [Decoupled Dynamic Filter](https://github.com/theFoxofSky/ddfnet).
+Our code is developed upon the public code of [Y-net](https://github.com/HarshayuGirase/Human-Path-Prediction/tree/master/ynet).
