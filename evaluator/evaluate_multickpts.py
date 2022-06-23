@@ -104,4 +104,4 @@ if __name__ == '__main__':
 
     main(args)
 
-# python -m pdb -m evaluator.evaluate_multickpts --config_filename inD_shortterm_eval.yaml --dataset_path filter/agent_type/scene1/truck_bus_filter --load_data predefined --network fusion --n_fusion 2 --pretrained_ckpt ckpts/inD__ynetmod__car_to_truck.pt --tuned_ckpts ckpts_inD/Seed_1__filter_agent_type_scene1_truck_bus_filter__lora_1__Pos_scene__TrN_20__lr_0.001.pt ckpts_inD/Seed_1__filter_agent_type_scene1_truck_bus_filter__lora_1__Pos_motion__TrN_20__lr_0.001.pt --n_round 5 --viz
+# python -m pdb -m evaluator.evaluate_multickpts --config_filename inD_shortterm_eval.yaml --dataset_path filter/agent_type/scene1/truck_bus_filter --load_data predefined --network fusion --n_fusion 2 --pretrained_ckpt ckpts/inD__ynetmod__car_to_truck.pt --tuned_ckpts ckpts/Seed_9__filter_agent_type_scene1_truck_bus_filter__mosa_1__Pos_scene__TrN_20__lr_0.001.pt ckpts/Seed_9__filter_agent_type_scene1_truck_bus_filter__mosa_1__Pos_motion__TrN_20__lr_0.001.pt --n_round 5 --viz

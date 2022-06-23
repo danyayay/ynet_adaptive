@@ -126,10 +126,10 @@ def base_img_plot(ax, scene_img, semantic_img=None):
     return im
 
 
-def plot_activation_single(
+def plot_goal_output(
     ckpts_hook_dict, index, df_test, image_path,
-    out_dir='figures/activation', format='png', obs_len=8, resize_factor=0.25,
-    display_scene_img=True, inhance_threshold=None):
+    out_dir='figures/activation', format='png', obs_len=8,
+    display_scene_img=True, inhance_threshold=None, window=None, white_bg=False):
     # scene 
     unique_scene = np.unique(np.array([idx[1] for idx in index]))
     if 'sdd' in image_path:
@@ -165,7 +165,12 @@ def plot_activation_single(
                         if isinstance(features, torch.Tensor):
                             features = features.cpu().detach().numpy()
                         scene_img = get_correct_scene_img(scene_images[scene_id], -1)
+                        
                         black = np.zeros((scene_img.shape[0], scene_img.shape[1], 3))
+                        if white_bg:
+                            bg = scene_img.mean(axis=2) == 0.0
+                            scene_img[bg] = 1.0
+                            black[bg] = 1.0
                         diff = features - base_features
                         diff_single = diff.mean(axis=0)
                         diff_single = cv2.resize(
@@ -184,7 +189,7 @@ def plot_activation_single(
                             axes[1].plot(df_meta.x.values[:obs_len], df_meta.y.values[:obs_len], 
                                 '.-', c='lightgreen', linewidth=1, markersize=3, label='observation')
                             axes[1].plot(df_meta.x.values[(obs_len-1):], df_meta.y.values[(obs_len-1):], 
-                                '.-', c='gold', linewidth=1, markersize=3, label='groundtruth prediction')
+                                '.-', c='gold', linewidth=1, markersize=3, label='groundtruth')
                             # plot map 
                             if vmin > 0: vmin = -0.00001
                             if vmax < 0: vmax = 0.00001
@@ -213,7 +218,7 @@ def plot_activation_single(
                             ax.plot(df_meta.x.values[:obs_len], df_meta.y.values[:obs_len], 
                                 '.-', c='lightgreen', linewidth=2, markersize=5, label='observation')
                             ax.plot(df_meta.x.values[(obs_len-1):], df_meta.y.values[(obs_len-1):], 
-                                '.-', c='gold', linewidth=2, markersize=5, label='groundtruth prediction')
+                                '.-', c='gold', linewidth=2, markersize=5, label='groundtruth')
                             # plot map 
                             if vmin >= 0: vmin = -0.00001
                             if vmax <= 0: vmax = 0.00001
@@ -227,9 +232,21 @@ def plot_activation_single(
                             ax.set_xticklabels([])
                             ax.set_xticks([])
                             ax.set_yticks([])
-                            leg = plt.legend(fontsize=15)
+                            leg = plt.legend(fontsize=20)
                             leg.legendHandles[0].set_color('mediumseagreen')
                             leg.legendHandles[1].set_color('goldenrod')
+                            if window is not None:
+                                x_center, y_center, x_range, ratio, layout = \
+                                    window[0], window[1], window[2], window[3], window[4]
+                                if layout == 'portrait' and ratio < 1.0: ratio = 1 / ratio 
+                                if layout == 'landscape' and ratio > 1.0: ratio = 1 / ratio 
+                                x_min = x_center - x_range // 2
+                                x_max = x_center + x_range // 2
+                                y_min = y_center - x_range * ratio // 2
+                                y_max = y_center + x_range * ratio // 2
+                                ax.set_xlim(x_min, x_max)
+                                ax.set_ylim(y_min, y_max)
+                                ax.invert_yaxis()
                         out_name = f'{ckpt_name}__{layer_name}__diff_single'
                         if display_scene_img: out_name = out_name + '__scene'
                         out_name = out_name + f'__{inhance_threshold}.{format}' if inhance_threshold is not None else out_name + f'.{format}'
