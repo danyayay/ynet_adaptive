@@ -868,7 +868,7 @@ def load_predefined_train_val_test(data_path, batch_size, n_train_batch=None, sh
 def prepare_dataeset(
     data_path, load_data, batch_size, n_train_batch, 
     train_files, val_files, val_split, test_splits, 
-    shuffle, share_val_test, mode='train', hide_data_details=False):
+    shuffle, share_val_test, mode='train', show_details=False):
     if load_data == 'predefined':
         print('Loading predefined train/val/test sets')
         df_train, df_val, df_test = load_predefined_train_val_test(data_path, 
@@ -892,7 +892,7 @@ def prepare_dataeset(
         else:
             raise NotImplementedError
 
-    if not hide_data_details:
+    if show_details:
         print(f'train_meta_ids: {df_train.metaId.unique()}')
         print(f'val_meta_ids: {df_val.metaId.unique()}')
         print(f'test_meta_ids: {df_test.metaId.unique()}')

@@ -22,7 +22,7 @@ def main(args):
     _, _, df_test = prepare_dataeset(
         DATA_PATH, args.load_data, args.batch_size, None, 
         None, args.val_files, args.val_split, args.test_splits, 
-        args.shuffle, args.share_val_test, 'eval', hide_data_details=True)
+        args.shuffle, args.share_val_test, 'eval', show_details=False)
     # get focused data 
     meta_ids_focus = get_meta_ids_focus(df_test, 
         given_csv={'path': args.result_path, 'name': args.result_name, 'n_limited': args.result_limited}, 

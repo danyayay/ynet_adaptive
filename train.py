@@ -22,7 +22,7 @@ def main(args):
     df_train, df_val, df_test = prepare_dataeset(
         DATA_PATH, args.load_data, args.batch_size, args.n_train_batch, 
         args.train_files, args.val_files, args.val_split, args.test_splits, 
-        args.shuffle, args.share_val_test, 'train', args.hide_data_details)
+        args.shuffle, args.share_val_test, 'train', args.show_details)
 
     folder_name = f"{args.seed}__{'_'.join(args.dataset_path.split('/'))}"
 

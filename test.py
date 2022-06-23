@@ -16,7 +16,7 @@ def main(args):
     # prepare data 
     _, _, df_test = prepare_dataeset(DATA_PATH, args.load_data, args.batch_size, 
         None, None, args.val_files, args.val_split, args.test_splits, 
-        args.shuffle, args.share_val_test, 'eval', args.hide_data_details)
+        args.shuffle, args.share_val_test, 'eval', args.show_details)
     
     # if args.pretrained_ckpt is not None:
     #     plot_given_trajectories_scenes_overlay(IMAGE_PATH, df_test, f'figures/traj_check/{args.tuned_ckpt}/test')
