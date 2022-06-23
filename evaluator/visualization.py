@@ -231,7 +231,7 @@ def plot_goal_output(
                             ax.set_xticklabels([])
                             ax.set_xticks([])
                             ax.set_yticks([])
-                            leg = plt.legend(fontsize=20)
+                            leg = plt.legend(loc='upper left', fontsize=25)
                             leg.legendHandles[0].set_color('mediumseagreen')
                             leg.legendHandles[1].set_color('goldenrod')
                             if window is not None:

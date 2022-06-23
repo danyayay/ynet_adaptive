@@ -16,6 +16,7 @@ def main(args):
     # configuration
     set_random_seeds(args.seed)
     params = get_params(args)
+    obs_len = params['obs_len']
     IMAGE_PATH, DATA_PATH = get_image_and_data_path(params)
 
     # prepare data 
@@ -81,7 +82,8 @@ def main(args):
                 f'figures/prediction/{folder_name}/{"_".join(ckpts_name)}')
         else:
             plot_multiple_predictions(IMAGE_PATH, ckpts_trajs_dict, 
-                f'figures/prediction_multiple/{folder_name}/{"_".join(ckpts_name)}')
+                f'figures/prediction_multiple/{folder_name}/{"_".join(ckpts_name)}', 
+                obs_len=obs_len)
             # plot_goal_map_with_samples(IMAGE_PATH, ckpts_trajs_dict, 
             #     f'figures/goal_map_with_samples/{folder_name}')
         
