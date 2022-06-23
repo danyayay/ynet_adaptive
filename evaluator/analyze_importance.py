@@ -48,7 +48,7 @@ def main(args):
         pretrained_model = YNetTrainer(params=params)
         pretrained_model.load(args.pretrained)
         set_random_seeds(args.seed)
-        _, _, list_metrics_pretrained, _ = pretrained_model.test(df_test, IMAGE_PATH, False, False, False) 
+        _, _, list_metrics_pretrained, _ = pretrained_model.test(df_test, IMAGE_PATH, False, False) 
         if args.replace_tuned:
             list_metrics_pretrained[0].to_csv(
                 f"{out_dir_tuned}/OODG__N{'_'.join(str(n) for n in args.n_leftouts)}.csv", index=False)
@@ -64,7 +64,7 @@ def main(args):
                 tuned_model = YNetTrainer(params=params)
                 tuned_model.load(tuned)
                 set_random_seeds(args.seed)
-                _, _, list_metrics_tuned, _ = tuned_model.test(df_test, IMAGE_PATH, False, False, False)         
+                _, _, list_metrics_tuned, _ = tuned_model.test(df_test, IMAGE_PATH, False, False)         
                 
                 # replace one layers in tuned model by pretrained model 
                 if args.replace_tuned:
@@ -80,7 +80,7 @@ def main(args):
                             # sanity check 
                             # for i in tuned_model.model.state_dict().keys(): print(i, (tuned_model.model.state_dict()[i] == pretrained_model.model.state_dict()[i]).all().item())
                             set_random_seeds(args.seed)
-                            _, _, list_metrics, _ = tuned_model.test(df_test, IMAGE_PATH, False, False, False) 
+                            _, _, list_metrics, _ = tuned_model.test(df_test, IMAGE_PATH, False, False) 
                             # store ade/fde 
                             out_path = f"{out_dir_tuned}/{tuned_name}__N{'_'.join(str(n) for n in args.n_leftouts)}__{param_name}.csv"
                             list_metrics[0].to_csv(out_path, index=False)
@@ -96,7 +96,7 @@ def main(args):
                             print(f'Replacing {param_name}')
                             pretrained_model.model.load_state_dict({param_name: param}, strict=False)
                             set_random_seeds(args.seed)
-                            _, _, list_metrics, _ = pretrained_model.test(df_test, IMAGE_PATH, False, False, False) 
+                            _, _, list_metrics, _ = pretrained_model.test(df_test, IMAGE_PATH, False, False) 
                             # store ade/fde 
                             out_path = f"{out_dir_pretrained}/{tuned_name}__N{'_'.join(str(n) for n in args.n_leftouts)}__{param_name}.csv"
                             list_metrics[0].to_csv(out_path, index=False)
@@ -135,7 +135,7 @@ def main(args):
                 tuned_model = YNetTrainer(params=params)
                 tuned_model.load(tuned)
                 set_random_seeds(args.seed)
-                _, _, list_metrics_tuned, _ = tuned_model.test(df_test, IMAGE_PATH, False, False, False)         
+                _, _, list_metrics_tuned, _ = tuned_model.test(df_test, IMAGE_PATH, False, False)         
                 
                 if args.replace_tuned:
                     list_metrics_tuned[0].to_csv(
@@ -156,7 +156,7 @@ def main(args):
                                     print(f'Replacing {param_name}')
                                     tuned_model.model.load_state_dict({param_name: param}, strict=False)
                         set_random_seeds(args.seed)
-                        _, _, list_metrics, _ = tuned_model.test(df_test, IMAGE_PATH, False, False, False) 
+                        _, _, list_metrics, _ = tuned_model.test(df_test, IMAGE_PATH, False, False) 
                         # store ade/fde 
                         out_path = f"{out_dir_tuned}/{tuned_name}__N{'_'.join(str(n) for n in args.n_leftouts)}__{param_selected}.csv"
                         list_metrics[0].to_csv(out_path, index=False)
@@ -182,7 +182,7 @@ def main(args):
                                     print(f'Replacing {param_name}')
                                     pretrained_model.model.load_state_dict({param_name: param}, strict=False)
                         set_random_seeds(args.seed)
-                        _, _, list_metrics, _ = pretrained_model.test(df_test, IMAGE_PATH, False, False, False) 
+                        _, _, list_metrics, _ = pretrained_model.test(df_test, IMAGE_PATH, False, False) 
                         # store ade/fde 
                         out_path = f"{out_dir_pretrained}/{tuned_name}__N{'_'.join(str(n) for n in args.n_leftouts)}__{param_selected}.csv"
                         list_metrics[0].to_csv(out_path, index=False) 

@@ -124,11 +124,11 @@ def update_params(ckpt_path, params):
 def get_ckpts_and_names(ckpts, ckpts_name, pretrained_ckpt, tuned_ckpts):
     if ckpts is not None:
         ckpts, ckpts_name = ckpts, ckpts_name
-        is_file_separated = False
+        is_file_separated = [False] * len(ckpts)
     elif pretrained_ckpt is not None:
         ckpts = [pretrained_ckpt] + tuned_ckpts
         ckpts_name = ['OODG'] + [get_ckpt_name(ckpt) for ckpt in tuned_ckpts]
-        is_file_separated = True
+        is_file_separated = [False] + [True] * len(tuned_ckpts)
     else:
         raise ValueError('No checkpoint provided')
     return ckpts, ckpts_name, is_file_separated

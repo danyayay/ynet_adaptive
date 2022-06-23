@@ -29,14 +29,14 @@ def main(args):
 
     # main  
     ckpts_hook_dict = {}
-    for ckpt, ckpt_name in zip(ckpts, ckpts_name):
+    for i, (ckpt, ckpt_name) in enumerate(zip(ckpts, ckpts_name)):
         ckpts_hook_dict[ckpt_name] = {}
         print(f'====== {ckpt_name} ======')
 
         # model 
-        model = restore_model(params, is_file_separated, 
-            ckpt if not is_file_separated else args.pretrained_ckpt, 
-            None if not is_file_separated else ckpt)
+        model = restore_model(params, is_file_separated[i], 
+            ckpt if not is_file_separated[i] else ckpts[0], 
+            None if not is_file_separated[i] else ckpt)
         model.model.eval()
 
         # register layer 

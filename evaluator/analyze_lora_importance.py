@@ -47,7 +47,7 @@ def main(args):
                     model_mod.model.load_state_dict({param_name: torch.zeros(param.shape)}, strict=False)
                     # test 
                     set_random_seeds(args.seed)
-                    _, _, list_metrics, _ = model_mod.test(df_test, IMAGE_PATH, False, False, False) 
+                    _, _, list_metrics, _ = model_mod.test(df_test, IMAGE_PATH, False, False) 
                     if args.store_csv:
                         # store ade/fde 
                         out_path = f"{out_dir_tuned}/{ckpts_name[1]}__N{len(meta_ids_focus)}__{param_name}.csv"
@@ -63,7 +63,7 @@ def main(args):
                             model_mod.model.load_state_dict({n: torch.zeros(p.shape)}, strict=False)
                     # test 
                     set_random_seeds(args.seed)
-                    _, _, list_metrics, _ = model_mod.test(df_test, IMAGE_PATH, False, False, False) 
+                    _, _, list_metrics, _ = model_mod.test(df_test, IMAGE_PATH, False, False) 
                     if args.store_csv:
                         # store ade/fde 
                         out_path = f"{out_dir_pretrained}/{ckpts_name[1]}__N{len(meta_ids_focus)}__{param_name}.csv"
@@ -93,7 +93,7 @@ def main(args):
                         model_mod.model.load_state_dict({param_name: torch.zeros(param.shape)}, strict=False)
                 # test 
                 set_random_seeds(args.seed)
-                _, _, list_metrics, _ = model_mod.test(df_test, IMAGE_PATH, False, False, False) 
+                _, _, list_metrics, _ = model_mod.test(df_test, IMAGE_PATH, False, False) 
                 if args.store_csv:
                     # store ade/fde 
                     out_path = f"{out_dir_tuned}/{ckpts_name[1]}__N{len(meta_ids_focus)}__{'_'.join(given_layers)}.csv"
@@ -108,7 +108,7 @@ def main(args):
                         model_mod.model.load_state_dict({param_name: torch.zeros(param.shape)}, strict=False)
                 # test 
                 set_random_seeds(args.seed)
-                _, _, list_metrics, _ = model_mod.test(df_test, IMAGE_PATH, False, False, False) 
+                _, _, list_metrics, _ = model_mod.test(df_test, IMAGE_PATH, False, False) 
                 if args.store_csv:
                     # store ade/fde 
                     out_path = f"{out_dir_pretrained}/{ckpts_name[1]}__N{len(meta_ids_focus)}__{'_'.join(given_layers)}.csv"

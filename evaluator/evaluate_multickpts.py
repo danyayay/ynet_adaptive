@@ -40,14 +40,14 @@ def main(args):
     for i, (ckpt, ckpt_name) in enumerate(zip(ckpts, ckpts_name)):
         print(f'====== Testing for {ckpt_name} ======')
 
-        # load model 
-        model = restore_model(params, is_file_separated, 
-            ckpt if not is_file_separated else args.pretrained_ckpt, 
-            None if not is_file_separated else ckpt)
+        # load model
+        model = restore_model(params, is_file_separated[i], 
+            ckpt if not is_file_separated[i] else ckpts[0], 
+            None if not is_file_separated[i] else ckpt)
 
         # test 
         set_random_seeds(args.seed)
-        _, _, list_metrics, list_trajs = model.test(df_test, IMAGE_PATH, False, True, True) 
+        _, _, list_metrics, list_trajs = model.test(df_test, IMAGE_PATH, True, True) 
 
         # store ade/fde comparison
         for r in range(args.n_round):
@@ -105,3 +105,5 @@ if __name__ == '__main__':
     main(args)
 
 # python -m pdb -m evaluator.evaluate_multickpts --config_filename inD_shortterm_eval.yaml --dataset_path filter/agent_type/scene1/truck_bus_filter --load_data predefined --network fusion --n_fusion 2 --pretrained_ckpt ckpts/inD__ynetmod__car_to_truck.pt --tuned_ckpts ckpts/Seed_9__filter_agent_type_scene1_truck_bus_filter__mosa_1__Pos_scene__TrN_20__lr_0.001.pt ckpts/Seed_9__filter_agent_type_scene1_truck_bus_filter__mosa_1__Pos_motion__TrN_20__lr_0.001.pt --n_round 5 --viz
+
+# python -m evaluator.evaluate_multickpts --config_filename inD_longterm_eval.yaml --dataset_path filter/agent_type/scene1/pedestrian_30_third --load_data predefined --network original --pretrained_ckpt ckpts/inD_longterm_weights.pt --tuned_ckpts ckpts/Seed_2__filter_agent_type_scene1_pedestrian_30_third__mosa_1__Pos_0_1_2_3_4__TrN_30__lr_0.005.pt --n_round 5 --viz
