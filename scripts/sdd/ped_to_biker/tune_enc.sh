@@ -1,5 +1,5 @@
 # config 
-list_train_seed=(4 5) 
+list_train_seed=(1 2 3 4 5) 
 batch_size=10
 n_epoch=100
 n_early_stop=30
