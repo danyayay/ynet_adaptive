@@ -3,31 +3,8 @@
 This is an implementation of the paper
 
 **Motion Style Transfer: Modular Low-Rank Adaptation for Deep Motion Forecasting**
-<br>
 
-<a href="https://thedebugger811.github.io">Parth Kothari</a>, 
-<a href="https://people.epfl.ch/danya.li/?lang=en">Danya Li</a>
-<a href="https://sites.google.com/view/yuejiangliu">Yuejiang Liu</a>,
-<a href="https://people.epfl.ch/alexandre.alahi/?lang=en/">Alexandre Alahi</a>
-<br>
-École Polytechnique Fédérale de Lausanne (EPFL)
-
-<!-- Links: **[`Arxiv 11/2021`](https://arxiv.org/abs/2111.14820) | [`Video (7 min)`](https://drive.google.com/file/d/1Uo0Y0eHq4vI7wOxya4mJlxbAe3U4kMx6/view) | [`Spurious`](https://github.com/vita-epfl/causalmotion/tree/main/spurious) | [`Style`](https://github.com/vita-epfl/causalmotion/tree/main/style)**
-<br> -->
 *Under Review*
-
-
-<!-- 
-If you find this code useful for your research, please cite our paper:
-
-```bibtex
-@article{liu2021causalmotion,
-  title={Towards Robust and Adaptive Motion Forecasting: A Causal Representation Perspective},
-  author={Liu, Yuejiang and Cadei, Riccardo and Schweizer, Jonas and Bahmani, Sherwin and Alahi, Alexandre},
-  journal={arXiv preprint arXiv:2111.14820},
-  year={2021}
-}
-``` -->
 
 
 ## Overview
@@ -62,14 +39,6 @@ pip install -r requirements.txt
 
 
 ## Dataset
-
-<!-- Get the raw dataset, our filtered custom dataset and segmentation masks for SDD from the original Y-net authors
-```
-pip install gdown && gdown https://drive.google.com/uc?id=14Jn8HsI-MjNIwepksgW4b5QoRcQe97Lg 
-
-pip install gdown && gdown https://drive.google.com/file/d/1BZQ6ApSTG8-nOPiX5jvN4FH7zf916uM_/view?usp=sharing
-unzip sdd_ynet.zip
-``` -->
 
 Our filtered datasets and segmentation masks can be downloaded from [here](https://drive.google.com/file/d/1BZQ6ApSTG8-nOPiX5jvN4FH7zf916uM_/view?usp=sharing). Due to copyright, we cannot provide data for inD dataset. Please request the inD file from the authors and then use the `bash scripts/inD/processing.sh` file for preprocessing. The data directory should have the following structure:
 ```
@@ -118,19 +87,6 @@ The above experiments correpond to scripts as follows:
 In each folder, scripts for pretraininng, generalizing, baseline fine-tuning, and MoSA fine-tuning are provided. Please check out L5 experiment in [this repository](link). 
 
 Our pretrained models can be downloaded from [here](https://drive.google.com/file/d/12Za6XlInUPzk5__Xwj_k14lw2dBaVqMn/view?usp=sharing) and should be placed under `ckpts/`. 
-
-
-<!-- &nbsp;&nbsp;&nbsp;&nbsp;Our pretrained models can be downloaded from [google drive](https://drive.google.com/drive/folders/1HzHP2_Mg2bAlDV3bQERoGQU3PvijKQmU).
-```
-cd ckpts
-gdown https://drive.google.com/uc?id=180sMpRiGhZOyCaGMMakZPXsTS7Affhuf
-``` -->
-
-<!-- ### Basic Results
-
-Results of different methods for low-shot transfer across agent types and speed limits.
-
-<img src="docs/result.png" height="180"/> -->
 
 
 ## Acknowledgement
