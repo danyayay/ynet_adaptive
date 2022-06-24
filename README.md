@@ -42,7 +42,14 @@ pip install -r requirements.txt
 
 <!-- Our filtered datasets and segmentation masks can be downloaded from [here](https://drive.google.com/file/d/1BZQ6ApSTG8-nOPiX5jvN4FH7zf916uM_/view?usp=sharing).  -->
 
-All the data and pretrained models can be downloaded [here](https://drive.google.com/file/d/1XrWBvJj8RJcnVPxTuHWCbG3A9jXRFk8G/view). Pretrained models should be placed under `ckpts/`. 
+All the data and pretrained models can be downloaded [here](https://drive.google.com/file/d/1XrWBvJj8RJcnVPxTuHWCbG3A9jXRFk8G/view) or use command: 
+
+```
+pip install gdown && gdown https://drive.google.com/uc?id=1XrWBvJj8RJcnVPxTuHWCbG3A9jXRFk8G
+unzip data_checkpoints_SDD_inD_L5.zip
+```
+Pretrained models should be placed under `ckpts/`. 
+
 Due to copyright, we cannot provide data for inD dataset. Please request the inD file from the authors and then use the `bash scripts/inD/processing.sh` file for preprocessing. 
 The data directory should have the following structure:
 ```
