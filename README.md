@@ -38,9 +38,13 @@ pip install -r requirements.txt
 ```
 
 
-## Dataset
+## Data
 
-Our filtered datasets and segmentation masks can be downloaded from [here](https://drive.google.com/file/d/1BZQ6ApSTG8-nOPiX5jvN4FH7zf916uM_/view?usp=sharing). Due to copyright, we cannot provide data for inD dataset. Please request the inD file from the authors and then use the `bash scripts/inD/processing.sh` file for preprocessing. The data directory should have the following structure:
+<!-- Our filtered datasets and segmentation masks can be downloaded from [here](https://drive.google.com/file/d/1BZQ6ApSTG8-nOPiX5jvN4FH7zf916uM_/view?usp=sharing).  -->
+
+All the data and pretrained models can be downloaded [here](https://drive.google.com/file/d/1XrWBvJj8RJcnVPxTuHWCbG3A9jXRFk8G/view). Pretrained models should be placed under `ckpts/`. 
+Due to copyright, we cannot provide data for inD dataset. Please request the inD file from the authors and then use the `bash scripts/inD/processing.sh` file for preprocessing. 
+The data directory should have the following structure:
 ```
 data
 ├── sdd
@@ -86,7 +90,8 @@ The above experiments correpond to scripts as follows:
 
 In each folder, scripts for pretraininng, generalizing, baseline fine-tuning, and MoSA fine-tuning are provided. Please check out L5 experiment in [this repository](link). 
 
-Our pretrained models can be downloaded from [here](https://drive.google.com/file/d/12Za6XlInUPzk5__Xwj_k14lw2dBaVqMn/view?usp=sharing) and should be placed under `ckpts/`. 
+<!-- Our pretrained SDD and inD models can be downloaded from [here](https://drive.google.com/file/d/1NXSMRccLV9lXTyYDxGC91aZiWpe4bugz/view?usp=sharing) and should be placed under `ckpts/`. -->
+
 
 
 ## Acknowledgement
