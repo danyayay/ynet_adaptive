@@ -15,12 +15,12 @@ pretrained_ckpt=ckpts/inD__ynetmod__ped_to_ped.pt
 ckpt_path=ckpts/inD/ped_to_ped/ynetmod
 
 # data path 
-dataset_path=filter/agent_type/scene1/pedestrian_40 # @Parth, to confirm 
+dataset_path=filter/agent_type/scene1/pedestrian
 load_data=predefined
 
 # fine-tune setting
 list_train_net=(mosa_1)
-list_position=("scene" "motion" "scene fusion" "motion fusion" "scene motion fusion")
+list_position=("scene motion fusion")
 list_n_train_batch=(1) 
 list_lr=(0.005)
 

@@ -85,7 +85,6 @@ def train_epoch(
 
             # Predict goal and waypoint probability distribution
             pred_goal_map = model.pred_goal(features)
-            # TODO: check with Parth: loss is very small even if two distributions differ a lot 
             goal_loss = criterion(pred_goal_map, gt_future_map) * loss_scale  # BCEWithLogitsLoss
 
             # Prepare (downsample) ground-truth goal and trajectory heatmap representation for conditioning trajectory decoder
