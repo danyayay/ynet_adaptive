@@ -67,7 +67,7 @@ In addition to our provided datasets, you can refer to `utils.inD_dataset.py` or
 
 ## Experiments 
 
-There are six sets of experiments provided in our paper:
+There are 5 sets of experiments provided in our paper:
 
 | Experiment | Dataset used | Model used | Prediction | Pretraining | Adaptation |
 |----------|--------|----------|--------|----------|--------|
