@@ -40,17 +40,10 @@ pip install -r requirements.txt
 
 ## Data
 
-<!-- Our filtered datasets and segmentation masks can be downloaded from [here](https://drive.google.com/file/d/1BZQ6ApSTG8-nOPiX5jvN4FH7zf916uM_/view?usp=sharing).  -->
-
-All the data and pretrained models can be downloaded [here](https://drive.google.com/file/d/1XrWBvJj8RJcnVPxTuHWCbG3A9jXRFk8G/view) or use command: 
-
-```
-pip install gdown && gdown https://drive.google.com/uc?id=1XrWBvJj8RJcnVPxTuHWCbG3A9jXRFk8G
-unzip data_checkpoints_SDD_inD_L5.zip
-```
-Pretrained models should be placed under `ckpts/`. 
+We provide raw and processed SDD dataset, segmentation models for both SDD and inD images, and pretrained models for both SDD and inD experiments. You can get them via `bash scripts/get_pretrained_model_and_data.sh`. 
 
 Due to copyright, we cannot provide data for inD dataset. Please request the inD file from the authors and then use the `bash scripts/inD/processing.sh` file for preprocessing. 
+
 The data directory should have the following structure:
 ```
 data
@@ -80,7 +73,6 @@ There are six sets of experiments provided in our paper:
 |----------|--------|----------|--------|----------|--------|
 | Motion Style Transfer across Agents | SDD | Y-Net | short-term | pedestrians (all scenes) | bikers (deathCircle_0) |
 | Motion Style Transfer across Scenes | inD | Y-Net | long-term | pedestrians (scenes=2,3,4) | pedestrians (scenes=1) | 
-| Motion Style Transfer across Scenes | L5 | ViT-Tiny | open-loop | vehicles (upper city) | vehicles (lower city) |
 | Modular Style Adapter (Agent motion) | inD | Y-Net-Mod | long-term |cars (scenes=1) | trucks (scenes=1) | 
 | Modular Style Adapter (Scene) | inD | Y-Net-Mod | short-term | pedestrians (scenes=2,3,4) | pedestrians (scenes=1) |
 | Modular Style Adapter (Agent motion) | SDD | Y-Net-Mod | shot-term | bikers (low speed) | bikers (high speed)
@@ -92,15 +84,7 @@ The above experiments correpond to scripts as follows:
 | Motion Style Transfer across Agents | `scripts/sdd/ped_to_biker/` | 
 | Motion Style Transfer across Scenes | `scripts/inD/ped_to_ped/ynet/` | 
 | Modular Style Adapter (Agent motion) | `scripts/inD/scene1_car_to_truck/` | 
-| Modular Style Adapter (Scene)1 | `scripts/inD/ped_to_ped/ynetmod/` | 
+| Modular Style Adapter (Scene) | `scripts/inD/ped_to_ped/ynetmod/` | 
 | Modular Style Adapter (Agent motion) | `scripts/sdd/biker_low_to_high/` |
 
-In each folder, scripts for pretraininng, generalizing, baseline fine-tuning, and MoSA fine-tuning are provided. Please check out L5 experiment in [this repository](link). 
-
-<!-- Our pretrained SDD and inD models can be downloaded from [here](https://drive.google.com/file/d/1NXSMRccLV9lXTyYDxGC91aZiWpe4bugz/view?usp=sharing) and should be placed under `ckpts/`. -->
-
-
-
-## Acknowledgement
-
-Our code is developed upon the public code of [Y-net](https://github.com/HarshayuGirase/Human-Path-Prediction/tree/master/ynet).
+In each folder, scripts for pretraininng, generalizing, baseline fine-tuning, and MoSA fine-tuning are provided. 
