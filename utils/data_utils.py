@@ -395,14 +395,20 @@ def create_dataset_by_agent_type(
                 out_path = os.path.join(out_dir, f"{agent}.pkl")
                 df_varf.to_pickle(out_path)
             else:
+                df_scenes = pd.DataFrame()
                 for scene_id in selected_scenes:
                     out_dir_scene = os.path.join(out_dir, scene_id)
                     out_path = os.path.join(out_dir_scene, f'{agent}.pkl')
                     pathlib.Path(out_dir_scene).mkdir(parents=True, exist_ok=True)
 
                     df_scene = df_varf[df_varf.sceneId == scene_id]
+                    df_scenes = pd.concat([df_scenes, df_scene], axis=0)
                     print(f'scene_id = {scene_id}, label = {agent}, #= {df_scene.metaId.unique().shape[0]}')
                     df_scene.to_pickle(out_path)
+                out_dir_scene = os.path.join(out_dir, '__'.join(selected_scenes))
+                pathlib.Path(out_dir_scene).mkdir(parents=True, exist_ok=True)
+                print(f'scene_id = {selected_scenes}, label = {agent}, #= {df_scenes.metaId.unique().shape[0]}')
+                df_scenes.to_pickle(os.path.join(out_dir_scene, f'{agent}.pkl'))
     
 
 def create_dataset_given_range(df, varf, varf_ranges, labels, out_dir, 

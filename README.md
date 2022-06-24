@@ -71,7 +71,7 @@ pip install gdown && gdown https://drive.google.com/file/d/1BZQ6ApSTG8-nOPiX5jvN
 unzip sdd_ynet.zip
 ``` -->
 
-Our filtered datasets and segmentation masks can be downloaded from [here](https://drive.google.com/file/d/1BZQ6ApSTG8-nOPiX5jvN4FH7zf916uM_/view?usp=sharing). Due to copyright, we cannot provide data for inD dataset. Please request the inD file from the authors and then use the `utils.processing_inD.py` file for preprocessing. The data directory should have the following structure:
+Our filtered datasets and segmentation masks can be downloaded from [here](https://drive.google.com/file/d/1BZQ6ApSTG8-nOPiX5jvN4FH7zf916uM_/view?usp=sharing). Due to copyright, we cannot provide data for inD dataset. Please request the inD file from the authors and then use the `bash scripts/inD/processing.sh` file for preprocessing. The data directory should have the following structure:
 ```
 data
 ├── sdd
@@ -89,10 +89,7 @@ data
 
 ```
 
-In addition to our provided datasets, you can create customized ones: 
-```
-bash scripts/customize_dataset.sh
-```
+In addition to our provided datasets, you can refer to `utils.inD_dataset.py` or `utils.sdd_dataset.py` to create customized ones. 
 
 
 ## Experiments 
