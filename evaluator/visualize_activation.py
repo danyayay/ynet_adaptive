@@ -103,7 +103,7 @@ def main(args):
     plot_goal_output(
         ckpts_hook_dict, index, df_test, IMAGE_PATH, 
         out_dir='figures/activation_yy/ped2ped_new/', display_scene_img=False,
-        inhance_threshold=0.1, format='png', white_bg=True, window=[800, 420, 550, 0.75, 'landscape'])
+        inhance_threshold=0.1, format='pdf', white_bg=True, window=[650, 400, 450, 0.75, 'landscape'])
     # plot_goal_output(
     #     ckpts_hook_dict, index, df_test, IMAGE_PATH, 
     #     out_dir='figures/activation_yy', display_scene_img=False,
@@ -160,14 +160,14 @@ if __name__ == '__main__':
 # metaid = 90: window=[650, 400, 500, 0.618, 'landscape']
 # metaid = 81: window=[650, 400, 500, 0.618, 'landscape'] / [650, 400, 450, 0.75, 'landscape']
 
-# python -m evaluator.visualize_activation --config_filename inD_longterm_eval.yaml --load_data predefined --network original --dataset_path filter/agent_type/scene1/pedestrian_30_third --pretrained_ckpt ckpts/inD_longterm_weights.pt --tuned_ckpts ckpts/Seed_2__filter_agent_type_scene1_pedestrian_30_third__mosa_1__Pos_0_1_2_3_4__TrN_30__lr_0.005.pt --given_meta_ids 104
+# python -m evaluator.visualize_activation --config_filename inD_longterm_eval.yaml --load_data predefined --network original --dataset_path filter/agent_type/scene1/pedestrian_30_third --pretrained_ckpt ckpts/inD_longterm_weights.pt --tuned_ckpts ckpts/Seed_2__filter_agent_type_scene1_pedestrian_30_third__mosa_1__Pos_0_1_2_3_4__TrN_30__lr_0.005.pt --given_meta_ids 339
 
 
-# metaid = 4419: window=[920, 350, 400, 0.618, 'portrait']
-# metaid = 2632: window=[825, 325, 400, 0.618, 'portrait']
-# metaid = 5058: window=[950, 250, 400, 0.618, 'portrait']
+# metaid = 4419: window=[920, 350, 400, 0.618, 'portrait'] / [920, 350, 400, 0.75, 'portrait']
+# metaid = 2632: window=[825, 325, 400, 0.618, 'portrait'] / [825, 325, 350, 0.75, 'portrait']
+# metaid = 5058: window=[950, 250, 400, 0.618, 'portrait'] / [950, 210, 370, 0.75, 'portrait']
 
-# python -m evaluator.visualize_activation --config_filename inD_shortterm_eval.yaml --load_data predefined --network fusion --n_fusion 2 --dataset_path filter/agent_type/scene1/truck_bus_filter --pretrained_ckpt ckpts/inD__ynetmod__car_to_truck.pt --tuned_ckpts ckpts/Seed_1__filter_agent_type_scene1_truck_bus_filter__mosa_1__Pos_scene__TrN_20__lr_0.001.pt ckpts/Seed_1__filter_agent_type_scene1_truck_bus_filter__mosa_1__Pos_motion__TrN_20__lr_0.001.pt ckpts/Seed_1__filter_agent_type_scene1_truck_bus_filter__mosa_1__Pos_scene_fusion__TrN_20__lr_0.001.pt ckpts/Seed_1__filter_agent_type_scene1_truck_bus_filter__mosa_1__Pos_motion_fusion__TrN_20__lr_0.001.pt ckpts/Seed_1__filter_agent_type_scene1_truck_bus_filter__mosa_1__Pos_scene_motion_fusion__TrN_20__lr_0.001.pt ckpts/Seed_1__filter_agent_type_scene1_truck_bus_filter__all__TrN_20__lr_0.00005.pt --given_meta_ids 5058
+# python -m evaluator.visualize_activation --config_filename inD_shortterm_eval.yaml --load_data predefined --network fusion --n_fusion 2 --dataset_path filter/agent_type/scene1/truck_bus_filter --pretrained_ckpt ckpts/inD__ynetmod__car_to_truck.pt --tuned_ckpts ckpts/Seed_1__filter_agent_type_scene1_truck_bus_filter__mosa_1__Pos_scene__TrN_20__lr_0.001.pt ckpts/Seed_1__filter_agent_type_scene1_truck_bus_filter__mosa_1__Pos_motion__TrN_20__lr_0.001.pt ckpts/Seed_1__filter_agent_type_scene1_truck_bus_filter__mosa_1__Pos_scene_fusion__TrN_20__lr_0.001.pt ckpts/Seed_1__filter_agent_type_scene1_truck_bus_filter__mosa_1__Pos_motion_fusion__TrN_20__lr_0.001.pt ckpts/Seed_1__filter_agent_type_scene1_truck_bus_filter__mosa_1__Pos_scene_motion_fusion__TrN_20__lr_0.001.pt ckpts/Seed_1__filter_agent_type_scene1_truck_bus_filter__all__TrN_20__lr_0.00005.pt --given_meta_ids 5058 2632
 
 # python -m evaluator.visualize_activation --config_filename inD_shortterm_eval.yaml --load_data predefined --network fusion --n_fusion 2 --dataset_path filter/agent_type/scene1/truck_bus_filter --pretrained_ckpt ckpts/inD__ynetmod__car_to_truck.pt --tuned_ckpts ckpts/Seed_9__filter_agent_type_scene1_truck_bus_filter__mosa_1__Pos_scene__TrN_20__lr_0.001.pt ckpts/Seed_9__filter_agent_type_scene1_truck_bus_filter__mosa_1__Pos_motion__TrN_20__lr_0.001.pt ckpts/Seed_9__filter_agent_type_scene1_truck_bus_filter__mosa_1__Pos_scene_fusion__TrN_20__lr_0.001.pt ckpts/Seed_9__filter_agent_type_scene1_truck_bus_filter__mosa_1__Pos_motion_fusion__TrN_20__lr_0.001.pt ckpts/Seed_9__filter_agent_type_scene1_truck_bus_filter__mosa_1__Pos_scene_motion_fusion__TrN_20__lr_0.001.pt ckpts/Seed_1__filter_agent_type_scene1_truck_bus_filter__all__TrN_20__lr_0.00005.pt --given_meta_ids 4419
 
