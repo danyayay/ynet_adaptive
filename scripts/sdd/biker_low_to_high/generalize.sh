@@ -9,7 +9,7 @@ network=fusion
 n_fusion=2
 
 # pretrained model 
-ckpts=ckpts/sdd__ynetmod__biker_low_to_high.pt
+ckpts=ckpts/sdd__ynetmod__biker.pt
 ckpts_name=OODG
 
 # data path 

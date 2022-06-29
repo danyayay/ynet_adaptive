@@ -22,3 +22,11 @@ mv data/sdd/filter/shortterm/avg_vel/Biker data/sdd/filter/shortterm/avg_vel/dc_
 python -m utils.split_dataset --data_dir data/sdd/filter/shortterm/avg_vel/dc_013/Biker --data_filename 0.5_3.5.pkl --val_split 0.1 --test_split 250 --seed 1 
 
 python -m utils.split_dataset --data_dir data/sdd/filter/shortterm/avg_vel/dc_013/Biker --data_filename 4_8.pkl --val_split 50 --test_split 250 --seed 1 
+
+
+
+
+# Long-term split 
+python -m utils.sdd_dataset --additional_data_dir /data/dli-data/sdd/raw --raw_data_dir /data/dli-data/sdd/raw --raw_data_filename data_5_30_1fps.pkl --step 30 --window_size 35 --stride 35 --obs_len 5 --varf agent_type --labels Pedestrian Biker --filter_data_dir /data/dli-data/sdd/filter/longterm 
+
+python -m utils.split_dataset --data_dir /data/dli-data/sdd/filter/longterm/agent_type --data_filename Pedestrian.pkl --val_split 0.1 --test_split 0.2 --seed 1 
