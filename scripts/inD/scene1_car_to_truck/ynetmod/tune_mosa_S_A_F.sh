@@ -11,7 +11,7 @@ network=fusion
 n_fusion=2
 
 # pretrained model 
-pretrained_ckpt=ckpts/inD__ynetmod__car_to_truck.pt
+pretrained_ckpt=ckpts/inD__ynetmod__car.pt
 ckpt_path=ckpts/inD/scene1_car_to_truck/ynetmod
 
 # data path 

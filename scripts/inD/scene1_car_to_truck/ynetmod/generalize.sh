@@ -9,7 +9,7 @@ network=fusion
 n_fusion=2
 
 # pretrained model 
-ckpts=ckpts/inD__ynetmod__car_to_truck.pt
+ckpts=ckpts/inD__ynetmod__car.pt
 ckpts_name=OODG
 
 # data path 

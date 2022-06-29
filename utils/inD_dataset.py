@@ -160,7 +160,7 @@ if __name__ == "__main__":
 		# ## get variation factor table 
 		varf_list = ['avg_vel', 'max_acc']
 		df_varf = get_varf_table(df, varf_list, args.obs_len)
-		out_path = os.path.join(args.additional_data_dir, f"{args.raw_data_filename.split('.')[0]}_varf.pkl")
+		out_path = os.path.join(args.additional_data_dir, args.raw_data_filename.replace('data', 'varf'))
 		df_varf.to_pickle(out_path)
 		print(f'Saved variation factor data to {out_path}')
 

@@ -10,7 +10,7 @@ config_filename=inD_longterm_train.yaml
 network=original
 
 # pretrained model 
-pretrained_ckpt=ckpts/inD__ynet__ped_to_ped.pt
+pretrained_ckpt=ckpts/inD__ynet__ped.pt
 ckpt_path=ckpts/inD/ped_to_ped/ynet
 
 # data path 

@@ -97,14 +97,14 @@ if __name__ == "__main__":
                 for idx_1st in out.index.get_level_values('sceneId').unique():
                     df.loc[out[idx_1st].index, 'dist'] = out[idx_1st].values
                 print(f'Added a column of distance with neighbors to df')
-        out_path = os.path.join(args.raw_data_dir, f"data.pkl")
+        out_path = os.path.join(args.raw_data_dir, args.raw_data_filename)
         df.to_pickle(out_path)
         print(f'Saved data to {out_path}')
 
         # ## get variation factor table 
         varf_list = ['avg_vel', 'max_acc']
         df_varf = get_varf_table(df, varf_list, args.obs_len)
-        out_path = os.path.join(args.additional_data_dir, "varf.pkl")
+        out_path = os.path.join(args.additional_data_dir, args.raw_data_filename.replace('data', 'varf'))
         df_varf.to_pickle(out_path)
         print(f'Saved variation factor data to {out_path}')
 

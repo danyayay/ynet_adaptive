@@ -8,7 +8,7 @@ config_filename=inD_longterm_eval.yaml
 network=original
 
 # pretrained model 
-ckpts=ckpts/inD__ynet__ped_to_ped.pt
+ckpts=ckpts/inD__ynet__ped.pt
 ckpts_name=OODG
 
 # data 

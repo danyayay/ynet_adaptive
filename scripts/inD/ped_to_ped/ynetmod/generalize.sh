@@ -9,7 +9,7 @@ network=fusion
 n_fusion=2
 
 # pretrained model 
-ckpts=ckpts/inD__ynetmod__ped_to_ped.pt
+ckpts=ckpts/inD__ynetmod__ped.pt
 ckpts_name=OODG
 
 # data path 

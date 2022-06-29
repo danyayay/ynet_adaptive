@@ -2,17 +2,17 @@
 list_eval_seed=(1) 
 batch_size=10
 n_round=3
-config_filename=sdd_shortterm_eval.yaml
+config_filename=sdd_longterm_eval.yaml
 
 # model 
 network=original
 
 # pretrained model 
-ckpts=ckpts/sdd__ynet__ped.pt
+ckpts=ckpts/inD__ynet__ped.pt
 ckpts_name=OODG
 
 # data path 
-dataset_path=filter/shortterm/agent_type/deathCircle_0/Biker
+dataset_path=filter/longterm/agent_type/Pedestrian
 load_data=predefined
 
 

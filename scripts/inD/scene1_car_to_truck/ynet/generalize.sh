@@ -8,7 +8,7 @@ config_filename=inD_shortterm_eval.yaml
 network=original
 
 # pretrained model 
-ckpts=ckpts/inD__ynet__car_to_truck.pt
+ckpts=ckpts/inD__ynet__car.pt
 ckpts_name=OODG
 
 # data path 

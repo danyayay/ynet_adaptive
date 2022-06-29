@@ -380,8 +380,8 @@ def create_dataset_by_agent_type(
     pathlib.Path(out_dir).mkdir(parents=True, exist_ok=True)
     df_label = df[df.label.isin(labels)]
     df_gb = df_label.groupby(by='label', dropna=True)
-    print('Statistics:\n', df_gb.count()['metaId'] / 20)
-    print('# total:', (df_gb.count()['metaId'] / 20).sum())
+    print('Statistics:\n', df_gb.count()['metaId'].unique().shape[0])
+    print('# total:', (df_gb.count()['metaId'].unique().shape[0]).sum())
     if not statistic_only:
         agent_group_dict = convert_df_to_dict(df_gb)
         for agent, agent_group in agent_group_dict.items():
@@ -447,8 +447,8 @@ def create_dataset_given_range(df, varf, varf_ranges, labels, out_dir,
     else:
         raise ValueError(f'Cannot process {varf}.')
     df_gb = df_label.groupby(by=varf_col_name, dropna=True)
-    print('Statistics:\n', df_gb.count()['metaId'] / 20)
-    print('# total:', (df_gb.count()['metaId'] / 20).sum())
+    print('Statistics:\n', df_gb.count()['metaId'].unique().shape[0])
+    print('# total:', (df_gb.count()['metaId'].unique().shape[0]).sum())
 
     # save categorized dataset
     if not statistic_only:

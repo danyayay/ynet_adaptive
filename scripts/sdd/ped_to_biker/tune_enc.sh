@@ -11,7 +11,7 @@ steps=20
 network=original
 
 # pretrained model 
-pretrained_ckpt=ckpts/sdd__ynet__ped_to_biker.pt
+pretrained_ckpt=ckpts/sdd__ynet__ped.pt
 ckpt_path=ckpts/sdd/ped_to_biker
 
 # data path 

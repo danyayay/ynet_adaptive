@@ -12,7 +12,7 @@ network=fusion
 n_fusion=2
 
 # pretrained model
-pretrained_ckpt=ckpts/sdd__ynetmod__biker_low_to_high.pt
+pretrained_ckpt=ckpts/sdd__ynetmod__biker.pt
 ckpt_path=ckpts/sdd/biker_low_to_high
 
 # data path 
