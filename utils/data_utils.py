@@ -943,6 +943,7 @@ def get_meta_ids_focus(df=None, given_meta_ids=None, given_csv=None, random_n=No
 
 def set_random_seeds(random_seed=0):
     torch.manual_seed(random_seed)
+    torch.cuda.manual_seed(random_seed)
     np.random.seed(random_seed)
     random.seed(random_seed)
     cv2.setRNGSeed(random_seed)

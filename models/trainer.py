@@ -282,7 +282,8 @@ class YNetTrainer:
 
         # Load the best model
         print(f'Best epoch at {best_epoch}')
-        model.load_state_dict(best_state_dict, strict=True)
+        if best_epoch != 0:
+            model.load_state_dict(best_state_dict, strict=True)
 
         # Save the best model
         pathlib.Path(ckpt_path).mkdir(parents=True, exist_ok=True)

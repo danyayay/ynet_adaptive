@@ -1,6 +1,8 @@
 import torch
 import torch.nn as nn
+import numpy as np 
 from utils.image_utils import get_patch, swap_pavement_terrain
+from utils.data_utils import set_random_seeds 
 
 
 def train_epoch(
@@ -27,7 +29,7 @@ def train_epoch(
 
     # outer loop, for loop over each scene as scenes have different image size and to calculate segmentation only once
     for batch, (trajectory, meta, scene) in enumerate(train_loader):
-
+        
         # Get scene image and apply semantic segmentation
         if epoch < e_unfreeze:  # before unfreeze only need to do semantic segmentation once
             model.eval()
@@ -40,6 +42,10 @@ def train_epoch(
 
         # inner loop, for each trajectory in the scene
         for i in range(0, len(trajectory), batch_size):
+            # set_random_seeds(1)
+            # np.save(f'z_run1/{scene}__batch_{i}__epoch_{epoch}.npy', 
+            #     trajectory[i:i+batch_size, :obs_len, :].detach().cpu().numpy())
+            
             if epoch >= e_unfreeze:
                 scene_image = train_images[scene].to(device).unsqueeze(0)
                 scene_image = model.segmentation(scene_image)
@@ -101,6 +107,9 @@ def train_epoch(
 
             # Backprop
             loss = goal_loss + traj_loss
+            # torch.set_printoptions(precision=16)
+            # print(goal_loss.detach().cpu(), traj_loss.detach().cpu(), loss.detach().cpu(), 
+            #     goal_loss.detach().cpu()+traj_loss.detach().cpu()==loss.detach().cpu())
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
@@ -115,6 +124,9 @@ def train_epoch(
                     ((((gt_future - pred_traj) / resize_factor) ** 2).sum(dim=2) ** 0.5).mean(dim=1))
                 train_FDE.append(
                     ((((gt_future[:, -1:] - pred_goal[:, -1:]) / resize_factor) ** 2).sum(dim=2) ** 0.5).mean(dim=1))
+
+    # print('train ADE:', [x.detach().cpu().numpy() for x in train_ADE])
+    # print('train FDE:', [x.detach().cpu().numpy() for x in train_FDE])
 
     train_ADE = torch.cat(train_ADE).mean()
     train_FDE = torch.cat(train_FDE).mean()
