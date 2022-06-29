@@ -15,7 +15,7 @@ pretrained_ckpt=ckpts/inD__ynetmod__car_to_truck.pt
 ckpt_path=ckpts/inD/scene1_car_to_truck/ynetmod
 
 # data path 
-dataset_path=filter/agent_type/scene1/truck_bus_filter
+dataset_path=filter/shortterm/agent_type/scene1/truck_bus_filter
 load_data=predefined
 
 # fine-tune setting 

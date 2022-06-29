@@ -12,7 +12,7 @@ n_fusion=2
 train_net=train 
 
 # data path 
-dataset_path=filter/agent_type/scene234/pedestrian
+dataset_path=filter/longterm/agent_type/scene234/pedestrian
 load_data=predefined
 
 

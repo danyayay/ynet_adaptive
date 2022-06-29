@@ -13,7 +13,7 @@ n_fusion=2
 train_net=train 
 
 # data path 
-dataset_path=filter/agent_type/scene1/car_filter
+dataset_path=filter/shortterm/agent_type/scene1/car_filter
 load_data=predefined
 
 

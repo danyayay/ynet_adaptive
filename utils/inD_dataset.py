@@ -108,12 +108,6 @@ def load_and_window_inD(step, window_size, stride, scenes=[1,2,3,4], path='inD-d
 
 
 if __name__ == "__main__":
-	# df_test = load_and_window_inD(step=25, window_size=35, stride=35, scenes=[1], path='/data/inD-dataset-v1.0/data')
-	# df_test.to_pickle('inD_test.pickle')
-
-	# df_train = load_and_window_inD(step=25, window_size=35, stride=35, scenes=[2, 3, 4], path='/data/inD-dataset-v1.0/data')
-	# df_train.to_pickle('inD_train.pickle')
-
 	parser = argparse.ArgumentParser()
 
 	parser.add_argument('--additional_data_dir', default='data/inD-dataset-v1.0/data', type=str, 
@@ -121,17 +115,13 @@ if __name__ == "__main__":
 	parser.add_argument('--raw_data_dir', default='data/inD-dataset-v1.0/data', type=str, 
 		help='Path to the raw data, can be a subset of the entire dataset')
 	parser.add_argument('--raw_data_filename', default='data_5_30_1fps.pkl', type=str)
-	parser.add_argument('--filter_data_dir', default='data/inD-dataset-v1.0/filter', type=str)
+	parser.add_argument('--filter_data_dir', default='data/inD-dataset-v1.0/filter/longterm', type=str)
 
 	parser.add_argument('--reload', action='store_true')
 	parser.add_argument('--statistic_only', action='store_true', 
 		help='By default, show the statistics and save the customized dataset. ' + \
 			'Set False to show only the statistics of data split.')
 
-	# parser.add_argument("--step", default=12, type=int)
-	# parser.add_argument("--window_size", default=20, type=int)
-	# parser.add_argument("--stride", default=20, type=int)
-	# parser.add_argument("--obs_len", default=8, type=int)
 	parser.add_argument("--step", default=25, type=int)
 	parser.add_argument("--window_size", default=35, type=int)
 	parser.add_argument("--stride", default=35, type=int)

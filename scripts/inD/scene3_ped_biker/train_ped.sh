@@ -12,7 +12,7 @@ network=original
 train_net=train 
 
 # data path 
-dataset_path=filter/agent_type/scene3/pedestrian_8_12/
+dataset_path=filter/shortterm/agent_type/scene3/pedestrian_8_12/
 load_data=predefined
 
 

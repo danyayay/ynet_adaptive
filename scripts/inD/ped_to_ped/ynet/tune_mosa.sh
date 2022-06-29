@@ -14,7 +14,7 @@ pretrained_ckpt=ckpts/inD__ynet__ped_to_ped.pt
 ckpt_path=ckpts/inD/ped_to_ped/ynet
 
 # data path 
-dataset_path=filter/agent_type/scene1/pedestrian_40
+dataset_path=filter/longterm/agent_type/scene1/pedestrian_40
 load_data=predefined
 
 # fine-tune setting

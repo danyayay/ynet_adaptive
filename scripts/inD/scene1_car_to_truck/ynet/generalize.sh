@@ -12,7 +12,7 @@ ckpts=ckpts/inD__ynet__car_to_truck.pt
 ckpts_name=OODG
 
 # data path 
-dataset_path=filter/agent_type/scene1/truck_bus_filter
+dataset_path=filter/shortterm/agent_type/scene1/truck_bus_filter
 load_data=predefined
 
 
