@@ -4,7 +4,7 @@ batch_size=10
 n_epoch=100
 n_early_stop=5
 n_round=3
-config_filename=sdd_train.yaml
+config_filename=sdd_shortterm_train.yaml
 ckpt_path=ckpts
 
 # model 
@@ -12,7 +12,7 @@ network=original
 train_net=train 
 
 # data path 
-dataset_path=filter/agent_type
+dataset_path=filter/shortterm/agent_type
 train_files=Pedestrian.pkl
 val_files=Pedestrian.pkl
 val_split=0.1

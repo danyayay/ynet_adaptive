@@ -2,7 +2,7 @@
 list_eval_seed=(1) 
 batch_size=10
 n_round=3
-config_filename=sdd_eval.yaml
+config_filename=sdd_shortterm_eval.yaml
 
 # model 
 network=fusion
@@ -13,7 +13,7 @@ ckpts=ckpts/sdd__ynetmod__biker_low_to_high.pt
 ckpts_name=OODG
 
 # data path 
-dataset_path=filter/avg_vel/dc_013/Biker/4_8
+dataset_path=filter/shortterm/avg_vel/dc_013/Biker/4_8
 load_data=predefined
 
 

@@ -4,7 +4,7 @@ batch_size=10
 n_epoch=100
 n_early_stop=30
 n_round=3
-config_filename=sdd_train.yaml
+config_filename=sdd_shortterm_train.yaml
 
 # model 
 network=fusion
@@ -15,7 +15,7 @@ pretrained_ckpt=ckpts/sdd__ynetmod__biker_low_to_high.pt
 ckpt_path=ckpts/sdd/biker_low_to_high
 
 # data path 
-dataset_path=filter/avg_vel/dc_013/Biker/4_8
+dataset_path=filter/shortterm/avg_vel/dc_013/Biker/4_8
 load_data=predefined
 
 # fine-tune setting  

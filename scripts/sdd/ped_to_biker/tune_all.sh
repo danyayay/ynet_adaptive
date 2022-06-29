@@ -3,7 +3,7 @@ list_train_seed=(1 2 3 4 5)
 batch_size=10
 n_epoch=100
 n_round=3
-config_filename=sdd_train.yaml
+config_filename=sdd_shortterm_train.yaml
 n_early_stop=30
 steps=20
 
@@ -15,7 +15,7 @@ pretrained_ckpt=ckpts/sdd__ynet__ped_to_biker.pt
 ckpt_path=ckpts/sdd/ped_to_biker
 
 # data path 
-dataset_path=filter/agent_type/deathCircle_0/Biker
+dataset_path=filter/shortterm/agent_type/deathCircle_0/Biker
 load_data=predefined
 
 # fine-tune setting 

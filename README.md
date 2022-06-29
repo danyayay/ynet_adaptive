@@ -50,14 +50,18 @@ data
 ├── sdd
 │   ├── raw/annotations/
 │   ├── filter
-│   |    ├── avg_vel/
-│   |    └── agent_type/
+│   |    ├── shortterm
+│   |    |    ├── avg_vel/
+│   |    |    └── agent_type/
+│   |    └── longterm/agent_type/
 │   └── sdd_segmentation.pth 
 |
 └── inD-dataset-v1.0
     ├── images/
     ├── data/
-    ├── filter/agent_type/
+    ├── filter
+    |    ├── shortterm/agent_type/
+    |    └── longterm/agent_type/
     └── inD_segmentation.pth 
 
 ```

@@ -4,7 +4,7 @@ batch_size=10
 n_epoch=100
 n_early_stop=5
 n_round=3
-config_filename=sdd_train.yaml
+config_filename=sdd_shortterm_train.yaml
 ckpt_path=ckpts
 
 # model 
@@ -13,7 +13,7 @@ n_fusion=2
 train_net=train 
 
 # data path 
-dataset_path=filter/avg_vel/dc_013/Biker/0.5_3.5
+dataset_path=filter/shortterm/avg_vel/dc_013/Biker/0.5_3.5
 load_data=predefined
 
 
