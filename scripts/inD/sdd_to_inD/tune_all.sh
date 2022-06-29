@@ -4,22 +4,22 @@ batch_size=10
 n_epoch=300
 n_early_stop=3000
 n_round=3
-config_filename=inD_longterm_train.yaml
+config_filename=inD_shortterm_eval.yaml
 
 # model 
 network=original
 
 # pretrained model 
-pretrained_ckpt=ckpts/inD__ynet__ped.pt
-ckpt_path=ckpts/inD/ped_to_ped/ynet
+pretrained_ckpt=ckpts/sdd__ynet__ped.pt
+ckpt_path=ckpts/inD/sdd_to_inD
 
 # data path 
-dataset_path=filter/longterm/agent_type/scene1/pedestrian_40
+dataset_path=filter/shortterm/agent_type/scene1/pedestrian_filter
 load_data=predefined
 
 # fine-tune setting 
 train_net=all
-list_n_train_batch=(1) 
+list_n_train_batch=(2) 
 list_lr=(0.00005)
 
 

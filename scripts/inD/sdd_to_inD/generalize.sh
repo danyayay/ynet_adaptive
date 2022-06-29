@@ -12,7 +12,7 @@ ckpts=ckpts/sdd__ynet__ped.pt
 ckpts_name=OODG
 
 # data path 
-dataset_path=filter/shortterm/agent_type/scene1/pedestrian
+dataset_path=filter/shortterm/agent_type/scene1/pedestrian_filter
 load_data=predefined
 
 

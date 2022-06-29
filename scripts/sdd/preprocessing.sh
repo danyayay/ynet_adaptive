@@ -30,3 +30,7 @@ python -m utils.split_dataset --data_dir data/sdd/filter/shortterm/avg_vel/dc_01
 python -m utils.sdd_dataset --additional_data_dir /data/dli-data/sdd/raw --raw_data_dir /data/dli-data/sdd/raw --raw_data_filename data_5_30_1fps.pkl --step 30 --window_size 35 --stride 35 --obs_len 5 --varf agent_type --labels Pedestrian Biker --filter_data_dir /data/dli-data/sdd/filter/longterm 
 
 python -m utils.split_dataset --data_dir /data/dli-data/sdd/filter/longterm/agent_type --data_filename Pedestrian.pkl --val_split 0.1 --test_split 0.2 --seed 1 
+
+python -m utils.filter_dataset --data_path /data/dli-data/sdd/filter/longterm/agent_type/Pedestrian.pkl --varf_path /data/dli-data/sdd/raw/varf_8_12_2_5fps.pkl --lower_bound 0.2
+
+python -m utils.split_dataset --data_dir /data/dli-data/sdd/filter/longterm/agent_type --data_filename Pedestrian_filter.pkl --val_split 0.1 --test_split 0.2 --seed 1 
