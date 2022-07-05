@@ -380,8 +380,9 @@ def create_dataset_by_agent_type(
     pathlib.Path(out_dir).mkdir(parents=True, exist_ok=True)
     df_label = df[df.label.isin(labels)]
     df_gb = df_label.groupby(by='label', dropna=True)
-    print('Statistics:\n', df_gb.count()['metaId'].unique().shape[0])
-    print('# total:', (df_gb.count()['metaId'].unique().shape[0]).sum())
+    n_total = df_label[df_label.metaId == df_label.metaId.unique()[0]].shape[0]
+    print('Statistics:\n', df_gb.count()['metaId'] / n_total)
+    print('# total:', (df_gb.count()['metaId'] / n_total).sum())
     if not statistic_only:
         agent_group_dict = convert_df_to_dict(df_gb)
         for agent, agent_group in agent_group_dict.items():

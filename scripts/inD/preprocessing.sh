@@ -25,10 +25,10 @@ python -m utils.split_dataset --data_dir data/inD-dataset-v1.0/filter/longterm/a
 
 
 
-# Construct shor-term data 
-python -m utils.inD_dataset --raw_data_filename data_8_12_2_5fps.pkl --step 10 --window_size 20 --stride 20 --obs_len 8 --labels car --filter_data_dir data/inD-dataset-v1.0/filter/shortterm 
+# Construct short-term data 
+python -m utils.inD_dataset --raw_data_filename data_8_12_2_5fps.pkl --step 10 --window_size 20 --stride 20 --obs_len 8 --labels pedestrian --filter_data_dir data/inD-dataset-v1.0/filter/shortterm 
 
-# Experiment: ind car to truck 
+# Experiment: short-term cars and trucks 
 python -m utils.inD_dataset --reload --raw_data_filename data_8_12_2_5fps.pkl --step 10 --window_size 20 --stride 20 --obs_len 8 --labels car truck_bus --selected_scenes scene1
 
 python -m utils.filter_dataset --data_path data/inD-dataset-v1.0/filter/shortterm/agent_type/scene1/car.pkl --varf_path data/inD-dataset-v1.0/data/varf_8_12_2_5fps.pkl --lower_bound 0.2
@@ -40,13 +40,25 @@ python -m utils.split_dataset --data_dir data/inD-dataset-v1.0/filter/shortterm/
 python -m utils.split_dataset --data_dir data/inD-dataset-v1.0/filter/shortterm/agent_type/scene1 --data_filename truck_bus_filter.pkl --val_split 40 --test_split 97 --seed 1 
 
 
-# Experiment: sdd to ind
-python -m utils.inD_dataset --reload --additional_data_dir /data/dli-data/inD-dataset-v1.0/data --raw_data_dir /data/dli-data/inD-dataset-v1.0/data --raw_data_filename data_8_12_2_5fps.pkl --filter_data_dir /data/dli-data/inD-dataset-v1.0/filter/shortterm --step 10 --window_size 20 --stride 20 --obs_len 8 --labels pedestrian --selected_scenes scene1 scene2 scene3 scene4
+# Experiment: short-term pedestrians 
+python -m utils.inD_dataset --reload --additional_data_dir data/inD-dataset-v1.0/data --raw_data_dir data/inD-dataset-v1.0/data --raw_data_filename data_8_12_2_5fps.pkl --filter_data_dir data/inD-dataset-v1.0/filter/shortterm --step 10 --window_size 20 --stride 20 --obs_len 8 --labels pedestrian --selected_scenes scene1 scene2 scene3 scene4
 
-mv /data/dli-data/inD-dataset-v1.0/filter/shortterm/agent_type/scene1__scene2__scene3__scene4 /data/dli-data/inD-dataset-v1.0/filter/shortterm/agent_type/scene1234
+mv data/inD-dataset-v1.0/filter/shortterm/agent_type/scene1__scene2__scene3__scene4 data/inD-dataset-v1.0/filter/shortterm/agent_type/scene1234
 
-python -m utils.split_dataset --data_dir /data/dli-data/inD-dataset-v1.0/filter/shortterm/agent_type/scene1 --data_filename pedestrian.pkl --val_split 100 --test_split 344 --seed 1  # 1044
+python -m utils.filter_dataset --data_path data/inD-dataset-v1.0/filter/shortterm/agent_type/scene1/pedestrian.pkl --varf_path data/inD-dataset-v1.0/data/varf_8_12_2_5fps.pkl --lower_bound 0.2 
 
-python -m utils.filter_dataset --data_path /data/dli-data/inD-dataset-v1.0/filter/shortterm/agent_type/scene1/pedestrian.pkl --varf_path /data/dli-data/inD-dataset-v1.0/data/varf_8_12_2_5fps.pkl --lower_bound 0.2 
+python -m utils.split_dataset --data_dir data/inD-dataset-v1.0/filter/shortterm/agent_type/scene1 --data_filename pedestrian_filter.pkl --val_split 100 --test_split 524 --seed 1  # 704
 
-python -m utils.split_dataset --data_dir /data/dli-data/inD-dataset-v1.0/filter/shortterm/agent_type/scene1 --data_filename pedestrian_filter.pkl --val_split 100 --test_split 300 --seed 1  # 704
+mv data/inD-dataset-v1.0/filter/shortterm/agent_type/scene1/pedestrian_filter data/inD-dataset-v1.0/filter/shortterm/agent_type/scene1/pedestrian_filter_s1_t524
+
+python -m utils.split_dataset --data_dir data/inD-dataset-v1.0/filter/shortterm/agent_type/scene1 --data_filename pedestrian_filter.pkl --val_split 100 --test_split 524 --seed 2  # 704
+
+mv data/inD-dataset-v1.0/filter/shortterm/agent_type/scene1/pedestrian_filter data/inD-dataset-v1.0/filter/shortterm/agent_type/scene1/pedestrian_filter_s2_t524
+
+python -m utils.split_dataset --data_dir data/inD-dataset-v1.0/filter/shortterm/agent_type/scene1 --data_filename pedestrian_filter.pkl --val_split 100 --test_split 300 --seed 1  # 704
+
+mv data/inD-dataset-v1.0/filter/shortterm/agent_type/scene1/pedestrian_filter data/inD-dataset-v1.0/filter/shortterm/agent_type/scene1/pedestrian_filter_s1_t300
+
+python -m utils.split_dataset --data_dir data/inD-dataset-v1.0/filter/shortterm/agent_type/scene1 --data_filename pedestrian_filter.pkl --val_split 100 --test_split 524 --seed 3  # 704
+
+mv data/inD-dataset-v1.0/filter/shortterm/agent_type/scene1/pedestrian_filter data/inD-dataset-v1.0/filter/shortterm/agent_type/scene1/pedestrian_filter_s3_t524

@@ -19,6 +19,7 @@ def get_experiment_name(args, n_data):
         experiment += f'__TrN_{n_data}'
         experiment += f'__lr_{np.format_float_positional(args.lr, trim="-")}'
         if args.smooth_val: experiment += '__smooth'
+        if args.n_early_stop < args.n_epoch: experiment += f'__early_{args.n_early_stop}'
         if args.augment: experiment += '__AUG'
         if args.ynet_bias: experiment += '__bias'
 
