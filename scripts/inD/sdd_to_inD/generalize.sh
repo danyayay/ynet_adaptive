@@ -1,5 +1,5 @@
 # config 
-list_eval_seed=(1) 
+list_eval_seed=(1 2 3) 
 batch_size=10
 n_round=3
 config_filename=inD_shortterm_eval.yaml
@@ -12,7 +12,7 @@ ckpts=ckpts/sdd__ynet__ped.pt
 ckpts_name=OODG
 
 # data path 
-dataset_path=filter/shortterm/agent_type/scene1/pedestrian_filter
+dataset_path=filter/shortterm/agent_type/scene1/pedestrian_filter_s1_t524
 load_data=predefined
 
 

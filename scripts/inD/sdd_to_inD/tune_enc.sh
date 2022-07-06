@@ -18,7 +18,7 @@ dataset_path=filter/shortterm/agent_type/scene1/pedestrian_filter_s1_t524
 load_data=predefined
 
 # fine-tune setting 
-train_net=all
+train_net=encoder
 list_n_train_batch=(2 4 8) 
 list_lr=(0.00005)
 
