@@ -62,3 +62,17 @@ mv data/inD-dataset-v1.0/filter/shortterm/agent_type/scene1/pedestrian_filter da
 python -m utils.split_dataset --data_dir data/inD-dataset-v1.0/filter/shortterm/agent_type/scene1 --data_filename pedestrian_filter.pkl --val_split 100 --test_split 524 --seed 3  # 704
 
 mv data/inD-dataset-v1.0/filter/shortterm/agent_type/scene1/pedestrian_filter data/inD-dataset-v1.0/filter/shortterm/agent_type/scene1/pedestrian_filter_s3_t524
+
+
+
+# experiment: biker
+python -m utils.inD_dataset --reload --additional_data_dir data/inD-dataset-v1.0/data --raw_data_dir data/inD-dataset-v1.0/data --raw_data_filename data_8_12_2_5fps.pkl --filter_data_dir data/inD-dataset-v1.0/filter/shortterm --step 10 --window_size 20 --stride 20 --obs_len 8 --labels bicycle --selected_scenes scene1 scene2 scene3 scene4
+
+mv data/inD-dataset-v1.0/filter/shortterm/agent_type/scene1__scene2__scene3__scene4/bicycle.pkl data/inD-dataset-v1.0/filter/shortterm/agent_type/scene1234/bicycle.pkl 
+
+# unfiltered 
+# scene_id = scene1, label = bicycle, #= 125
+# scene_id = scene2, label = bicycle, #= 503
+# scene_id = scene3, label = bicycle, #= 2584
+# scene_id = scene4, label = bicycle, #= 41
+# total = 3253
