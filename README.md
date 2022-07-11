@@ -1,8 +1,18 @@
 # Motion Style Transfer
 
+
+**[`Paper`](link) | [`Video`](link) | [`Poster`](link)**
+
 This is an implementation of the paper
 
 **Motion Style Transfer: Modular Low-Rank Adaptation for Deep Motion Forecasting**
+<br>
+<a href="https://thedebugger811.github.io">Parth Kothari*</a>, 
+<a href="https://people.epfl.ch/danya.li/?lang=en">Danya Li*</a>, 
+<a href="https://sites.google.com/view/yuejiangliu">Yuejiang Liu</a>,
+<a href="https://people.epfl.ch/alexandre.alahi/?lang=en/">Alexandre Alahi</a>
+<br>
+École Polytechnique Fédérale de Lausanne (EPFL)
 
 *Under Review*
 
@@ -92,3 +102,20 @@ The above experiments correpond to scripts as follows:
 | Modular Style Adapter (Agent motion) | `scripts/sdd/biker_low_to_high/` |
 
 In each folder, scripts for pretraininng, generalizing, baseline fine-tuning, and MoSA fine-tuning are provided. 
+
+
+## Qualitative Results
+
+We present three examples from motion style transfer across agents (pedestrians to bikers) on SDD. Each of the figures below illustrates the difference in goal decoder output of Y-Net on the adaptation of pedestrian-trained model using our proposed style-injection modules, where red means increased focus and blue means decreased focus. 
+Adapted Y-Net successfully learns the style differences between the behavior of pedestrians and bikers:
+* it correctly infers valid areas of traversal (move on bikerways instead of sidewalks)
+* it updates the motion style parameters (new goal position is farther than old one)
+* it effectively captures bikers' multimodality 
+
+
+
+<p float="left">
+  <img src="docs/5358__lora_1[0_1_2_3_4](20)__goal_decoder.predictor_output__diff_single__0.15.jpg" width="180" />
+  <img src="docs/5883__lora_1[0_1_2_3_4](20)__goal_decoder.predictor_output__diff_single__0.15.jpg" width="180" /> 
+  <img src="docs/5982__lora_1[0_1_2_3_4](20)__goal_decoder.predictor_output__diff_single__0.15.jpg" width="180" />
+</p>
