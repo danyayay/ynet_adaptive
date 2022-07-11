@@ -5,8 +5,8 @@ import pandas as pd
 from utils.util import get_position
 
 
-def extract_train_msg(test_msg):
-    msg_split = re.split('save_every_n', test_msg)[1:]
+def extract_train_msg(msgs):
+    msg_split = re.split('save_every_n', msgs)[1:]
     df = pd.DataFrame(columns=['seed', 'pretrained_ckpt', 'experiment', 'n_param', 'n_epoch', 'ade', 'fde'])
     for msg in msg_split: 
         seed = re.search("'seed': ([\d+]),", msg)
