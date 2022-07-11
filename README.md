@@ -115,7 +115,7 @@ Adapted Y-Net successfully learns the style differences between the behavior of 
 
 
 <p float="left">
-  <img src="docs/5358__lora_1[0_1_2_3_4](20)__goal_decoder.predictor_output__diff_single__0.15.jpg" width="180" />
-  <img src="docs/5883__lora_1[0_1_2_3_4](20)__goal_decoder.predictor_output__diff_single__0.15.jpg" width="180" /> 
-  <img src="docs/5982__lora_1[0_1_2_3_4](20)__goal_decoder.predictor_output__diff_single__0.15.jpg" width="180" />
+  <img src="docs/5358__lora_1[0_1_2_3_4](20)__goal_decoder.predictor_output__diff_single__0.15.jpg" width="250" />
+  <img src="docs/5883__lora_1[0_1_2_3_4](20)__goal_decoder.predictor_output__diff_single__0.15.jpg" width="250" /> 
+  <img src="docs/5982__lora_1[0_1_2_3_4](20)__goal_decoder.predictor_output__diff_single__0.15.jpg" width="250" />
 </p>

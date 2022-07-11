@@ -57,7 +57,7 @@ if __name__ == "__main__":
         help='Path to the scene images and variation factor file')
     parser.add_argument('--raw_data_dir', default='data/sdd/raw', type=str, 
         help='Path to the raw data, can be a subset of the entire dataset')
-    parser.add_argument('--raw_data_filename', default='data.pkl', type=str)
+    parser.add_argument('--raw_data_filename', default='data_8_12_2_5fps.pkl', type=str)
     parser.add_argument('--filter_data_dir', default='data/sdd/filter/shortterm', type=str)
 
     parser.add_argument('--reload', action='store_true')
