@@ -87,9 +87,9 @@ There are 5 sets of experiments provided in our paper:
 |----------|--------|----------|--------|----------|--------|
 | Motion Style Transfer across Agents | SDD | Y-Net | short-term | pedestrians (all scenes) | bikers (deathCircle_0) |
 | Motion Style Transfer across Scenes | inD | Y-Net | long-term | pedestrians (scenes=2,3,4) | pedestrians (scenes=1) | 
-| Modular Style Adapter (Agent motion) | inD | Y-Net-Mod | long-term |cars (scenes=1) | trucks (scenes=1) | 
-| Modular Style Adapter (Scene) | inD | Y-Net-Mod | short-term | pedestrians (scenes=2,3,4) | pedestrians (scenes=1) |
-| Modular Style Adapter (Agent motion) | SDD | Y-Net-Mod | shot-term | bikers (low speed) | bikers (high speed)
+| Modular Style Adapter (Agent motion) | inD | Y-Net-Mod | short-term |cars (scenes=1) | trucks (scenes=1) | 
+| Modular Style Adapter (Scene) | inD | Y-Net-Mod | long-term | pedestrians (scenes=2,3,4) | pedestrians (scenes=1) |
+| Modular Style Adapter (Agent motion) | SDD | Y-Net-Mod | short-term | bikers (low speed) | bikers (high speed)
 
 The above experiments correpond to scripts as follows:
 
