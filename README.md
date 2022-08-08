@@ -1,7 +1,7 @@
 # Motion Style Transfer
 
 
-**[`Paper`](link) | [`Video`](link) | [`Poster`](link)**
+**[`Paper`](https://learn-to-race.org/workshop-sl4ad-icml2022/assets/papers/paper_19.pdf) | [`Teaser`](https://drive.google.com/file/d/1f6E4GjVnd006udfVCrU88y0TIm12Ps8u/view?usp=sharing) | [`Video`](https://drive.google.com/file/d/1lkNXW1BbkB6cWD0-3r5gs8w-zoHNwPPj/view?usp=sharing) | [`Poster`](https://drive.google.com/file/d/10JXVbmUOo5BAxeBI4YP5EAxkoHL9AJ19/view?usp=sharing)**
 
 This is an implementation of the paper
 
