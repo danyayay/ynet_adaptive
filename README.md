@@ -14,7 +14,7 @@ This is an implementation of the paper
 <br>
 École Polytechnique Fédérale de Lausanne (EPFL)
 
-*Under Review*
+*Accepted to CoRL 2022*
 
 
 ## Overview
