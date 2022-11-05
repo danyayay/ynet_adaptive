@@ -1,14 +1,14 @@
 # Motion Style Transfer
 
 
-**[`Paper`](https://learn-to-race.org/workshop-sl4ad-icml2022/assets/papers/paper_19.pdf) | [`Teaser`](https://drive.google.com/file/d/1f6E4GjVnd006udfVCrU88y0TIm12Ps8u/view?usp=sharing) | [`Video`](https://drive.google.com/file/d/1lkNXW1BbkB6cWD0-3r5gs8w-zoHNwPPj/view?usp=sharing) | [`Poster`](https://drive.google.com/file/d/10JXVbmUOo5BAxeBI4YP5EAxkoHL9AJ19/view?usp=sharing)**
+**[`Paper`](https://openreview.net/pdf?id=tVgD4METs6o) | [`Teaser`](https://drive.google.com/file/d/1f6E4GjVnd006udfVCrU88y0TIm12Ps8u/view?usp=sharing) | [`Video`](https://drive.google.com/file/d/1lkNXW1BbkB6cWD0-3r5gs8w-zoHNwPPj/view?usp=sharing) | [`Poster`](https://drive.google.com/file/d/10JXVbmUOo5BAxeBI4YP5EAxkoHL9AJ19/view?usp=sharing)**
 
 This is an implementation of the paper
 
 **Motion Style Transfer: Modular Low-Rank Adaptation for Deep Motion Forecasting**
 <br>
-<a href="https://thedebugger811.github.io">Parth Kothari*</a>, 
-<a href="https://people.epfl.ch/danya.li/?lang=en">Danya Li*</a>, 
+<a href="https://thedebugger811.github.io">Parth Kothari</a>, 
+<a href="https://people.epfl.ch/danya.li/?lang=en">Danya Li</a>, 
 <a href="https://sites.google.com/view/yuejiangliu">Yuejiang Liu</a>,
 <a href="https://people.epfl.ch/alexandre.alahi/?lang=en/">Alexandre Alahi</a>
 <br>
